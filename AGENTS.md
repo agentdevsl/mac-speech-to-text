@@ -46,15 +46,16 @@
 
 ## Tech Stack
 
-| Layer           | Technology      | Notes                 |
-| --------------- | --------------- | --------------------- |
-| Language        | TypeScript 5.7+ | Strict mode, ESM      |
-| Runtime         | Node.js 24+     | LTS, native ESM       |
-| Testing         | Vitest          | Fast, Vite-compatible |
-| Linting         | ESLint 9        | Flat config           |
-| Formatting      | Prettier 3      | Consistent style      |
-| Package Manager | npm             | Or pnpm/yarn          |
-| CI/CD           | GitHub Actions  | Lint, test, deploy    |
+| Layer           | Technology      | Notes                      |
+| --------------- | --------------- | -------------------------- |
+| Language        | TypeScript 5.7+ | Strict mode, ESM           |
+| Runtime         | Bun 1.35+       | Fast runtime, native ESM   |
+| Testing         | Vitest          | Fast, Vite-compatible      |
+| Linting         | ESLint 9        | Flat config                |
+| Formatting      | Prettier 3      | Consistent style           |
+| Package Manager | Bun             | Preferred over npm/yarn    |
+| Git Hooks       | pre-commit      | Automated code quality     |
+| CI/CD           | GitHub Actions  | Lint, test, deploy         |
 
 ---
 
@@ -389,25 +390,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '20'
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
       - name: Type check
-        run: npm run typecheck
+        run: bun run typecheck
 
       - name: Lint
-        run: npm run lint
+        run: bun run lint
 
       - name: Format check
-        run: npm run format:check
+        run: bun run format:check
 
       - name: Test
-        run: npm run test:coverage
+        run: bun run test:coverage
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -435,18 +435,22 @@ jobs:
 
 ```bash
 # Development
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run typecheck    # Check types
+bun run dev          # Start development server
+bun run build        # Build for production
+bun run typecheck    # Check types
 
 # Quality
-npm run lint         # Run ESLint
-npm run lint:fix     # Fix lint issues
-npm run format       # Format with Prettier
-npm run format:check # Check formatting
+bun run lint         # Run ESLint
+bun run lint:fix     # Fix lint issues
+bun run format       # Format with Prettier
+bun run format:check # Check formatting
 
 # Testing
-npm run test         # Run tests
-npm run test:watch   # Watch mode
-npm run test:coverage # With coverage
+bun run test         # Run tests
+bun run test:watch   # Watch mode
+bun run test:coverage # With coverage
+
+# Pre-commit hooks
+pre-commit install   # Install git hooks
+pre-commit run --all-files  # Run all hooks manually
 ```
