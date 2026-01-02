@@ -1,0 +1,99 @@
+# Pre-commit hooks for TypeScript/Node.js web development
+#
+# Install: pre-commit install --hook-type pre-commit --hook-type pre-push
+# Run manually: pre-commit run --all-files
+# Update hooks: pre-commit autoupdate
+#
+# Requirements:
+#   Node.js 20+: npm install
+repos:
+  # ESLint - TypeScript/JavaScript linting (auto-fix on commit)
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        description: Lints TypeScript/JavaScript files
+        entry: npx eslint --fix
+        language: system
+        types_or: [javascript, jsx, ts, tsx]
+        pass_filenames: true
+        stages: [pre-commit]
+
+  # Prettier - Code formatting (auto-fix on commit)
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier
+        description: Formats code with Prettier
+        entry: npx prettier --write --ignore-unknown
+        language: system
+        types_or: [javascript, jsx, ts, tsx, json, markdown, yaml]
+        pass_filenames: true
+        stages: [pre-commit]
+
+  # TypeScript type checking
+  - repo: local
+    hooks:
+      - id: typecheck
+        name: TypeScript Type Check
+        description: Runs TypeScript compiler for type checking (CI-consistent)
+        entry: npm run typecheck
+        language: system
+        types: [ts, tsx]
+        pass_filenames: false
+        stages: [pre-commit]
+
+  # Pre-push: Full CI-equivalent checks (no auto-fix, all files)
+  - repo: local
+    hooks:
+      - id: lint-check
+        name: Lint Check (CI)
+        description: Runs ESLint on all files without fixing
+        entry: npm run lint
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: format-check
+        name: Format Check (CI)
+        description: Checks formatting on all files
+        entry: npm run format:check
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint-fix
+        name: Lint Markdown
+
+  # Secret scanning
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.22.1
+    hooks:
+      - id: gitleaks
+        name: Detect secrets
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
