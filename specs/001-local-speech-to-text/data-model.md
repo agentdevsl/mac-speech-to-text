@@ -413,8 +413,8 @@ interface StreamingAudioBuffer {
 **Lifecycle**:
 1. Created when recording starts
 2. Updated every 100ms with new audio chunk
-3. Analyzed for VAD (voice activity detection)
-4. Sent to Python ML backend for transcription
+3. Analyzed for VAD (voice activity detection via FluidAudio)
+4. Sent to FluidAudio Swift SDK for transcription
 5. Cleared after transcription completes
 
 **Memory Management**:
@@ -513,15 +513,16 @@ interface StreamingAudioBuffer {
 │  │  - ml_backend: Arc<Mutex<MLBackend>>     │     │           │
 │  │  - swift_bridge: Arc<Mutex<SwiftBridge>> │     │           │
 │  └──────────────────────────────────────────┘     │           │
-│       │                           │                │           │
-│       │ (Swift FFI)               │ (JSON-RPC)     │           │
-│       ▼                           ▼                │           │
-│  ┌─────────────┐           ┌──────────────┐       │           │
-│  │Swift Native │           │Python Process│       │           │
-│  │- Hotkey     │           │- Transcriber │       │           │
-│  │- Audio      │           │- ModelMgr    │       │           │
-│  │- Text Insert│           │- VAD         │       │           │
-│  └─────────────┘           └──────────────┘       │           │
+│       │                                             │           │
+│       │ (Swift FFI)                               │           │
+│       ▼                                           │           │
+│  ┌──────────────────────────────────┐             │           │
+│  │   Swift Native + FluidAudio      │             │           │
+│  │   - Hotkey                       │             │           │
+│  │   - FluidAudio (ASR + VAD)       │             │           │
+│  │   - Text Insert                  │             │           │
+│  │   - Model Management             │             │           │
+│  └──────────────────────────────────┘             │           │
 └────────────────────────────────────────────────────┼───────────┘
                                                      │
 ┌────────────────────────────────────────────────────┼───────────┐
