@@ -13,7 +13,7 @@
 - **Better performance**: <10ms hotkey latency vs ~30ms, native 120fps rendering
 - **Native macOS integration**: `.ultraThinMaterial` frosted glass, native animations, perfect ProMotion support
 
-**Tests**: Tests are NOT explicitly requested in the specification. Testing tasks have been EXCLUDED. Manual testing via SwiftUI Previews and Xcode debugging is expected during development.
+**Tests**: TDD methodology per constitution Section VI.1 is MANDATORY. Test tasks follow RED-GREEN-REFACTOR pattern. Each implementation task has corresponding XCTest file written BEFORE implementation (RED phase). Tests in `/workspace/Tests/SpeechToTextTests/` directory.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -102,6 +102,8 @@
 - [ ] T030 [US1] Implement modal dismissal on Escape key or outside click in RecordingModal view
 - [ ] T031 [US1] Add error handling in RecordingViewModel for permission failures, transcription errors, and insertion failures
 - [ ] T032 [US1] Add clipboard fallback in TextInsertionService when no active text field detected
+- [ ] T085 [US1] Add progress indicator to RecordingModal for recordings >10 seconds showing elapsed time and transcription status (FR-017)
+- [ ] T086 [US1] Implement microphone disconnection detection and recovery in AudioCaptureService with user notification and auto-resume (FR-022)
 
 **Checkpoint**: User Story 1 complete - user can dictate text via global hotkey with automatic insertion. This is the MVP!
 
