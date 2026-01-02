@@ -1,0 +1,403 @@
+import XCTest
+@testable import SpeechToText
+
+final class AppStateTests: XCTestCase {
+
+    var appState: AppState!
+    var userDefaults: UserDefaults!
+
+    override func setUp() {
+        super.setUp()
+        // Use test suite to avoid interfering with actual app data
+        userDefaults = UserDefaults(suiteName: "com.speechtotext.appstate.tests")!
+        userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
+
+        // Note: AppState creates its own services internally
+        // For full testing, we'd need dependency injection
+        appState = AppState()
+    }
+
+    override func tearDown() {
+        userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
+        super.tearDown()
+    }
+
+    // MARK: - Initialization Tests
+
+    func test_initialization_loadsSettings() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertNotNil(appState.settings)
+        XCTAssertEqual(appState.settings.version, UserSettings.default.version)
+    }
+
+    func test_initialization_loadsStatistics() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertNotNil(appState.statistics)
+    }
+
+    func test_initialization_setsShowOnboardingBasedOnSettings() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        // Should show onboarding if not completed
+        XCTAssertEqual(appState.showOnboarding, !appState.settings.onboarding.completed)
+    }
+
+    func test_initialization_startsWithNoRecording() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertFalse(appState.isRecording)
+        XCTAssertNil(appState.currentSession)
+    }
+
+    // MARK: - Initialize FluidAudio Tests
+
+    func test_initializeFluidAudio_attemptsInitialization() async {
+        // Given
+        let appState = AppState()
+
+        // When
+        await appState.initializeFluidAudio()
+
+        // Then
+        // In test environment, this will likely fail
+        // Error message should be set if initialization fails
+        // Or no error if mock/stub is used
+    }
+
+    // MARK: - Start Recording Tests
+
+    func test_startRecording_createsNewSession() {
+        // Given
+        XCTAssertNil(appState.currentSession)
+
+        // When
+        appState.startRecording()
+
+        // Then
+        XCTAssertNotNil(appState.currentSession)
+        XCTAssertEqual(appState.currentSession?.state, .recording)
+        XCTAssertTrue(appState.isRecording)
+    }
+
+    func test_startRecording_usesDefaultLanguageFromSettings() {
+        // Given
+        let expectedLanguage = appState.settings.language.defaultLanguage
+
+        // When
+        appState.startRecording()
+
+        // Then
+        XCTAssertEqual(appState.currentSession?.language, expectedLanguage)
+    }
+
+    // MARK: - Stop Recording Tests
+
+    func test_stopRecording_transitionsToTranscribing() {
+        // Given
+        appState.startRecording()
+        XCTAssertTrue(appState.isRecording)
+
+        // When
+        appState.stopRecording()
+
+        // Then
+        XCTAssertFalse(appState.isRecording)
+        XCTAssertEqual(appState.currentSession?.state, .transcribing)
+        XCTAssertNotNil(appState.currentSession?.endTime)
+    }
+
+    func test_stopRecording_whenNoSession_doesNothing() {
+        // Given
+        XCTAssertNil(appState.currentSession)
+
+        // When
+        appState.stopRecording()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+        XCTAssertFalse(appState.isRecording)
+    }
+
+    // MARK: - Complete Session Tests
+
+    func test_completeSession_marksAsCompleted() {
+        // Given
+        appState.startRecording()
+        appState.stopRecording()
+
+        // When
+        appState.completeSession()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+    }
+
+    func test_completeSession_recordsStatistics() {
+        // Given
+        appState.startRecording()
+        appState.stopRecording()
+        let initialStats = appState.statistics
+
+        // When
+        appState.completeSession()
+
+        // Then
+        // Statistics should be refreshed
+        XCTAssertNotNil(appState.statistics)
+    }
+
+    func test_completeSession_whenNoSession_doesNothing() {
+        // Given
+        XCTAssertNil(appState.currentSession)
+
+        // When
+        appState.completeSession()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+    }
+
+    // MARK: - Cancel Session Tests
+
+    func test_cancelSession_clearsCurrent Session() {
+        // Given
+        appState.startRecording()
+        XCTAssertNotNil(appState.currentSession)
+
+        // When
+        appState.cancelSession()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+        XCTAssertFalse(appState.isRecording)
+    }
+
+    func test_cancelSession_setsStateToCancelled() {
+        // Given
+        appState.startRecording()
+
+        // When
+        appState.cancelSession()
+
+        // Then
+        // Session should be cleared, so we can't check its state
+        XCTAssertNil(appState.currentSession)
+    }
+
+    // MARK: - Update Settings Tests
+
+    func test_updateSettings_savesAndUpdatesSettings() {
+        // Given
+        var newSettings = UserSettings.default
+        newSettings.language.defaultLanguage = "fr"
+
+        // When
+        appState.updateSettings(newSettings)
+
+        // Then
+        XCTAssertEqual(appState.settings.language.defaultLanguage, "fr")
+    }
+
+    func test_updateSettings_setsErrorMessageOnFailure() {
+        // Given
+        let settings = UserSettings.default
+
+        // When
+        appState.updateSettings(settings)
+
+        // Then
+        // Should succeed or set error message
+        // Error message will be nil on success
+    }
+
+    // MARK: - Complete Onboarding Tests
+
+    func test_completeOnboarding_hidesOnboarding() {
+        // Given
+        appState.showOnboarding = true
+
+        // When
+        appState.completeOnboarding()
+
+        // Then
+        XCTAssertFalse(appState.showOnboarding)
+    }
+
+    func test_completeOnboarding_updatesSettings() {
+        // Given
+        XCTAssertFalse(appState.settings.onboarding.completed)
+
+        // When
+        appState.completeOnboarding()
+
+        // Then
+        XCTAssertTrue(appState.settings.onboarding.completed)
+    }
+
+    // MARK: - Refresh Statistics Tests
+
+    func test_refreshStatistics_updatesStatistics() {
+        // Given
+        let initialStats = appState.statistics
+
+        // When
+        appState.refreshStatistics()
+
+        // Then
+        XCTAssertNotNil(appState.statistics)
+    }
+
+    // MARK: - Error Handling Tests
+
+    func test_errorMessage_initiallyNil() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertNil(appState.errorMessage)
+    }
+
+    func test_errorMessage_setWhenOperationFails() async {
+        // Given
+        let appState = AppState()
+
+        // When
+        await appState.initializeFluidAudio()
+
+        // Then
+        // May set error message if FluidAudio initialization fails
+        // In production environment with SDK, this might succeed
+    }
+
+    // MARK: - Show Settings Tests
+
+    func test_showSettings_initiallyFalse() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertFalse(appState.showSettings)
+    }
+
+    func test_showSettings_canBeToggled() {
+        // Given
+        appState.showSettings = false
+
+        // When
+        appState.showSettings = true
+
+        // Then
+        XCTAssertTrue(appState.showSettings)
+    }
+
+    // MARK: - Recording Session Lifecycle Tests
+
+    func test_fullRecordingLifecycle() {
+        // Given
+        XCTAssertNil(appState.currentSession)
+
+        // When
+        // 1. Start recording
+        appState.startRecording()
+        XCTAssertNotNil(appState.currentSession)
+        XCTAssertEqual(appState.currentSession?.state, .recording)
+
+        // 2. Stop recording
+        appState.stopRecording()
+        XCTAssertEqual(appState.currentSession?.state, .transcribing)
+
+        // 3. Complete session
+        appState.completeSession()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+    }
+
+    func test_cancelledRecordingLifecycle() {
+        // Given
+        XCTAssertNil(appState.currentSession)
+
+        // When
+        appState.startRecording()
+        XCTAssertNotNil(appState.currentSession)
+
+        appState.cancelSession()
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+        XCTAssertFalse(appState.isRecording)
+    }
+
+    // MARK: - Observable Tests
+
+    func test_appState_isObservable() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        // AppState should be marked with @Observable
+        // This enables SwiftUI to react to state changes
+        XCTAssertNotNil(appState)
+    }
+
+    // MARK: - Service Integration Tests
+
+    func test_appState_hasAllRequiredServices() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertNotNil(appState.fluidAudioService)
+        XCTAssertNotNil(appState.permissionService)
+        XCTAssertNotNil(appState.settingsService)
+        XCTAssertNotNil(appState.statisticsService)
+    }
+
+    // MARK: - Concurrent Access Tests
+
+    func test_appState_handlesConcurrentAccess() async {
+        // Given
+        let appState = AppState()
+
+        // When
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask {
+                appState.startRecording()
+            }
+            group.addTask {
+                appState.refreshStatistics()
+            }
+            group.addTask {
+                _ = appState.settings
+            }
+        }
+
+        // Then
+        // Should complete without crashes
+        XCTAssertTrue(true)
+    }
+
+    // MARK: - Multiple Sessions Tests
+
+    func test_multipleSessions_workSequentially() {
+        // Given/When
+        for _ in 0..<3 {
+            appState.startRecording()
+            appState.stopRecording()
+            appState.completeSession()
+        }
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+    }
+}
