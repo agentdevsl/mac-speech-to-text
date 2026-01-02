@@ -2,9 +2,9 @@
 
 **Feature Branch**: `001-local-speech-to-text`
 **Created**: 2026-01-02
-**Updated**: 2026-01-02 (Updated to use FluidAudio Swift SDK)
+**Updated**: 2026-01-02 (Pure Swift + SwiftUI Architecture)
 **Status**: Draft
-**Input**: User description: "Build a macOS local speech-to-text application with a beautiful, privacy-focused design. The app should be invisible until triggered by a global hotkey (⌘⌃Space), then appear with an elegant recording modal. Key features: Tauri 2.0 + React + TypeScript frontend, FluidAudio Swift SDK for local ML inference on Apple Silicon with Parakeet TDT v3, Swift for native APIs (global hotkeys, audio capture, text insertion), 'Warm Minimalism' design aesthetic with frosted glass UI, Real-time audio waveform visualization, Automatic text insertion into active applications, Settings for hotkey customization, language selection, Onboarding flow with permission requests, Menu bar integration with quick stats, Complete privacy - 100% local processing via Apple Neural Engine"
+**Input**: User description: "Build a macOS local speech-to-text application with a beautiful, privacy-focused design. The app should be invisible until triggered by a global hotkey (⌘⌃Space), then appear with an elegant recording modal. Key features: Pure Swift + SwiftUI frontend with native macOS design, FluidAudio Swift SDK for local ML inference on Apple Silicon with Parakeet TDT v3, 'Warm Minimalism' design aesthetic with frosted glass UI (.ultraThinMaterial), Real-time audio waveform visualization, Automatic text insertion into active applications, Settings for hotkey customization and language selection, Onboarding flow with permission requests, Menu bar integration with quick stats, Complete privacy - 100% local processing via Apple Neural Engine"
 
 ## User Scenarios & Testing
 
@@ -150,7 +150,7 @@ A multilingual user wants to dictate in different languages depending on context
 - **FR-022**: System MUST gracefully handle microphone disconnection with error messaging and recovery options
 - **FR-023**: Users MUST be able to adjust audio sensitivity threshold for silence detection
 - **FR-024**: System MUST prevent multiple app instances from running simultaneously
-- **FR-025**: System MUST apply "Warm Minimalism" design aesthetic with frosted glass UI effects
+- **FR-025**: System MUST apply "Warm Minimalism" design aesthetic with native SwiftUI frosted glass effects (.ultraThinMaterial)
 
 ### Key Entities
 

@@ -2,7 +2,7 @@
 
 **Feature**: 001-local-speech-to-text - macOS Local Speech-to-Text Application
 **Date**: 2026-01-02
-**Updated**: 2026-01-02 (FluidAudio SDK)
+**Updated**: 2026-01-02 (Pure Swift + SwiftUI Architecture)
 **Prerequisites**: macOS 12.0+, Apple Silicon (M1/M2/M3/M4)
 
 ---
@@ -24,11 +24,11 @@
 ### Hardware
 - **Apple Silicon Mac** (M1, M2, M3, or M4) - Required for Apple Neural Engine
 - Minimum 8GB RAM (16GB recommended)
-- 3GB free disk space (development tools + FluidAudio models)
+- 3GB free disk space (Xcode + FluidAudio models)
 
 ### Software
 - macOS 12.0 (Monterey) or later
-- Xcode 14.0+ (for Swift compiler and macOS SDK)
+- Xcode 15.0+ (for Swift 5.9+ and SwiftUI)
 - Command Line Tools for Xcode
 
 ### Permissions (for testing)
@@ -40,71 +40,66 @@
 
 ## Development Environment Setup
 
-### Step 1: Install System Dependencies
+### Step 1: Install Xcode and Command Line Tools
 
 ```bash
-# Install Homebrew (if not already installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# Install Xcode from Mac App Store
+# Or download from https://developer.apple.com/xcode/
 
-# Install Rust toolchain (for Tauri)
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.cargo/env
-
-# Install Bun (for frontend development)
-curl -fsSL https://bun.sh/install | bash
-
-# Install Swift (comes with Xcode Command Line Tools)
+# Install Command Line Tools
 xcode-select --install
+
+# Verify Xcode installation
+xcodebuild -version
+# Should output: Xcode 15.0 or later
+
+# Verify Swift version
+swift --version
+# Should output: Swift 5.9 or later
 ```
 
-### Step 2: Install Tauri CLI
-
-```bash
-# Install Tauri 2.0 CLI
-cargo install tauri-cli --version "^2.0.0"
-
-# Verify installation
-cargo tauri --version
-# Should output: tauri-cli 2.x.x
-```
-
-### Step 3: Clone Repository and Install Dependencies
+### Step 2: Clone Repository
 
 ```bash
 # Clone repository
 git clone <repository-url>
 cd mac-speech-to-text
 
-# Install frontend dependencies
-cd src
-bun install
-
-# Verify Bun installation
-bun --version
-
-# Return to root
-cd ..
+# Verify project structure
+ls -la
+# Should see: SpeechToText.xcodeproj, Package.swift, Sources/, Tests/
 ```
 
-### Step 4: Build Swift Package with FluidAudio
+### Step 3: Resolve Swift Package Dependencies
 
 ```bash
-# Navigate to Swift package
-cd src-tauri/swift
-
-# Resolve Swift Package Manager dependencies (includes FluidAudio)
+# Resolve dependencies (includes FluidAudio SDK)
 swift package resolve
-
-# Build Swift package
-swift build -c release
 
 # Verify FluidAudio SDK is available
 swift package show-dependencies
 # Should show: FluidAudio v0.9.0 or later
 
-# Return to root
-cd ../..
+# Build Swift packages
+swift build
 ```
+
+### Step 4: Open Project in Xcode
+
+```bash
+# Open Xcode project
+open SpeechToText.xcodeproj
+
+# Or use Xcode's File > Open menu
+```
+
+In Xcode:
+1. Wait for Swift Package Manager to resolve dependencies (progress in status bar)
+2. Select target: **SpeechToText** (macOS)
+3. Select scheme: **SpeechToText** or **SpeechToText (Debug)**
+4. Verify build settings:
+   - Deployment Target: macOS 12.0 or later
+   - Architecture: Apple Silicon (arm64)
 
 ### Step 5: Grant Development Permissions
 
@@ -118,6 +113,14 @@ cd ../..
 # 3. Input monitoring permission (for global hotkeys)
 ```
 
+**Manual Permission Setup** (if script fails):
+1. **System Settings** > **Privacy & Security** > **Microphone**
+   - Enable **Xcode** or **SpeechToText.app**
+2. **System Settings** > **Privacy & Security** > **Accessibility**
+   - Enable **Xcode** or **SpeechToText.app**
+3. **System Settings** > **Privacy & Security** > **Input Monitoring**
+   - Enable **Xcode** or **SpeechToText.app**
+
 **Note**: FluidAudio will automatically download language models on first use. The English model (~500MB) will be cached locally in `~/Library/Application Support/FluidAudio/`.
 
 ---
@@ -126,194 +129,334 @@ cd ../..
 
 ```
 mac-speech-to-text/
-├── src/                         # React + TypeScript frontend
-│   ├── components/
-│   │   ├── RecordingModal/      # Main recording UI
-│   │   ├── Onboarding/          # First-time setup
-│   │   ├── Settings/            # Configuration screens
-│   │   └── Waveform/            # Audio visualization
-│   ├── services/
-│   │   ├── audio.service.ts     # Audio state management
-│   │   ├── settings.service.ts  # User preferences
-│   │   └── ipc.service.ts       # Tauri command wrappers
-│   ├── hooks/                   # React custom hooks
-│   ├── types/                   # TypeScript definitions
-│   └── App.tsx                  # Main React app
+├── SpeechToText.xcodeproj    # Xcode project
+├── Package.swift              # Swift Package Manager config
 │
-├── src-tauri/                   # Rust backend (Tauri core)
-│   ├── src/
-│   │   ├── main.rs              # Tauri app entry point
-│   │   ├── commands.rs          # IPC command handlers
-│   │   ├── swift_bridge.rs      # Swift FFI interop
-│   │   └── lib/                 # Shared utilities
-│   ├── swift/                   # Swift native + FluidAudio
-│   │   ├── Package.swift        # SPM configuration
-│   │   ├── Sources/
-│   │   │   ├── GlobalHotkey/    # Carbon API hotkeys
-│   │   │   ├── FluidAudioService/ # FluidAudio wrapper
-│   │   │   ├── TextInsertion/   # Accessibility API
-│   │   │   └── bridge.swift     # C ABI exports
-│   │   └── Tests/
-│   ├── Cargo.toml
-│   └── build.rs                 # Swift compilation integration
+├── Sources/
+│   ├── SpeechToTextApp/       # App entry point
+│   │   ├── SpeechToTextApp.swift   # @main entry
+│   │   ├── AppDelegate.swift       # Lifecycle, menu bar
+│   │   └── AppState.swift          # Observable state
+│   │
+│   ├── Views/                 # SwiftUI views
+│   │   ├── RecordingModal.swift    # Main recording UI
+│   │   ├── OnboardingView.swift    # First-time setup
+│   │   ├── SettingsView.swift      # Configuration
+│   │   ├── MenuBarView.swift       # Menu dropdown
+│   │   └── Components/
+│   │       ├── WaveformView.swift  # Audio visualization
+│   │       ├── PermissionCard.swift
+│   │       └── LanguagePicker.swift
+│   │
+│   ├── Services/              # Business logic
+│   │   ├── FluidAudioService.swift      # FluidAudio wrapper
+│   │   ├── HotkeyService.swift          # Global hotkeys
+│   │   ├── AudioCaptureService.swift    # Core Audio
+│   │   ├── TextInsertionService.swift   # Accessibility API
+│   │   ├── SettingsService.swift        # UserDefaults
+│   │   ├── StatisticsService.swift      # Usage tracking
+│   │   └── PermissionService.swift      # Permission checks
+│   │
+│   ├── Models/                # Data types
+│   │   ├── RecordingSession.swift
+│   │   ├── UserSettings.swift
+│   │   ├── LanguageModel.swift
+│   │   ├── UsageStatistics.swift
+│   │   └── AudioBuffer.swift
+│   │
+│   └── Utilities/             # Shared helpers
+│       ├── Extensions/
+│       │   ├── Color+Theme.swift
+│       │   └── View+Modifiers.swift
+│       └── Constants.swift
 │
-├── tests/                       # Integration tests
-│   ├── e2e/                     # End-to-end tests
-│   └── integration/             # Cross-layer tests
+├── Tests/
+│   ├── SpeechToTextTests/     # Unit tests (XCTest)
+│   │   ├── Services/
+│   │   │   ├── FluidAudioServiceTests.swift
+│   │   │   ├── HotkeyServiceTests.swift
+│   │   │   └── TextInsertionServiceTests.swift
+│   │   └── Models/
+│   │       └── RecordingSessionTests.swift
+│   │
+│   └── SpeechToTextUITests/   # UI tests (XCUITest)
+│       ├── OnboardingFlowTests.swift
+│       ├── RecordingFlowTests.swift
+│       └── SettingsTests.swift
 │
-└── scripts/                     # Build and dev tools
-    ├── setup-dev.sh             # Dev environment setup
-    └── build-swift.sh           # Swift module compilation
+├── Resources/
+│   ├── Assets.xcassets/       # Images, icons, colors
+│   ├── Sounds/                # Audio feedback
+│   └── Localizations/         # i18n (25 languages)
+│
+└── scripts/                   # Build and dev tools
+    ├── setup-dev.sh           # Dev environment setup
+    └── export-dmg.sh          # DMG creation
 ```
 
 ---
 
 ## Building the Application
 
-### Development Build
+### Development Build in Xcode
+
+1. **Open Project**: `open SpeechToText.xcodeproj`
+2. **Select Scheme**: SpeechToText (Debug)
+3. **Select Target Device**: My Mac (Apple Silicon)
+4. **Build and Run**: `Cmd + R` or Product > Run
+
+**SwiftUI Previews** (for rapid UI iteration):
+- Open any SwiftUI view file (e.g., `RecordingModal.swift`)
+- Click "Resume" in the preview pane (right side of Xcode)
+- Edit view code and see live updates
+
+### Command-Line Build
 
 ```bash
-# Full development build (frontend + Tauri + Swift)
-cargo tauri dev
+# Build for development (with debug symbols)
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -configuration Debug \
+  build
 
-# This will:
-# 1. Build Swift package (including FluidAudio)
-# 2. Compile Rust Tauri core
-# 3. Start Vite dev server for React frontend
-# 4. Launch the app with hot-reload enabled
+# Build for release (optimized)
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -configuration Release \
+  build
+
+# Output location
+ls -lh build/Release/SpeechToText.app
 ```
 
-### Production Build
+### Swift Package Manager Build (for testing)
 
 ```bash
-# Create optimized production build
-cargo tauri build
+# Build Swift packages independently
+swift build -c debug
 
-# Output locations:
-# - macOS App Bundle: src-tauri/target/release/bundle/macos/
-# - DMG Installer: src-tauri/target/release/bundle/dmg/
-```
-
-### Swift-Only Build (for testing)
-
-```bash
-cd src-tauri/swift
-
-# Build Swift package independently
+# Build for release
 swift build -c release
 
-# Run Swift tests
-swift test
+# Clean build artifacts
+swift package clean
+```
 
-cd ../..
+### Production Build (DMG Distribution)
+
+```bash
+# Create signed and notarized DMG
+./scripts/export-dmg.sh
+
+# This will:
+# 1. Build release configuration
+# 2. Code sign the app bundle
+# 3. Create DMG installer
+# 4. Submit for Apple notarization
+# 5. Staple notarization ticket
+
+# Output location
+ls -lh build/Release/SpeechToText.dmg
 ```
 
 ---
 
 ## Running Tests
 
-### Frontend Tests (Vitest)
+### Unit Tests (XCTest)
 
+**In Xcode**:
+1. **Test Navigator**: `Cmd + 6`
+2. **Run All Tests**: `Cmd + U`
+3. **Run Single Test**: Click ◇ next to test method name
+
+**Command Line**:
 ```bash
-cd src
-
 # Run all tests
-bun test
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64'
 
-# Watch mode
-bun test --watch
+# Run specific test suite
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -only-testing:SpeechToTextTests/FluidAudioServiceTests
 
-# Coverage report
-bun test --coverage
-
-cd ..
+# Run with coverage
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -enableCodeCoverage YES
 ```
 
-### Rust Tests (Cargo)
+### Swift Package Manager Tests
 
 ```bash
-cd src-tauri
-
-# Unit tests
-cargo test
-
-# Integration tests (requires permissions)
-cargo test --ignored
-
-# With output
-cargo test -- --nocapture
-
-cd ..
-```
-
-### Swift Tests (XCTest)
-
-```bash
-cd src-tauri/swift
-
-# Run all Swift tests
+# Run all Swift package tests
 swift test
+
+# Run with verbose output
+swift test --verbose
 
 # Run specific test
 swift test --filter FluidAudioServiceTests
 
-# Verbose output
-swift test --verbose
-
-cd ../..
+# Run with parallel execution
+swift test --parallel
 ```
 
-### Run All Tests
+### UI Tests (XCUITest)
+
+**In Xcode**:
+1. **Test Navigator**: `Cmd + 6`
+2. Expand **SpeechToTextUITests**
+3. Click ◇ next to test method name
+
+**Command Line**:
+```bash
+# Run UI tests (requires permissions)
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -only-testing:SpeechToTextUITests
+
+# Run specific UI test
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -only-testing:SpeechToTextUITests/RecordingFlowTests/testRecordingFlow
+```
+
+### Performance Tests
 
 ```bash
-# Run complete test suite
-bun test && \
-  cd src-tauri && cargo test && cd .. && \
-  cd src-tauri/swift && swift test && cd ../..
+# Run performance benchmarks
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -only-testing:SpeechToTextTests/PerformanceTests
+
+# View performance metrics in Xcode Test Report
+# Test Navigator > Select test > Performance tab
+```
+
+### Code Coverage
+
+**In Xcode**:
+1. **Product** > **Test** (with coverage enabled)
+2. **Report Navigator**: `Cmd + 9`
+3. Select latest test report
+4. Click **Coverage** tab
+
+**Command Line**:
+```bash
+# Generate coverage report
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -enableCodeCoverage YES \
+  -resultBundlePath TestResults.xcresult
+
+# View coverage (requires xcov or xcresultparser)
+xcrun xccov view --report TestResults.xcresult
 ```
 
 ---
 
 ## Development Workflow
 
-### 1. Start Development Server
+### 1. Start Development
 
 ```bash
-# Terminal 1: Start Tauri dev server (includes hot-reload)
-cargo tauri dev
+# Open project in Xcode
+open SpeechToText.xcodeproj
+
+# Or use command line
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -configuration Debug \
+  build
 ```
 
-### 2. Make Changes
+### 2. SwiftUI Preview Workflow (Recommended)
 
-- **Frontend**: Edit files in `src/` - Vite hot-reload applies changes instantly
-- **Rust**: Edit files in `src-tauri/src/` - Requires rebuild (automatic on save)
-- **Swift**: Edit files in `src-tauri/swift/Sources/` - Requires rebuild
+1. Open any SwiftUI view file (e.g., `RecordingModal.swift`)
+2. Click **Resume** in preview pane (right side)
+3. Edit code and see live updates
+4. Test interactions directly in preview
+5. Use preview variants for different states
 
-### 3. Test Changes
+**Example Preview**:
+```swift
+#Preview("Recording") {
+    RecordingModal(isRecording: true)
+        .environmentObject(AppState())
+}
+
+#Preview("Idle") {
+    RecordingModal(isRecording: false)
+        .environmentObject(AppState())
+}
+```
+
+### 3. Make Changes
+
+- **Views**: Edit SwiftUI files in `Sources/Views/` - use Previews for instant feedback
+- **Services**: Edit business logic in `Sources/Services/` - write tests first (TDD)
+- **Models**: Edit data types in `Sources/Models/` - update tests
+- **Tests**: Follow RED-GREEN-REFACTOR cycle
+
+### 4. Test Changes
 
 ```bash
-# Frontend changes
-cd src && bun test
+# Quick test (during development)
+swift test
 
-# Rust changes
-cd src-tauri && cargo test
-
-# Swift changes
-cd src-tauri/swift && swift test
+# Full test suite (before commit)
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64'
 ```
 
-### 4. Common Tasks
+### 5. Common Tasks
 
-| Task | Command |
-|------|---------|
-| Start dev server | `cargo tauri dev` |
-| Build for production | `cargo tauri build` |
-| Run frontend tests | `cd src && bun test` |
-| Run Rust tests | `cd src-tauri && cargo test` |
-| Run Swift tests | `cd src-tauri/swift && swift test` |
-| Format code | `cd src && bun run format` |
-| Lint code | `cd src && bun run lint` |
-| Type check | `cd src && bun run typecheck` |
+| Task | Xcode | Command Line |
+|------|-------|--------------|
+| Build | `Cmd + B` | `xcodebuild build` |
+| Run | `Cmd + R` | `xcodebuild build && open build/...` |
+| Test | `Cmd + U` | `xcodebuild test` |
+| Clean | `Cmd + Shift + K` | `xcodebuild clean` |
+| Preview | `Cmd + Option + P` | N/A (Xcode only) |
+| Format | Xcode auto-format | `swiftformat .` |
+| Lint | Xcode warnings | `swiftlint` |
+
+### 6. Git Workflow
+
+```bash
+# Create feature branch
+git checkout -b feature/your-feature-name
+
+# Make changes and test
+swift test
+
+# Stage changes
+git add .
+
+# Commit (pre-commit hooks will run)
+git commit -m "feat: add your feature"
+
+# Push to remote
+git push origin feature/your-feature-name
+```
 
 ---
 
@@ -328,8 +471,9 @@ cd src-tauri/swift && swift test
 # Check internet connection
 curl -I https://huggingface.co
 
-# Verify FluidAudio can access model registry
-swift run fluidaudio transcribe --help
+# Verify FluidAudio SDK version
+swift package show-dependencies | grep FluidAudio
+# Should show: FluidAudio v0.9.0 or later
 
 # Check local cache
 ls ~/Library/Application\ Support/FluidAudio/models/
@@ -337,16 +481,17 @@ ls ~/Library/Application\ Support/FluidAudio/models/
 # Clear cache and retry
 rm -rf ~/Library/Application\ Support/FluidAudio/models/
 # Restart app - FluidAudio will re-download
+
+# Check Xcode console for download errors
+# Look for: "FluidAudio: Downloading model..."
 ```
 
 ### Issue: Swift build fails with "cannot find module FluidAudio"
 
-**Symptom**: Build error during `cargo tauri dev`
+**Symptom**: Build error in Xcode or command line
 
 **Solution**:
 ```bash
-cd src-tauri/swift
-
 # Reset Swift Package Manager cache
 swift package reset
 
@@ -355,8 +500,35 @@ swift package resolve
 
 # Verify FluidAudio is listed
 swift package show-dependencies | grep FluidAudio
-
 # Should output: FluidAudio (from: https://github.com/FluidInference/FluidAudio.git)
+
+# Clean build in Xcode
+# Product > Clean Build Folder (Cmd + Shift + K)
+
+# Rebuild
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  build
+```
+
+### Issue: Xcode cannot find Swift Package dependencies
+
+**Symptom**: "No such module 'FluidAudio'" error
+
+**Solution**:
+```bash
+# In Xcode:
+# File > Packages > Reset Package Caches
+# File > Packages > Resolve Package Versions
+
+# Or command line:
+rm -rf ~/Library/Caches/org.swift.swiftpm/
+rm -rf .build/
+
+# Re-resolve
+swift package resolve
+
+# Restart Xcode
 ```
 
 ### Issue: Global hotkey not working
@@ -367,12 +539,16 @@ swift package show-dependencies | grep FluidAudio
 ```bash
 # Check Input Monitoring permission
 # System Settings > Privacy & Security > Input Monitoring
-# Ensure your app is listed and enabled
+# Ensure "Xcode" or "SpeechToText" is listed and enabled
 
-# Verify hotkey registration in logs
-cargo tauri dev --verbose
-
+# Verify hotkey registration in Xcode console
 # Look for: "Hotkey registered: keyCode=49, modifiers=..."
+
+# Test with different hotkey (in SettingsView)
+
+# Check for conflicting system shortcuts
+# System Settings > Keyboard > Keyboard Shortcuts
+# Ensure ⌘⌃Space is not assigned to another function
 ```
 
 ### Issue: Text insertion fails
@@ -383,14 +559,19 @@ cargo tauri dev --verbose
 ```bash
 # Check Accessibility permission
 # System Settings > Privacy & Security > Accessibility
-# Ensure your app is listed and enabled
+# Ensure "Xcode" or "SpeechToText" is listed and enabled
 
 # Test with TextEdit
 open -a TextEdit
 # Focus on TextEdit window, then try dictation
 
-# Check logs for accessibility errors
-cargo tauri dev --verbose
+# Check Xcode console for accessibility errors
+# Look for: "AXError: permission denied"
+
+# Verify TextInsertionService is initialized
+# Add breakpoint in TextInsertionService.swift
+
+# Try alternative text insertion method (clipboard fallback)
 ```
 
 ### Issue: Microphone access denied
@@ -401,11 +582,14 @@ cargo tauri dev --verbose
 ```bash
 # Grant microphone permission
 # System Settings > Privacy & Security > Microphone
-# Enable your app
+# Enable "Xcode" or "SpeechToText"
 
-# Verify permission status
-cargo tauri dev --verbose
+# Restart app after granting permission
+
+# Verify permission status in Xcode console
 # Look for: "Microphone permission: granted"
+
+# Test microphone in System Settings > Sound > Input
 ```
 
 ### Issue: Apple Neural Engine not being used
@@ -425,9 +609,80 @@ system_profiler SPHardwareDataType | grep "Chip"
 # Should show: M1/M2/M3/M4
 
 # Check FluidAudio version
-cd src-tauri/swift
 swift package show-dependencies | grep FluidAudio
 # Should be v0.9.0 or later (Swift 6 compatible)
+
+# Verify Release build (Debug builds may not use ANE)
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -configuration Release \
+  build
+```
+
+### Issue: SwiftUI Previews not working
+
+**Symptom**: "Preview crashed" or "Cannot preview in this file"
+
+**Solution**:
+```bash
+# Clean build folder
+# Product > Clean Build Folder (Cmd + Shift + K)
+
+# Restart Xcode Preview process
+# Editor > Canvas > Restart Canvas
+
+# Check for syntax errors in view file
+
+# Verify preview provider is correct
+#Preview {
+    YourView()
+        .environmentObject(AppState())
+}
+
+# Restart Xcode if previews are still broken
+```
+
+### Issue: Code signing errors during build
+
+**Symptom**: "Code signing failed" or "No certificate found"
+
+**Solution**:
+```bash
+# In Xcode:
+# Project Settings > Signing & Capabilities
+# Team: Select your Apple Developer team
+# Signing Certificate: Automatic (recommended)
+
+# For development builds, use:
+# Signing: Automatically manage signing
+# Team: Your personal team
+
+# For production builds, use:
+# Signing: Manually manage signing
+# Provisioning Profile: SpeechToText Distribution
+```
+
+### Issue: Tests failing with permission errors
+
+**Symptom**: XCUITests fail with "Permission denied"
+
+**Solution**:
+```bash
+# UI tests require permissions to be granted beforehand
+# Run app manually first to grant permissions:
+xcodebuild -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  build
+
+# Open app and grant all permissions
+open build/Debug/SpeechToText.app
+
+# Then run UI tests
+xcodebuild test \
+  -project SpeechToText.xcodeproj \
+  -scheme SpeechToText \
+  -destination 'platform=macOS,arch=arm64' \
+  -only-testing:SpeechToTextUITests
 ```
 
 ---
@@ -435,9 +690,9 @@ swift package show-dependencies | grep FluidAudio
 ## Next Steps
 
 1. **Explore Contracts**: See [contracts/swift-fluidaudio.md](./contracts/swift-fluidaudio.md) for FluidAudio integration details
-2. **Explore Contracts**: See [contracts/tauri-ipc.md](./contracts/tauri-ipc.md) for frontend-backend API
-3. **Review Architecture**: See [plan.md](./plan.md) for system design
-4. **Check Data Models**: See [data-model.md](./data-model.md) for entity definitions
+2. **Review Architecture**: See [plan.md](./plan.md) for system design
+3. **Check Data Models**: See [data-model.md](./data-model.md) for entity definitions
+4. **Read Spec**: See [spec.md](./spec.md) for feature requirements and user stories
 
 ---
 
@@ -457,9 +712,27 @@ swift package show-dependencies | grep FluidAudio
 2. **Language switching**: Parakeet TDT v3 is multilingual (no model reload needed)
 3. **Memory**: Monitor with Instruments.app for leaks
 4. **Performance**: Use Release builds for accurate benchmarking
+5. **SwiftUI**: Use `.task` and `.onChange` modifiers for reactive updates
+6. **Async/Await**: Use Swift Concurrency for all asynchronous operations
+
+### Xcode Instruments Profiling
+
+```bash
+# Profile app in Xcode
+# Product > Profile (Cmd + I)
+
+# Useful instruments:
+# - Time Profiler: CPU usage and call stacks
+# - Allocations: Memory usage and leaks
+# - Leaks: Memory leak detection
+# - System Trace: System-level performance
+
+# Or command line:
+instruments -t "Time Profiler" build/Release/SpeechToText.app
+```
 
 ---
 
-**Environment Ready!** 🎉
+**Environment Ready!**
 
-You can now start developing the macOS local speech-to-text application with FluidAudio SDK.
+You can now start developing the macOS local speech-to-text application with Pure Swift + SwiftUI architecture and FluidAudio SDK.

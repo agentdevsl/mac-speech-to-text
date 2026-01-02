@@ -13,28 +13,28 @@
 Represents a single speech-to-text capture event from start to completion.
 
 **Attributes**:
-```typescript
-interface RecordingSession {
-  id: string;                    // UUID v4
-  startTime: Date;               // ISO 8601 timestamp
-  endTime: Date | null;          // null if in progress
-  duration: number;              // milliseconds
-  audioData: Int16Array | null;  // Raw audio samples (16kHz mono)
-  transcribedText: string;       // Final transcription
-  language: string;              // Language code (e.g., 'en', 'es')
-  confidenceScore: number;       // 0.0 - 1.0
-  insertionSuccess: boolean;     // Whether text was inserted successfully
-  errorMessage: string | null;   // Error details if failed
-  peakAmplitude: number;         // For statistics
-  wordCount: number;             // Calculated from transcribedText
-  segments: TranscriptionSegment[]; // Word-level timestamps
+```swift
+struct RecordingSession {
+  let id: UUID                   // UUID v4
+  let startTime: Date            // ISO 8601 timestamp
+  var endTime: Date?             // nil if in progress
+  var duration: TimeInterval     // seconds
+  var audioData: [Int16]?        // Raw audio samples (16kHz mono)
+  var transcribedText: String    // Final transcription
+  let language: String           // Language code (e.g., 'en', 'es')
+  var confidenceScore: Double    // 0.0 - 1.0
+  var insertionSuccess: Bool     // Whether text was inserted successfully
+  var errorMessage: String?      // Error details if failed
+  var peakAmplitude: Int16       // For statistics
+  var wordCount: Int             // Calculated from transcribedText
+  var segments: [TranscriptionSegment] // Word-level timestamps
 }
 
-interface TranscriptionSegment {
-  text: string;                  // Word or phrase
-  startTime: number;             // Milliseconds from recording start
-  endTime: number;
-  confidence: number;            // 0.0 - 1.0
+struct TranscriptionSegment {
+  let text: String               // Word or phrase
+  let startTime: TimeInterval    // Seconds from recording start
+  let endTime: TimeInterval
+  let confidence: Double         // 0.0 - 1.0
 }
 ```
 
@@ -57,11 +57,11 @@ interface TranscriptionSegment {
 - `id` must be valid UUID v4
 - `startTime` cannot be in the future
 - `endTime` must be after `startTime`
-- `duration` = `endTime - startTime`
+- `duration` = `endTime.timeIntervalSince(startTime)`
 - `language` must be one of supported languages
 - `confidenceScore` must be between 0.0 and 1.0
 - `audioData` sample rate must be 16000 Hz
-- `wordCount` calculated as `transcribedText.split(/\s+/).length`
+- `wordCount` calculated as `transcribedText.components(separatedBy: .whitespaces).count`
 
 ---
 
@@ -70,67 +70,96 @@ interface TranscriptionSegment {
 Represents persistent user configuration stored locally.
 
 **Attributes**:
-```typescript
-interface UserSettings {
-  version: number;                        // Schema version for migration
-  hotkey: HotkeyConfiguration;
-  language: LanguageConfiguration;
-  audio: AudioConfiguration;
-  ui: UIConfiguration;
-  privacy: PrivacyConfiguration;
-  onboarding: OnboardingState;
-  lastModified: Date;
+```swift
+struct UserSettings: Codable {
+  var version: Int                        // Schema version for migration
+  var hotkey: HotkeyConfiguration
+  var language: LanguageConfiguration
+  var audio: AudioConfiguration
+  var ui: UIConfiguration
+  var privacy: PrivacyConfiguration
+  var onboarding: OnboardingState
+  var lastModified: Date
 }
 
-interface HotkeyConfiguration {
-  enabled: boolean;
-  keyCode: number;                        // Virtual key code
-  modifiers: KeyModifier[];               // ['command', 'control', 'space']
-  conflictDetected: boolean;
-  alternativeHotkey: HotkeyConfiguration | null;
+struct HotkeyConfiguration: Codable {
+  var enabled: Bool
+  var keyCode: Int                        // Virtual key code
+  var modifiers: [KeyModifier]            // [.command, .control, etc.]
+  var conflictDetected: Bool
+  var alternativeHotkey: HotkeyConfiguration?
 }
 
-type KeyModifier = 'command' | 'control' | 'option' | 'shift';
-
-interface LanguageConfiguration {
-  defaultLanguage: string;                // Primary language code
-  recentLanguages: string[];              // Last 5 used languages
-  autoDetectEnabled: boolean;
-  downloadedModels: string[];             // List of available language codes
+enum KeyModifier: String, Codable {
+  case command
+  case control
+  case option
+  case shift
 }
 
-interface AudioConfiguration {
-  inputDeviceId: string | null;           // null = system default
-  sensitivity: number;                    // 0.0 - 1.0, controls noise gate
-  silenceThreshold: number;               // milliseconds (500 - 3000)
-  noiseSuppression: boolean;
-  autoGainControl: boolean;
+struct LanguageConfiguration: Codable {
+  var defaultLanguage: String             // Primary language code
+  var recentLanguages: [String]           // Last 5 used languages
+  var autoDetectEnabled: Bool
+  var downloadedModels: [String]          // List of available language codes
 }
 
-interface UIConfiguration {
-  theme: 'light' | 'dark' | 'system';
-  modalPosition: 'center' | 'cursor';
-  showWaveform: boolean;
-  showConfidenceIndicator: boolean;
-  animationsEnabled: boolean;
-  menuBarIcon: 'default' | 'minimal';
+struct AudioConfiguration: Codable {
+  var inputDeviceId: String?              // nil = system default
+  var sensitivity: Double                 // 0.0 - 1.0, controls noise gate
+  var silenceThreshold: TimeInterval      // seconds (0.5 - 3.0)
+  var noiseSuppression: Bool
+  var autoGainControl: Bool
 }
 
-interface PrivacyConfiguration {
-  collectAnonymousStats: boolean;         // Word count, session count only
-  storagePolicy: 'none' | 'session-only' | 'persistent';
-  dataRetentionDays: number;              // 0, 7, 30, 90, 365
+struct UIConfiguration: Codable {
+  var theme: Theme
+  var modalPosition: ModalPosition
+  var showWaveform: Bool
+  var showConfidenceIndicator: Bool
+  var animationsEnabled: Bool
+  var menuBarIcon: MenuBarIcon
 }
 
-interface OnboardingState {
-  completed: boolean;
-  currentStep: number;
-  permissionsGranted: {
-    microphone: boolean;
-    accessibility: boolean;
-    inputMonitoring: boolean;
-  };
-  skippedSteps: string[];
+enum Theme: String, Codable {
+  case light
+  case dark
+  case system
+}
+
+enum ModalPosition: String, Codable {
+  case center
+  case cursor
+}
+
+enum MenuBarIcon: String, Codable {
+  case `default`
+  case minimal
+}
+
+struct PrivacyConfiguration: Codable {
+  var collectAnonymousStats: Bool         // Word count, session count only
+  var storagePolicy: StoragePolicy
+  var dataRetentionDays: Int              // 0, 7, 30, 90, 365
+}
+
+enum StoragePolicy: String, Codable {
+  case none
+  case sessionOnly
+  case persistent
+}
+
+struct OnboardingState: Codable {
+  var completed: Bool
+  var currentStep: Int
+  var permissionsGranted: PermissionsGranted
+  var skippedSteps: [String]
+}
+
+struct PermissionsGranted: Codable {
+  var microphone: Bool
+  var accessibility: Bool
+  var inputMonitoring: Bool
 }
 ```
 
@@ -139,67 +168,69 @@ interface OnboardingState {
 - Influences all RecordingSessions (language, audio config)
 - Determines which LanguageModels are downloaded
 
-**Storage**: JSON file via Tauri Store plugin at:
+**Storage**: JSON file via UserDefaults or PropertyListEncoder at:
 - macOS: `~/Library/Application Support/com.example.speech-to-text/settings.json`
 
 **Validation Rules**:
 - `hotkey.keyCode` must be valid macOS virtual key code
 - `language.defaultLanguage` must be in supported languages list
 - `audio.sensitivity` must be between 0.0 and 1.0
-- `audio.silenceThreshold` must be between 500 and 3000 ms
-- `ui.theme` must be 'light', 'dark', or 'system'
+- `audio.silenceThreshold` must be between 0.5 and 3.0 seconds
+- `ui.theme` must be .light, .dark, or .system
 - `privacy.dataRetentionDays` must be 0, 7, 30, 90, or 365
 - `onboarding.currentStep` must be >= 0 and <= 5
 
 **Default Values**:
-```typescript
-const DEFAULT_SETTINGS: UserSettings = {
-  version: 1,
-  hotkey: {
-    enabled: true,
-    keyCode: 49,              // Space key
-    modifiers: ['command', 'control'],
-    conflictDetected: false,
-    alternativeHotkey: null,
-  },
-  language: {
-    defaultLanguage: 'en',
-    recentLanguages: ['en'],
-    autoDetectEnabled: false,
-    downloadedModels: ['en'],
-  },
-  audio: {
-    inputDeviceId: null,      // System default
-    sensitivity: 0.3,
-    silenceThreshold: 1500,   // 1.5 seconds
-    noiseSuppression: true,
-    autoGainControl: true,
-  },
-  ui: {
-    theme: 'system',
-    modalPosition: 'center',
-    showWaveform: true,
-    showConfidenceIndicator: true,
-    animationsEnabled: true,
-    menuBarIcon: 'default',
-  },
-  privacy: {
-    collectAnonymousStats: true,
-    storagePolicy: 'session-only',
-    dataRetentionDays: 7,
-  },
-  onboarding: {
-    completed: false,
-    currentStep: 0,
-    permissionsGranted: {
-      microphone: false,
-      accessibility: false,
-      inputMonitoring: false,
-    },
-    skippedSteps: [],
-  },
-  lastModified: new Date(),
-};
+```swift
+extension UserSettings {
+  static let `default` = UserSettings(
+    version: 1,
+    hotkey: HotkeyConfiguration(
+      enabled: true,
+      keyCode: 49,              // Space key
+      modifiers: [.command, .control],
+      conflictDetected: false,
+      alternativeHotkey: nil
+    ),
+    language: LanguageConfiguration(
+      defaultLanguage: "en",
+      recentLanguages: ["en"],
+      autoDetectEnabled: false,
+      downloadedModels: ["en"]
+    ),
+    audio: AudioConfiguration(
+      inputDeviceId: nil,       // System default
+      sensitivity: 0.3,
+      silenceThreshold: 1.5,    // 1.5 seconds
+      noiseSuppression: true,
+      autoGainControl: true
+    ),
+    ui: UIConfiguration(
+      theme: .system,
+      modalPosition: .center,
+      showWaveform: true,
+      showConfidenceIndicator: true,
+      animationsEnabled: true,
+      menuBarIcon: .default
+    ),
+    privacy: PrivacyConfiguration(
+      collectAnonymousStats: true,
+      storagePolicy: .sessionOnly,
+      dataRetentionDays: 7
+    ),
+    onboarding: OnboardingState(
+      completed: false,
+      currentStep: 0,
+      permissionsGranted: PermissionsGranted(
+        microphone: false,
+        accessibility: false,
+        inputMonitoring: false
+      ),
+      skippedSteps: []
+    ),
+    lastModified: Date()
+  )
+}
 ```
 
 ---
@@ -209,56 +240,65 @@ const DEFAULT_SETTINGS: UserSettings = {
 Represents a downloaded ML model for a specific language.
 
 **Attributes**:
-```typescript
-interface LanguageModel {
-  languageCode: string;                   // ISO 639-1 code
-  displayName: string;                    // Native name (e.g., "Español")
-  modelPath: string;                      // Absolute filesystem path
-  downloadStatus: DownloadStatus;
-  fileSize: number;                       // Bytes
-  downloadedAt: Date | null;
-  lastUsed: Date | null;
-  version: string;                        // Model version (e.g., "0.6b-v3")
-  checksumSHA256: string;                 // Verify integrity
+```swift
+struct LanguageModel: Codable {
+  let languageCode: String                // ISO 639-1 code
+  let displayName: String                 // Native name (e.g., "Español")
+  var modelPath: URL                      // Absolute filesystem path
+  var downloadStatus: DownloadStatus
+  let fileSize: Int64                     // Bytes
+  var downloadedAt: Date?
+  var lastUsed: Date?
+  let version: String                     // Model version (e.g., "0.6b-v3")
+  let checksumSHA256: String              // Verify integrity
 }
 
-type DownloadStatus =
-  | { type: 'not_downloaded' }
-  | { type: 'downloading'; progress: number; bytesDownloaded: number }
-  | { type: 'downloaded' }
-  | { type: 'error'; message: string };
+enum DownloadStatus: Codable {
+  case notDownloaded
+  case downloading(progress: Double, bytesDownloaded: Int64)
+  case downloaded
+  case error(message: String)
+}
 ```
 
 **Supported Languages** (25 total):
-```typescript
-const SUPPORTED_LANGUAGES: Record<string, string> = {
-  'en': 'English',
-  'es': 'Español',
-  'fr': 'Français',
-  'de': 'Deutsch',
-  'it': 'Italiano',
-  'pt': 'Português',
-  'ru': 'Русский',
-  'zh': '中文',
-  'ja': '日本語',
-  'ko': '한국어',
-  'ar': 'العربية',
-  'hi': 'हिन्दी',
-  'tr': 'Türkçe',
-  'pl': 'Polski',
-  'nl': 'Nederlands',
-  'sv': 'Svenska',
-  'da': 'Dansk',
-  'no': 'Norsk',
-  'fi': 'Suomi',
-  'cs': 'Čeština',
-  'ro': 'Română',
-  'uk': 'Українська',
-  'el': 'Ελληνικά',
-  'he': 'עברית',
-  'th': 'ไทย',
-  'vi': 'Tiếng Việt',
-};
+```swift
+enum SupportedLanguage: String, CaseIterable, Codable {
+  case en, es, fr, de, it, pt, ru, zh, ja, ko
+  case ar, hi, tr, pl, nl, sv, da, no, fi, cs
+  case ro, uk, el, he, th, vi
+
+  var displayName: String {
+    switch self {
+    case .en: return "English"
+    case .es: return "Español"
+    case .fr: return "Français"
+    case .de: return "Deutsch"
+    case .it: return "Italiano"
+    case .pt: return "Português"
+    case .ru: return "Русский"
+    case .zh: return "中文"
+    case .ja: return "日本語"
+    case .ko: return "한국어"
+    case .ar: return "العربية"
+    case .hi: return "हिन्दी"
+    case .tr: return "Türkçe"
+    case .pl: return "Polski"
+    case .nl: return "Nederlands"
+    case .sv: return "Svenska"
+    case .da: return "Dansk"
+    case .no: return "Norsk"
+    case .fi: return "Suomi"
+    case .cs: return "Čeština"
+    case .ro: return "Română"
+    case .uk: return "Українська"
+    case .el: return "Ελληνικά"
+    case .he: return "עברית"
+    case .th: return "ไทย"
+    case .vi: return "Tiếng Việt"
+    }
+  }
+}
 ```
 
 **Relationships**:
@@ -296,36 +336,36 @@ models/
 Represents aggregated usage metrics without storing sensitive content.
 
 **Attributes**:
-```typescript
-interface UsageStatistics {
-  id: string;                             // UUID
-  date: Date;                             // Day bucket (midnight UTC)
-  totalSessions: number;
-  successfulSessions: number;
-  failedSessions: number;
-  totalWordsTranscribed: number;
-  totalDurationMs: number;
-  averageConfidence: number;              // 0.0 - 1.0
-  languageBreakdown: LanguageStats[];
-  errorBreakdown: ErrorStats[];
+```swift
+struct UsageStatistics: Codable {
+  let id: UUID
+  let date: Date                          // Day bucket (midnight UTC)
+  var totalSessions: Int
+  var successfulSessions: Int
+  var failedSessions: Int
+  var totalWordsTranscribed: Int
+  var totalDurationSeconds: TimeInterval
+  var averageConfidence: Double           // 0.0 - 1.0
+  var languageBreakdown: [LanguageStats]
+  var errorBreakdown: [ErrorStats]
 }
 
-interface LanguageStats {
-  languageCode: string;
-  sessionCount: number;
-  wordCount: number;
+struct LanguageStats: Codable {
+  let languageCode: String
+  var sessionCount: Int
+  var wordCount: Int
 }
 
-interface ErrorStats {
-  errorType: string;                      // e.g., 'permission_denied', 'model_error'
-  count: number;
+struct ErrorStats: Codable {
+  let errorType: String                   // e.g., 'permission_denied', 'model_error'
+  var count: Int
 }
 
-interface AggregatedStats {
-  today: UsageStatistics;
-  thisWeek: UsageStatistics;
-  thisMonth: UsageStatistics;
-  allTime: UsageStatistics;
+struct AggregatedStats {
+  let today: UsageStatistics
+  let thisWeek: UsageStatistics
+  let thisMonth: UsageStatistics
+  let allTime: UsageStatistics
 }
 ```
 
@@ -391,22 +431,30 @@ CREATE TABLE error_stats (
 Represents in-memory audio data during recording.
 
 **Attributes**:
-```typescript
-interface AudioBuffer {
-  samples: Int16Array;                    // Raw audio samples
-  sampleRate: number;                     // Always 16000 Hz
-  channels: number;                       // Always 1 (mono)
-  duration: number;                       // milliseconds
-  peakAmplitude: number;                  // Max absolute value
-  rmsLevel: number;                       // Root mean square energy
-  timestamp: Date;                        // When buffer was created
+```swift
+struct AudioBuffer {
+  let samples: [Int16]                    // Raw audio samples
+  let sampleRate: Int                     // Always 16000 Hz
+  let channels: Int                       // Always 1 (mono)
+  let duration: TimeInterval              // seconds
+  let peakAmplitude: Int16                // Max absolute value
+  let rmsLevel: Double                    // Root mean square energy
+  let timestamp: Date                     // When buffer was created
 }
 
-interface StreamingAudioBuffer {
-  chunks: AudioBuffer[];                  // Array of audio segments
-  totalDuration: number;                  // Sum of all chunk durations
-  maxChunkSize: number;                   // 100ms chunks (1600 samples)
-  isComplete: boolean;
+class StreamingAudioBuffer {
+  var chunks: [AudioBuffer]               // Array of audio segments
+  var totalDuration: TimeInterval {       // Sum of all chunk durations
+    chunks.reduce(0) { $0 + $1.duration }
+  }
+  let maxChunkSize: Int                   // 100ms chunks (1600 samples)
+  var isComplete: Bool
+
+  init(maxChunkSize: Int = 1600) {
+    self.chunks = []
+    self.maxChunkSize = maxChunkSize
+    self.isComplete = false
+  }
 }
 ```
 
@@ -426,8 +474,8 @@ interface StreamingAudioBuffer {
 **Validation Rules**:
 - `sampleRate` must be exactly 16000 Hz
 - `channels` must be 1 (mono)
-- `samples` length must equal `sampleRate * duration / 1000`
-- `peakAmplitude` must be <= 32767 (Int16 max)
+- `samples` length must equal `Int(Double(sampleRate) * duration)`
+- `peakAmplitude` must be <= Int16.max (32767)
 
 ---
 
@@ -490,38 +538,47 @@ interface StreamingAudioBuffer {
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        React Frontend                         │
+│                      SwiftUI Frontend                         │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  RecordingContext (React Context + State)              │  │
-│  │  - currentSession: RecordingSession | null             │  │
-│  │  - audioLevel: number                                  │  │
-│  │  - isRecording: boolean                                │  │
-│  │  - isTranscribing: boolean                             │  │
+│  │  RecordingViewModel (@ObservableObject)                │  │
+│  │  - @Published currentSession: RecordingSession?        │  │
+│  │  - @Published audioLevel: Double                       │  │
+│  │  - @Published isRecording: Bool                        │  │
+│  │  - @Published isTranscribing: Bool                     │  │
 │  └────────────────────────────────────────────────────────┘  │
 │               │                                    ▲           │
-│               │ Tauri IPC Commands                 │           │
+│               │ Swift Method Calls                 │           │
 │               ▼                                    │           │
 └───────────────┼────────────────────────────────────┼───────────┘
                 │                                    │
 ┌───────────────┼────────────────────────────────────┼───────────┐
-│               │      Rust Tauri Core               │           │
+│               │      Swift App Layer               │           │
 │  ┌────────────▼─────────────────────────────┐     │           │
 │  │  AppState (Shared State)                 │     │           │
-│  │  - settings: Arc<Mutex<UserSettings>>    │     │           │
-│  │  - current_session: Arc<Mutex<Option<    │     │           │
-│  │      RecordingSession>>>                 │     │           │
-│  │  - ml_backend: Arc<Mutex<MLBackend>>     │     │           │
-│  │  - swift_bridge: Arc<Mutex<SwiftBridge>> │     │           │
+│  │  - settings: UserSettings                │     │           │
+│  │  - currentSession: RecordingSession?     │     │           │
+│  │  - audioManager: AudioManager            │     │           │
+│  │  - transcriptionManager: Manager         │     │           │
+│  │  - hotkeyManager: HotkeyManager          │     │           │
 │  └──────────────────────────────────────────┘     │           │
 │       │                                             │           │
-│       │ (Swift FFI)                               │           │
+│       │ (FluidAudio SDK)                          │           │
 │       ▼                                           │           │
 │  ┌──────────────────────────────────┐             │           │
-│  │   Swift Native + FluidAudio      │             │           │
-│  │   - Hotkey                       │             │           │
-│  │   - FluidAudio (ASR + VAD)       │             │           │
-│  │   - Text Insert                  │             │           │
+│  │   FluidAudio Swift SDK           │             │           │
+│  │   - Speech Recognition (ASR)     │             │           │
+│  │   - Voice Activity Detection     │             │           │
 │  │   - Model Management             │             │           │
+│  │   - Audio Processing             │             │           │
+│  └──────────────────────────────────┘             │           │
+│       │                                             │           │
+│       │ (macOS APIs)                              │           │
+│       ▼                                           │           │
+│  ┌──────────────────────────────────┐             │           │
+│  │   macOS System APIs              │             │           │
+│  │   - AVFoundation (Audio)         │             │           │
+│  │   - Accessibility (Text Insert)  │             │           │
+│  │   - Carbon (Hotkey Registration) │             │           │
 │  └──────────────────────────────────┘             │           │
 └────────────────────────────────────────────────────┼───────────┘
                                                      │
@@ -574,32 +631,49 @@ Each entity should have tests for:
 - Serialization/deserialization (JSON, SQLite)
 - Business rule enforcement
 
-### Example Test (TypeScript):
-```typescript
-describe('RecordingSession', () => {
-  it('should calculate wordCount from transcribedText', () => {
-    const session = new RecordingSession({
-      transcribedText: 'Hello world this is a test',
-    });
+### Example Test (Swift with XCTest):
+```swift
+import XCTest
+@testable import SpeechToText
 
-    expect(session.wordCount).toBe(6);
-  });
+class RecordingSessionTests: XCTestCase {
+  func testWordCountCalculation() {
+    var session = RecordingSession(
+      id: UUID(),
+      startTime: Date(),
+      language: "en"
+    )
+    session.transcribedText = "Hello world this is a test"
 
-  it('should reject invalid confidence score', () => {
-    expect(() => {
-      new RecordingSession({ confidenceScore: 1.5 });
-    }).toThrow('Confidence score must be between 0.0 and 1.0');
-  });
+    XCTAssertEqual(session.wordCount, 6)
+  }
 
-  it('should enforce endTime after startTime', () => {
-    const startTime = new Date('2026-01-02T10:00:00Z');
-    const endTime = new Date('2026-01-02T09:59:00Z');
+  func testInvalidConfidenceScore() {
+    var session = RecordingSession(
+      id: UUID(),
+      startTime: Date(),
+      language: "en"
+    )
 
-    expect(() => {
-      new RecordingSession({ startTime, endTime });
-    }).toThrow('endTime must be after startTime');
-  });
-});
+    // Should fail validation when confidence > 1.0
+    session.confidenceScore = 1.5
+    XCTAssertFalse(session.isValid, "Confidence score must be between 0.0 and 1.0")
+  }
+
+  func testEndTimeAfterStartTime() {
+    let startTime = Date(timeIntervalSince1970: 1735819200) // 2026-01-02 10:00:00 UTC
+    let endTime = Date(timeIntervalSince1970: 1735819140)   // 2026-01-02 09:59:00 UTC
+
+    var session = RecordingSession(
+      id: UUID(),
+      startTime: startTime,
+      language: "en"
+    )
+    session.endTime = endTime
+
+    XCTAssertFalse(session.isValid, "endTime must be after startTime")
+  }
+}
 ```
 
 ---

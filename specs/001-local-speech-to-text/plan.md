@@ -1,46 +1,45 @@
 # Implementation Plan: macOS Local Speech-to-Text Application
 
-**Branch**: `001-local-speech-to-text` | **Date**: 2026-01-02 | **Updated**: 2026-01-02 (FluidAudio) | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-local-speech-to-text` | **Date**: 2026-01-02 | **Updated**: 2026-01-02 (Pure Swift + SwiftUI) | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-local-speech-to-text/spec.md`
 
-**Note**: This template is filled in by the `/speckit.plan` command. Updated to use FluidAudio Swift SDK v0.9.0.
+**Note**: This template is filled in by the `/speckit.plan` command. Updated to Pure Swift + SwiftUI architecture with FluidAudio SDK v0.9.0.
 
 ## Summary
 
-Build a privacy-first macOS speech-to-text application that runs 100% locally on Apple Silicon. The app uses a global hotkey to trigger an elegant recording modal, captures audio, transcribes locally using FluidAudio SDK with Parakeet TDT v3 on Apple Neural Engine, and automatically inserts text into the active application. Technical stack: Tauri 2.0 + React + TypeScript frontend, FluidAudio Swift SDK for ML inference and audio processing, Swift for native macOS APIs (hotkeys, text insertion).
+Build a privacy-first macOS speech-to-text application that runs 100% locally on Apple Silicon. The app uses a global hotkey to trigger an elegant recording modal, captures audio, transcribes locally using FluidAudio SDK with Parakeet TDT v3 on Apple Neural Engine, and automatically inserts text into the active application. Technical stack: Pure Swift + SwiftUI for native macOS application with FluidAudio SDK for ML inference and audio processing.
 
 ## Technical Context
 
 **Language/Version**:
-- Frontend: TypeScript 5.7+ (strict mode), React 18+
-- Native/ML: Swift 5.9+ with FluidAudio SDK v0.9.0+
-- Build: Rust 1.75+ (Tauri framework)
+- Swift 5.9+ (single language for entire application)
+- SwiftUI for declarative UI
+- FluidAudio SDK v0.9.0+ (ASR, VAD, audio processing)
 
 **Primary Dependencies**:
-- Tauri 2.0 (cross-platform app framework with Rust core)
-- React 18+ with TypeScript (UI layer)
+- SwiftUI (native macOS UI framework)
 - FluidAudio Swift SDK v0.9.0+ (local ASR with Parakeet TDT v3, VAD, audio processing)
-- Swift: Carbon/Cocoa (global hotkeys), Accessibility APIs (text insertion)
-- Swift Package Manager for FluidAudio integration
+- Swift: Carbon/Cocoa (global hotkeys), Accessibility APIs (text insertion), Core Audio (audio capture)
+- Swift Package Manager for dependency management
 
 **Storage**:
-- User settings: Local JSON/SQLite via Tauri Store plugin
+- User settings: UserDefaults or local JSON
 - ML models: Managed by FluidAudio SDK (auto-downloads from HuggingFace)
-- Usage statistics: Local SQLite database
+- Usage statistics: Local SQLite database or UserDefaults
 - No cloud storage or network calls
 
 **Testing**:
-- Frontend: Vitest + React Testing Library
-- Swift/FluidAudio: XCTest for native API integrations and ASR pipeline
-- E2E: Tauri WebDriver for full application flow
-- Performance: Automated benchmarks for transcription latency and memory usage
+- XCTest for all Swift code (UI, services, FluidAudio integration)
+- SwiftUI Previews for rapid UI development
+- XCUITest for end-to-end application testing
+- Performance: XCTest measure blocks for benchmarking
 
 **Target Platform**:
 - macOS 12.0 (Monterey) or later
 - Apple Silicon only (M1/M2/M3/M4)
 - Universal binary distribution via DMG
 
-**Project Type**: Desktop application (hybrid: web frontend + native backend + ML inference)
+**Project Type**: Native macOS desktop application (Pure Swift)
 
 **Performance Goals**:
 - Hotkey response: <50ms from keypress to modal display
@@ -48,7 +47,7 @@ Build a privacy-first macOS speech-to-text application that runs 100% locally on
 - Waveform visualization: 30+ fps during recording
 - Idle memory: <200MB RAM
 - Active transcription: <500MB RAM
-- UI responsiveness: 60fps (no jank during transcription)
+- UI responsiveness: 60fps (120fps on ProMotion displays)
 
 **Constraints**:
 - 100% local processing (zero network calls post-setup)
@@ -60,8 +59,8 @@ Build a privacy-first macOS speech-to-text application that runs 100% locally on
 
 **Scale/Scope**:
 - Single-user desktop application
-- 25 supported languages
-- ~12 UI screens (onboarding, settings, recording modal, menu bar)
+- 25 supported languages (via FluidAudio)
+- ~8 SwiftUI views (onboarding, settings, recording modal, menu bar)
 - ML models: ~500MB per language, up to 12.5GB if all downloaded
 - Expected usage: 20-50 transcription sessions per day per user
 
@@ -71,34 +70,35 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 ### Constitution Compliance Analysis
 
-This project diverges from the web-centric TypeScript/Node.js constitution but the differences are justified by the desktop/ML nature:
+This project diverges from the web-centric TypeScript/Node.js constitution, but the differences are justified by the native macOS desktop application nature:
 
-**COMPLIANT**:
-- TypeScript with strict mode for frontend React code
-- Vitest for frontend testing
-- ESLint + Prettier for code quality
-- Environment variables for configuration
+**COMPLIANT (Adapted for Swift)**:
+- Strict type safety (Swift's type system equivalent to TypeScript strict mode)
+- XCTest for all testing (equivalent to Vitest)
+- SwiftLint for code quality (equivalent to ESLint + Prettier)
+- Environment variables / configuration patterns
 - TDD methodology (RED-GREEN-REFACTOR)
-- Service-repository pattern for frontend state management
-- Explicit error handling with typed errors
-- Modern async/await patterns
+- Service-repository pattern for state management
+- Explicit error handling with typed errors (Swift Error protocol)
+- Modern async/await patterns (Swift Concurrency)
 
-**JUSTIFIED DEVIATIONS** (Desktop + ML Application):
+**JUSTIFIED DEVIATIONS** (Native macOS Application):
 
 | Constitution Rule | Deviation | Justification |
 |------------------|-----------|---------------|
-| "Node.js 24+ runtime" | Uses Tauri (Rust) + Swift runtime | Desktop apps require native performance and system integration. Tauri provides secure native APIs, Swift provides macOS system access and ML via FluidAudio. Node.js cannot access macOS Accessibility APIs or Apple Neural Engine. |
-| "Web application structure" | Desktop application structure | macOS desktop app with native UI requirements (global hotkeys, menu bar, system permissions). Web architecture inappropriate for system-level integrations. |
-| "All code in TypeScript" | Swift for native APIs + ML | macOS APIs (Accessibility, hotkeys) and FluidAudio SDK require Swift. TypeScript cannot access Apple Neural Engine or system frameworks. FluidAudio eliminates need for Python. |
-| "Single language stack" | Multi-language (TS/Rust/Swift) | Each language serves essential purpose: TS for UI, Rust for security/IPC, Swift for macOS APIs and on-device ML. Significantly simpler than previous Python approach. |
+| "TypeScript with strict mode" | Swift 5.9+ with strict concurrency checking | Native macOS app requires Swift for system integration, SwiftUI, Accessibility APIs, and FluidAudio SDK. Swift provides equivalent type safety and better performance. |
+| "Node.js 24+ runtime" | macOS native (Swift runtime) | Desktop app requires native performance and system integration. Swift provides direct access to macOS frameworks, Apple Neural Engine, and system APIs that Node.js cannot access. |
+| "Vitest for testing" | XCTest for testing | XCTest is the native Swift testing framework with first-class Xcode integration, SwiftUI test support, and performance testing capabilities. |
+| "Web application structure" | Native app structure | macOS desktop app with native UI requirements (global hotkeys, menu bar, system permissions). Web architecture inappropriate for system-level integrations. |
 
 **NO VIOLATIONS**:
-- Security-first development: All secrets in env vars, input validation, no credential storage
-- Test-driven development: TDD for all layers (frontend Vitest, Swift XCTest)
-- Code quality: ESLint + Prettier for TS, SwiftLint for Swift
+- Security-first development: Input validation, no credential storage, secure keychain usage
+- Test-driven development: TDD for all layers (XCTest for Swift, XCUITest for UI)
+- Code quality: SwiftLint for style, SwiftFormat for formatting
 - Architecture patterns: Service layer for business logic, repository pattern for data access
+- Single language: Pure Swift eliminates multi-language complexity
 
-**GATE STATUS**: ✅ PASS - Deviations are necessary and well-justified for desktop ML application. FluidAudio SDK significantly simplifies architecture by eliminating Python layer. The constitution's TypeScript/web principles apply to frontend layer.
+**GATE STATUS**: ✅ PASS - Pure Swift architecture is simpler and more aligned with macOS best practices. Single-language stack reduces complexity significantly. Constitution's principles (TDD, type safety, code quality) apply to Swift layer.
 
 ## Project Structure
 
@@ -116,86 +116,99 @@ specs/[###-feature]/
 
 ### Source Code (repository root)
 
-**Structure Decision**: Tauri desktop application with Swift-first architecture. Frontend (React/TS) communicates with Rust core via Tauri IPC. Rust core orchestrates Swift native layer which includes FluidAudio SDK for ML inference. This structure eliminates Python complexity while maintaining clear separation of concerns.
+**Structure Decision**: Pure Swift application using SwiftUI for UI and FluidAudio SDK for ML inference. All code in a single language with clear separation of concerns using Swift's native patterns.
 
 ```text
-src-tauri/                    # Rust backend (Tauri core)
-├── src/
-│   ├── main.rs              # Tauri app entry point
-│   ├── commands.rs          # IPC command handlers
-│   ├── swift_bridge.rs      # Swift interop via FFI
-│   ├── models/              # Rust data types
-│   └── lib/                 # Shared utilities
-├── swift/                   # Swift native modules + FluidAudio
-│   ├── Package.swift        # Swift Package Manager config
-│   ├── GlobalHotkey/        # Hotkey registration (Carbon API)
-│   ├── FluidAudioService/   # FluidAudio SDK wrapper for ASR
-│   ├── TextInsertion/       # Accessibility API bridge
-│   ├── MenuBar/             # NSStatusItem integration
-│   └── bridge.swift         # C ABI exports to Rust
-├── Cargo.toml
-└── build.rs                 # Swift compilation integration
+SpeechToText.xcodeproj   # Xcode project
+Package.swift             # Swift Package Manager config
 
-src/                         # React + TypeScript frontend
-├── components/
-│   ├── RecordingModal/      # Main recording UI
-│   ├── Onboarding/          # First-time setup flow
-│   ├── Settings/            # Configuration screens
-│   ├── Waveform/            # Audio visualization
-│   └── MenuBar/             # Menu dropdown
-├── services/
-│   ├── audio.service.ts     # Audio state management
-│   ├── settings.service.ts  # User preferences
-│   ├── stats.service.ts     # Usage tracking
-│   └── ipc.service.ts       # Tauri command wrappers
-├── hooks/                   # React custom hooks
-├── types/                   # TypeScript definitions
-├── styles/                  # Warm Minimalism design system
-└── App.tsx                  # Main React app
+Sources/
+├── SpeechToTextApp/
+│   ├── SpeechToTextApp.swift    # @main entry point
+│   ├── AppDelegate.swift         # App lifecycle, menu bar
+│   └── AppState.swift            # Observable app state
+│
+├── Views/                        # SwiftUI views
+│   ├── RecordingModal.swift     # Main recording UI with waveform
+│   ├── OnboardingView.swift     # First-time setup flow
+│   ├── SettingsView.swift       # Configuration screens
+│   ├── MenuBarView.swift        # Menu dropdown content
+│   └── Components/
+│       ├── WaveformView.swift   # Audio visualization
+│       ├── PermissionCard.swift # Permission request UI
+│       └── LanguagePicker.swift # Language selection
+│
+├── Services/                     # Business logic
+│   ├── FluidAudioService.swift  # FluidAudio SDK wrapper
+│   ├── HotkeyService.swift      # Global hotkey (Carbon API)
+│   ├── AudioCaptureService.swift # Core Audio integration
+│   ├── TextInsertionService.swift # Accessibility API
+│   ├── SettingsService.swift    # UserDefaults wrapper
+│   ├── StatisticsService.swift  # Usage tracking
+│   └── PermissionService.swift  # System permission checks
+│
+├── Models/                       # Data types
+│   ├── RecordingSession.swift   # Recording state machine
+│   ├── UserSettings.swift       # Configuration model
+│   ├── LanguageModel.swift      # Language metadata
+│   ├── UsageStatistics.swift    # Stats aggregation
+│   └── AudioBuffer.swift        # Audio data handling
+│
+└── Utilities/                    # Shared helpers
+    ├── Extensions/
+    │   ├── Color+Theme.swift    # Warm Minimalism palette
+    │   └── View+Modifiers.swift # Custom SwiftUI modifiers
+    └── Constants.swift          # App-wide constants
 
-tests/                      # Cross-layer integration tests
-├── e2e/
-│   ├── test_hotkey_flow.rs  # Full recording flow
-│   ├── test_onboarding.rs   # Permission grants
-│   └── test_settings.rs     # Configuration changes
-└── integration/
-    └── test_swift_bridge.rs # Native API + FluidAudio integration
+Tests/
+├── SpeechToTextTests/           # Unit tests (XCTest)
+│   ├── Services/
+│   │   ├── FluidAudioServiceTests.swift
+│   │   ├── HotkeyServiceTests.swift
+│   │   └── TextInsertionServiceTests.swift
+│   └── Models/
+│       └── RecordingSessionTests.swift
+│
+└── SpeechToTextUITests/         # UI tests (XCUITest)
+    ├── OnboardingFlowTests.swift
+    ├── RecordingFlowTests.swift
+    └── SettingsTests.swift
 
-scripts/                    # Build and development tools
-├── setup-dev.sh           # Development environment setup
-└── build-swift.sh         # Swift module compilation with SPM
+Resources/
+├── Assets.xcassets/             # Images, icons, colors
+├── Sounds/                      # Audio feedback
+└── Localizations/               # i18n (25 languages)
 ```
 
 ## Complexity Tracking
 
 | Deviation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|--------------------------------------|
-| Multi-language stack (TS/Rust/Swift) | Each language provides irreplaceable capabilities: TS for modern UI, Rust for secure system integration, Swift for macOS native APIs + FluidAudio ML | Electron: Cannot access Accessibility APIs or global hotkeys. Pure Swift: Poor web UI tooling, no Tauri benefits. TypeScript-only: Cannot access Apple Neural Engine or system frameworks. |
-| Swift FluidAudio SDK | FluidAudio provides production-ready ASR with Parakeet TDT v3 on Apple Neural Engine. Eliminates need for Python/MLX custom integration | Custom MLX integration: Requires Python subprocess, JSON-RPC IPC, custom model loading. WASM ML: Insufficient performance, no ANE acceleration. Server-based: Violates privacy requirement. |
-| Swift native bridge | macOS Accessibility API, global hotkey registration (Carbon), menu bar integration require Objective-C/Swift runtime | Rust only: Cannot access Accessibility framework or Carbon API. JavaScript bridge: Performance penalty, security risk for system APIs. |
+| FluidAudio SDK dependency | FluidAudio provides production-ready ASR with Parakeet TDT v3 on Apple Neural Engine. Built-in VAD, model management, and 25-language support | Custom MLX integration: Would require Python subprocess and complex IPC. Apple Speech Framework: Requires network, violates privacy requirement. WASM ML: Insufficient performance, no ANE acceleration. |
+| Carbon API for global hotkeys | Modern Swift lacks native global hotkey API. Carbon provides the only reliable cross-app hotkey registration on macOS | Accessibility API hotkeys: Unreliable, permission issues. Polling: High CPU usage, poor latency. CGEventTap: Requires accessibility permission anyway. |
+| Accessibility API for text insertion | Only API that can insert text programmatically into arbitrary applications | Clipboard paste simulation: Unreliable, replaces clipboard. AppleScript: Slow, application-specific. Pasteboard: Doesn't trigger insertion. |
 
 ---
 
 ## Phase 0: Research & Discovery
 
-**Status**: ✅ COMPLETE (Updated for FluidAudio SDK)
+**Status**: ✅ COMPLETE (Pure Swift + SwiftUI Architecture)
 
-All technical unknowns resolved. Architecture significantly simplified with FluidAudio SDK.
+All technical unknowns resolved. Architecture significantly simplified with Pure Swift approach.
 
 **Key Decisions**:
-1. ML inference: FluidAudio Swift SDK with Parakeet TDT v3 on Apple Neural Engine
-2. Audio processing: FluidAudio handles VAD, preprocessing, and model management
-3. Swift bridge: Dynamic library via FFI with C ABI
-4. Performance benchmarking: Multi-tier with automated regression detection
-5. Permission testing: Mocked unit tests + pre-authorized integration tests
-6. Tauri + React: Typed IPC commands + React Context for state
-7. Model management: FluidAudio auto-downloads from HuggingFace
-8. macOS permissions: Incremental onboarding with explanations
+1. **Pure Swift**: Single language for entire application (eliminates Tauri/Rust/TypeScript)
+2. **SwiftUI**: Declarative UI framework with native macOS integration
+3. **FluidAudio SDK**: Production-ready ASR with Parakeet TDT v3 on Apple Neural Engine
+4. **Swift Concurrency**: async/await for all asynchronous operations
+5. **XCTest**: Native testing framework with SwiftUI test support
+6. **Swift Package Manager**: Dependency management for FluidAudio
+7. **Xcode**: Primary development environment with Previews for rapid iteration
 
 **Architecture Simplification**:
-- **Eliminated**: Python subprocess, JSON-RPC protocol, custom MLX integration
-- **Unified**: All Swift code in single layer (native APIs + ML via FluidAudio)
-- **Reduced complexity**: 3 languages instead of 4, simpler IPC surface
+- **Eliminated**: Tauri, Rust, React, TypeScript, Python, JSON-RPC, IPC boundaries
+- **Unified**: All code in Swift with native APIs
+- **Reduced complexity**: 1 language (Swift) instead of 3-4 languages
 
 ---
 
@@ -212,21 +225,16 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
    - UsageStatistics (privacy-preserving aggregations)
    - AudioBuffer (in-memory audio handling)
 
-2. **contracts/tauri-ipc.md**: Tauri IPC API specification
-   - Command definitions with request/response schemas
-   - Event emissions for real-time updates
-   - Error handling patterns and codes
-   - TypeScript type generation strategy
-
-3. **contracts/swift-fluidae.md**: Swift FluidAudio integration contract
+2. **contracts/swift-fluidaudio.md**: Swift FluidAudio integration contract
    - FluidAudio SDK wrapper interface
    - AsrManager configuration and usage
    - Model loading and language switching
    - Error codes and Swift implementation patterns
 
-4. **quickstart.md**: Developer onboarding guide
+3. **quickstart.md**: Developer onboarding guide
    - System requirements and dependencies
    - Swift Package Manager setup for FluidAudio
+   - Xcode workspace configuration
    - Development workflow and common tasks
    - Troubleshooting guide
 
@@ -237,33 +245,31 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
 ### System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     React Frontend (TS)                      │
-│  • Recording modal with waveform visualization              │
-│  • Onboarding flow with permission requests                 │
-│  • Settings UI with hotkey customization                    │
-│  • Menu bar integration                                     │
-└──────────────────┬──────────────────────────────────────────┘
-                   │ Tauri IPC (async invoke)
-┌──────────────────▼──────────────────────────────────────────┐
-│                   Rust Tauri Core                           │
-│  • IPC command handlers (commands.rs)                       │
-│  • Application state management                             │
-│  • Swift bridge orchestration (FFI)                         │
-└──────────────────┬──────────────────────────────────────────┘
-                   │ Swift FFI (C ABI)
-┌──────────────────▼──────────────────────────────────────────┐
-│              Swift Native Layer + FluidAudio                 │
-│  • GlobalHotkey (Carbon API)                                │
-│  • FluidAudio SDK:                                          │
-│    - AsrManager (Parakeet TDT v3)                           │
-│    - Voice Activity Detection (Silero)                      │
-│    - Audio preprocessing (16kHz conversion)                 │
-│    - Model management (auto-download)                       │
-│  • TextInsertion (Accessibility API)                        │
-│  • MenuBar (NSStatusItem)                                   │
-│  • Apple Neural Engine (ANE) for inference                  │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│         SwiftUI Application             │
+│  ┌───────────────────────────────────┐  │
+│  │  Views                            │  │
+│  │  - RecordingModal (waveform)     │  │
+│  │  - OnboardingView                │  │
+│  │  - SettingsView                  │  │
+│  │  - MenuBarView                   │  │
+│  └─────────────┬─────────────────────┘  │
+│                │                         │
+│  ┌─────────────▼─────────────────────┐  │
+│  │  Services (Swift)                 │  │
+│  │  - FluidAudioService              │  │
+│  │  - HotkeyService (Carbon)         │  │
+│  │  - AudioCaptureService            │  │
+│  │  - TextInsertionService (AX)     │  │
+│  │  - SettingsService                │  │
+│  │  - StatisticsService              │  │
+│  │  - PermissionService              │  │
+│  └─────────────┬─────────────────────┘  │
+│                │                         │
+│                ▼                         │
+│         FluidAudio SDK                   │
+│         Apple Neural Engine              │
+└─────────────────────────────────────────┘
 ```
 
 ### Data Flow: User Dictation
@@ -271,41 +277,33 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
 ```
 1. User presses ⌘⌃Space
    ↓
-2. Swift GlobalHotkey detects → emits event to Rust
+2. HotkeyService detects via Carbon API
    ↓
-3. Rust emits 'hotkey-pressed' → React shows modal
+3. AppState updates → RecordingModal appears (SwiftUI)
    ↓
-4. React calls invoke('start_recording')
+4. User speaks → AudioCaptureService captures audio
    ↓
-5. Rust calls Swift FluidAudioService → starts recording
+5. AudioCaptureService → audio levels to WaveformView (30fps)
    ↓
-6. FluidAudio captures audio (16kHz) + VAD detection
+6. FluidAudioService detects silence via VAD (1.5s)
    ↓
-7. Audio levels → Rust → React (30fps) for waveform
+7. FluidAudioService.transcribe() → Apple Neural Engine
    ↓
-8. Silence detected by FluidAudio VAD (1.5s) → auto-stop
+8. Parakeet TDT v3 inference → text + confidence
    ↓
-9. Swift calls FluidAudio AsrManager.transcribe()
+9. TextInsertionService inserts via Accessibility API
    ↓
-10. Apple Neural Engine inference (Parakeet TDT v3)
-    ↓
-11. FluidAudio returns text + confidence → Swift → Rust
-    ↓
-12. Rust calls Swift TextInsertion → Accessibility API
-    ↓
-13. Text inserted at cursor → modal closes
-    ↓
-14. Statistics updated → SQLite
+10. Modal closes → StatisticsService updates
 ```
 
 ### Technology Integration Points
 
 | Integration | Mechanism | Purpose |
 |-------------|-----------|---------|
-| React ↔ Rust | Tauri IPC commands | UI state management, trigger actions |
-| Rust ↔ Swift | FFI with C ABI (dylib) | Native macOS APIs + FluidAudio ML |
-| Swift → FluidAudio | Swift Package Manager | ASR transcription, VAD, model management |
-| Swift → Hardware | Carbon, Accessibility | System hotkeys, text insertion |
+| SwiftUI → Services | @StateObject, @EnvironmentObject | Reactive UI updates, dependency injection |
+| Services → FluidAudio | Swift Package Manager | ASR transcription, VAD, model management |
+| Services → Carbon | C API bridge | Global hotkey registration |
+| Services → Accessibility | macOS framework | Text insertion into active app |
 | FluidAudio → ANE | Apple Neural Engine | Parakeet TDT v3 inference (on-device) |
 
 ### Security & Privacy Architecture
@@ -314,21 +312,21 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
 - 100% local processing via Apple Neural Engine (zero network calls post-setup)
 - No audio data persisted to disk
 - No transcribed text stored (only aggregated statistics)
-- User settings encrypted at rest (Tauri Store)
+- User settings stored in UserDefaults (encrypted by macOS)
 - Models auto-downloaded by FluidAudio from HuggingFace (HTTPS only)
 
 **Permission Boundaries**:
-- Microphone: Required for audio capture via FluidAudio
+- Microphone: Required for audio capture
 - Accessibility: Required for text insertion
 - Input Monitoring: Required for global hotkeys (macOS 10.15+)
 - No network permission needed (except model downloads)
-- No file system access beyond app sandbox
+- App Sandbox compatible (with entitlements)
 
 **Sandboxing**:
-- Swift native code runs in same process (FFI) with clearly defined C ABI boundary
-- Frontend (React) has no direct access to native APIs
-- All cross-boundary communication validated
+- All code runs in single process (no IPC boundaries)
+- Clear service boundaries via Swift protocols
 - FluidAudio SDK runs in-process for maximum performance
+- Accessibility API accessed via official macOS frameworks
 
 ---
 
@@ -338,21 +336,21 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
 
 ```
         ┌─────────────────┐
-        │   E2E Tests     │  Manual QA on fresh macOS
-        │   (Manual)      │  Permission flows, full user stories
+        │   E2E Tests     │  XCUITest on fresh macOS
+        │   (XCUITest)    │  Permission flows, full user stories
         └─────────────────┘
               ▲
               │
         ┌─────────────────┐
         │  Integration    │  Pre-authorized environment
-        │  Tests (Cargo)  │  Swift bridge, Python bridge
+        │  Tests (XCTest) │  FluidAudio, Accessibility API
         └─────────────────┘
               ▲
               │
     ┌───────────────────────┐
     │   Unit Tests          │  Mocked system APIs
-    │   (Vitest + pytest +  │  100% business logic coverage
-    │    Cargo + XCTest)    │  No permission dependencies
+    │   (XCTest)            │  100% business logic coverage
+    │                       │  No permission dependencies
     └───────────────────────┘
 ```
 
@@ -360,67 +358,78 @@ All technical unknowns resolved. Architecture significantly simplified with Flui
 
 | Layer | Tool | Minimum Coverage | Notes |
 |-------|------|------------------|-------|
-| Frontend (React/TS) | Vitest + React Testing Library | 80% | Components, hooks, services |
-| Rust (Tauri core) | cargo test + mockall | 80% | Commands, Swift bridge, state |
-| Swift (Native + FluidAudio) | XCTest + mocks | 75% | Hotkey, FluidAudio wrapper, text insertion |
-| Integration | cargo test --ignored | Key flows | Hotkey → modal → transcribe → insert |
-| E2E | Manual QA | User stories | All acceptance criteria from spec.md |
+| Services | XCTest + mocks | 80% | FluidAudioService, HotkeyService, etc. |
+| Models | XCTest | 90% | RecordingSession, UserSettings, etc. |
+| Views | SwiftUI Previews + XCUITest | 60% | Visual regression via Previews |
+| Integration | XCTest --ignored | Key flows | Hotkey → modal → transcribe → insert |
+| E2E | XCUITest | User stories | All acceptance criteria from spec.md |
 
 ### TDD Workflow
 
 **RED Phase** (Write failing test):
-```typescript
-// src/services/audio.service.test.ts
-describe('AudioService', () => {
-  it('should start recording when microphone permission granted', async () => {
-    const mockIPC = createMockIPCService({ micPermission: true });
-    const audioService = new AudioService(mockIPC);
+```swift
+// Tests/SpeechToTextTests/Services/FluidAudioServiceTests.swift
+import XCTest
+@testable import SpeechToText
 
-    await audioService.startRecording();
+class FluidAudioServiceTests: XCTestCase {
+    func testTranscribeReturnsTextForValidAudio() async throws {
+        let service = FluidAudioService()
+        try await service.initialize(language: "en")
 
-    expect(mockIPC.startRecording).toHaveBeenCalled();
-    expect(audioService.isRecording).toBe(true);
-  });
-});
+        let mockSamples = generateSilence(duration: 2.0) // 2 seconds of silence
+
+        let result = try await service.transcribe(samples: mockSamples)
+
+        XCTAssertFalse(result.text.isEmpty)
+        XCTAssertGreaterThan(result.confidence, 0.0)
+    }
+}
 ```
 
 **GREEN Phase** (Minimal implementation):
-```typescript
-// src/services/audio.service.ts
-export class AudioService {
-  private _isRecording = false;
+```swift
+// Sources/Services/FluidAudioService.swift
+import FluidAudio
 
-  constructor(private ipc: IPCService) {}
+class FluidAudioService {
+    private var asrManager: AsrManager?
 
-  async startRecording(): Promise<void> {
-    await this.ipc.startRecording();
-    this._isRecording = true;
-  }
+    func initialize(language: String) async throws {
+        let models = try await AsrModels.downloadAndLoad(version: .v3)
+        self.asrManager = AsrManager(config: .default)
+        try await asrManager?.initialize(models: models)
+    }
 
-  get isRecording(): boolean {
-    return this._isRecording;
-  }
+    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+        let floatSamples = samples.map { Float($0) / 32768.0 }
+        let result = try await asrManager!.transcribe(floatSamples)
+        return TranscriptionResult(text: result.text, confidence: result.confidence ?? 0.95)
+    }
 }
 ```
 
 **REFACTOR Phase** (Improve with error handling):
-```typescript
-export class AudioService {
-  async startRecording(): Promise<void> {
-    if (this._isRecording) {
-      throw new Error('Recording already in progress');
-    }
+```swift
+class FluidAudioService {
+    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+        guard let asrManager = asrManager else {
+            throw FluidAudioError.notInitialized
+        }
 
-    try {
-      await this.ipc.startRecording();
-      this._isRecording = true;
-    } catch (error) {
-      if (error.code === 'PERMISSION_DENIED') {
-        throw new PermissionError('Microphone permission not granted');
-      }
-      throw error;
+        guard !samples.isEmpty else {
+            throw FluidAudioError.invalidInput("Audio samples cannot be empty")
+        }
+
+        let floatSamples = samples.map { Float($0) / 32768.0 }
+
+        do {
+            let result = try await asrManager.transcribe(floatSamples)
+            return TranscriptionResult(text: result.text, confidence: result.confidence ?? 0.95)
+        } catch {
+            throw FluidAudioError.transcriptionFailed(error.localizedDescription)
+        }
     }
-  }
 }
 ```
 
@@ -434,23 +443,31 @@ Automated benchmarks run on every PR to detect regressions:
 - Waveform FPS: ≥30fps
 - Idle RAM: <200MB
 - Active RAM: <500MB
-- UI responsiveness: 60fps during transcription
+- UI responsiveness: 60fps (120fps on ProMotion)
 
-**CI Pipeline**:
-```yaml
-# .github/workflows/ci.yml
-- name: Run performance benchmarks
-  run: |
-    cargo bench --bench hotkey_latency
-    cargo bench --bench transcription_e2e
-    pytest ml-backend/tests/ --benchmark-only
+**XCTest Measure Blocks**:
+```swift
+class PerformanceTests: XCTestCase {
+    func testHotkeyResponseLatency() {
+        let service = HotkeyService()
 
-- name: Compare against baseline
-  run: |
-    python scripts/compare-benchmarks.py \
-      --current target/criterion/ \
-      --baseline main \
-      --threshold 10%  # Fail if >10% regression
+        measure {
+            service.simulateHotkeyPress()
+            // Measure time until modal appears
+        }
+        // XCTest will report average time, std deviation
+    }
+
+    func testTranscriptionLatency() async throws {
+        let service = FluidAudioService()
+        try await service.initialize(language: "en")
+        let samples = generateTestAudio(duration: 5.0)
+
+        measure {
+            _ = try? await service.transcribe(samples: samples)
+        }
+    }
+}
 ```
 
 ---
@@ -458,45 +475,48 @@ Automated benchmarks run on every PR to detect regressions:
 ## Implementation Roadmap
 
 ### Milestone 1: Core Infrastructure (P1 - User Story 1 & 2)
-- [ ] Tauri app scaffold with React frontend
-- [ ] Swift dylib build integration with Swift Package Manager
+- [ ] Xcode project setup with Swift Package Manager
 - [ ] FluidAudio SDK integration via SPM
-- [ ] Basic IPC commands (start_recording, stop_recording, transcribe)
-- [ ] Swift global hotkey registration (Carbon API)
-- [ ] FluidAudio AsrManager wrapper (English only initially)
-- [ ] Swift text insertion (Accessibility API)
-- [ ] Onboarding flow with permission requests
+- [ ] SwiftUI app scaffold with menu bar integration
+- [ ] HotkeyService (Carbon API for global hotkeys)
+- [ ] AudioCaptureService (Core Audio)
+- [ ] FluidAudioService wrapper (English only initially)
+- [ ] TextInsertionService (Accessibility API)
+- [ ] Basic RecordingModal SwiftUI view
+- [ ] OnboardingView with permission requests
 - **Deliverable**: User can press hotkey, speak, and see text inserted
 
 ### Milestone 2: UI/UX Polish (P2 - User Story 3)
-- [ ] Recording modal with frosted glass design
-- [ ] Real-time waveform visualization (Web Audio API)
-- [ ] Settings UI (hotkey, language, audio sensitivity)
-- [ ] Menu bar integration with stats
+- [ ] RecordingModal with frosted glass design (.ultraThinMaterial)
+- [ ] Real-time WaveformView (Core Audio visualization)
+- [ ] SettingsView (hotkey, language, audio sensitivity)
+- [ ] MenuBarView with stats display
 - [ ] Error handling and user feedback
+- [ ] "Warm Minimalism" design system (colors, typography, animations)
 - **Deliverable**: Production-quality UI matching design spec
 
 ### Milestone 3: Multi-Language Support (P3 - User Story 4 & 5)
-- [ ] Language selection UI
-- [ ] FluidAudio model management (auto-download from HuggingFace)
-- [ ] Language switching (AsrManager language parameter)
+- [ ] Language selection UI in SettingsView
+- [ ] FluidAudio model management (auto-download with progress)
+- [ ] Language switching in FluidAudioService
 - [ ] Model download progress UI
-- **Deliverable**: 25 European languages supported via FluidAudio
+- [ ] 25 European language support
+- **Deliverable**: All languages supported via FluidAudio
 
 ### Milestone 4: Testing & Quality (All Priorities)
-- [ ] Unit tests for all layers (80% coverage)
-- [ ] Integration tests (Swift bridge + FluidAudio)
-- [ ] Performance benchmarks (automated CI)
-- [ ] E2E test scenarios (manual QA checklist)
+- [ ] Unit tests for all services (80% coverage)
+- [ ] XCUITest for E2E flows
+- [ ] Performance benchmarks (XCTest measure blocks)
+- [ ] SwiftUI Previews for all views
 - [ ] Accessibility testing (VoiceOver, keyboard navigation)
 - **Deliverable**: Production-ready quality
 
 ### Milestone 5: Distribution (Release)
 - [ ] DMG installer with code signing
 - [ ] App notarization (Apple)
-- [ ] Auto-update mechanism (Tauri updater)
+- [ ] Sparkle framework for auto-updates
 - [ ] Crash reporting (privacy-preserving)
-- [ ] Analytics (opt-in, anonymous)
+- [ ] Optional analytics (opt-in, anonymous)
 - **Deliverable**: Shippable macOS app
 
 ---
@@ -505,13 +525,13 @@ Automated benchmarks run on every PR to detect regressions:
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Accessibility API reliability | High | Fallback to clipboard copy, extensive testing |
+| Accessibility API reliability | High | Fallback to clipboard copy, extensive testing across apps |
 | FluidAudio model download failures | Low | FluidAudio handles downloads with built-in retry logic |
 | Global hotkey conflicts | Medium | Conflict detection, alternative hotkey suggestions |
-| Memory leaks in FluidAudio | Low | FluidAudio manages memory internally, monitor via instruments |
-| FluidAudio SDK updates breaking changes | Medium | Pin to specific version, test upgrades in isolation |
+| Memory leaks in FluidAudio | Low | FluidAudio manages memory internally, monitor via Instruments |
+| FluidAudio SDK breaking changes | Medium | Pin to specific version (0.9.0), test upgrades in isolation |
 | Permission denial by users | Medium | Clear explanations, graceful degradation, settings link |
-| Swift/Rust FFI ABI mismatch | High | Strict C ABI only, comprehensive integration tests |
+| Carbon API deprecation | Low | Monitor Apple announcements, prepare CGEventTap fallback |
 
 ---
 
@@ -545,6 +565,6 @@ Automated benchmarks run on every PR to detect regressions:
 
 **Ready for Phase 3**: Task generation
 
-Run `/speckit.tasks` command to generate `tasks.md` with dependency-ordered implementation tasks.
+Run `/speckit.tasks` command to generate `tasks.md` with dependency-ordered implementation tasks for Pure Swift + SwiftUI architecture.
 
 **Note**: This plan stops at Phase 2 as per the `/speckit.plan` workflow. Implementation occurs in Phase 3 via the `/speckit.implement` command.
