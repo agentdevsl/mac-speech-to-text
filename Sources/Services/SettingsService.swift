@@ -28,7 +28,6 @@ class SettingsService {
 
         let data = try encoder.encode(updatedSettings)
         userDefaults.set(data, forKey: settingsKey)
-        userDefaults.synchronize()
     }
 
     /// Reset settings to defaults

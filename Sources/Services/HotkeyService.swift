@@ -9,6 +9,7 @@ class HotkeyService {
 
     deinit {
         unregisterHotkey()
+        // Note: The retained self reference is released in unregisterHotkey()
     }
 
     /// Register a global hotkey
@@ -57,7 +58,7 @@ class HotkeyService {
             eventHandlerCallback,
             1,
             &eventSpec,
-            Unmanaged.passUnretained(self).toOpaque(),
+            Unmanaged.passRetained(self).toOpaque(),
             &eventHandler
         )
 
@@ -83,12 +84,21 @@ class HotkeyService {
     /// Unregister current hotkey
     func unregisterHotkey() {
         if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
+            let status = UnregisterEventHotKey(hotKeyRef)
+            if status != noErr {
+                print("[HotkeyService] Warning: Failed to unregister hotkey: \(status)")
+            }
             self.hotKeyRef = nil
         }
 
         if let eventHandler = eventHandler {
-            RemoveEventHandler(eventHandler)
+            let status = RemoveEventHandler(eventHandler)
+            if status != noErr {
+                print("[HotkeyService] Warning: Failed to remove event handler: \(status)")
+            }
+
+            // Release the retained self reference that was created in registerHotkey
+            Unmanaged.passUnretained(self).release()
             self.eventHandler = nil
         }
 

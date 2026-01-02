@@ -41,7 +41,11 @@ class TextInsertionService {
             return
         }
 
-        let axElement = element as! AXUIElement
+        guard let axElement = element as? AXUIElement else {
+            // Type mismatch - fallback to clipboard
+            try await copyToClipboard(text)
+            return
+        }
 
         // Try to insert text directly
         let insertionResult = AXUIElementSetAttributeValue(
@@ -53,6 +57,9 @@ class TextInsertionService {
         if insertionResult == .success {
             return
         }
+
+        // Log why direct insertion failed before falling back
+        print("[TextInsertionService] Direct insertion failed with error: \(insertionResult). Falling back to paste.")
 
         // Try alternative: simulate paste
         try await simulatePaste(text)
@@ -71,28 +78,38 @@ class TextInsertionService {
         try await copyToClipboard(text)
 
         // Simulate Cmd+V
-        let source = CGEventSource(stateID: .hidSystemState)
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            throw TextInsertionError.eventSourceCreationFailed
+        }
 
         // Press Cmd
-        let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) // Cmd key
-        cmdDown?.flags = .maskCommand
+        guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) else {
+            throw TextInsertionError.keyEventCreationFailed("Command key down")
+        }
+        cmdDown.flags = .maskCommand
 
         // Press V
-        let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) // V key
-        vDown?.flags = .maskCommand
+        guard let vDown = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: true) else {
+            throw TextInsertionError.keyEventCreationFailed("V key down")
+        }
+        vDown.flags = .maskCommand
 
         // Release V
-        let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false)
-        vUp?.flags = .maskCommand
+        guard let vUp = CGEvent(keyboardEventSource: source, virtualKey: 0x09, keyDown: false) else {
+            throw TextInsertionError.keyEventCreationFailed("V key up")
+        }
+        vUp.flags = .maskCommand
 
         // Release Cmd
-        let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false)
+        guard let cmdUp = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: false) else {
+            throw TextInsertionError.keyEventCreationFailed("Command key up")
+        }
 
         // Post events
-        cmdDown?.post(tap: .cghidEventTap)
-        vDown?.post(tap: .cghidEventTap)
-        vUp?.post(tap: .cghidEventTap)
-        cmdUp?.post(tap: .cghidEventTap)
+        cmdDown.post(tap: .cghidEventTap)
+        vDown.post(tap: .cghidEventTap)
+        vUp.post(tap: .cghidEventTap)
+        cmdUp.post(tap: .cghidEventTap)
     }
 }
 
@@ -101,6 +118,8 @@ enum TextInsertionError: Error, LocalizedError {
     case noFocusedElement
     case insertionFailed
     case clipboardFailed
+    case eventSourceCreationFailed
+    case keyEventCreationFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -110,6 +129,10 @@ enum TextInsertionError: Error, LocalizedError {
             return "Failed to insert text via Accessibility API"
         case .clipboardFailed:
             return "Failed to copy text to clipboard"
+        case .eventSourceCreationFailed:
+            return "Failed to create CGEventSource for keyboard simulation"
+        case .keyEventCreationFailed(let key):
+            return "Failed to create keyboard event for \(key)"
         }
     }
 }

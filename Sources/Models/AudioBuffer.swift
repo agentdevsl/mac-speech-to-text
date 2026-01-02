@@ -24,8 +24,12 @@ struct AudioBuffer {
         self.peakAmplitude = samples.map { abs($0) }.max() ?? 0
 
         // Calculate RMS level
-        let sumOfSquares = samples.reduce(0.0) { $0 + pow(Double($1), 2) }
-        self.rmsLevel = sqrt(sumOfSquares / Double(samples.count))
+        if samples.isEmpty {
+            self.rmsLevel = 0.0
+        } else {
+            let sumOfSquares = samples.reduce(0.0) { $0 + pow(Double($1), 2) }
+            self.rmsLevel = sqrt(sumOfSquares / Double(samples.count))
+        }
     }
 
     var isValid: Bool {
@@ -37,7 +41,8 @@ struct AudioBuffer {
 }
 
 /// Streaming audio buffer for real-time capture
-class StreamingAudioBuffer {
+/// Thread-safe actor for concurrent access from audio callback thread
+actor StreamingAudioBuffer {
     private(set) var chunks: [AudioBuffer] = []
     let maxChunkSize: Int
 

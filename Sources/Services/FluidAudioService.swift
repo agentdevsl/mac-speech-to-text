@@ -9,7 +9,7 @@ struct TranscriptionResult {
 }
 
 /// Errors specific to FluidAudio integration
-enum FluidAudioError: Error, LocalizedError {
+enum FluidAudioError: Error, LocalizedError, Sendable {
     case notInitialized
     case modelNotLoaded
     case initializationFailed(String)

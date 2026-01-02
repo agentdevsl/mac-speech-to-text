@@ -107,7 +107,6 @@ class StatisticsService {
     /// Clear all statistics
     func clearAll() {
         userDefaults.removeObject(forKey: statsKey)
-        userDefaults.synchronize()
     }
 
     /// Clear statistics older than retention period
@@ -136,7 +135,6 @@ class StatisticsService {
         encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(stats)
         userDefaults.set(data, forKey: statsKey)
-        userDefaults.synchronize()
     }
 
     private func saveStats(_ stats: UsageStatistics) throws {

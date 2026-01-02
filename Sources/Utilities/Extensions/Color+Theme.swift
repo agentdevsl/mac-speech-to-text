@@ -37,10 +37,17 @@ extension Color {
 /// Dynamic color that adapts to light/dark mode
 extension Color {
     static func adaptive(light: Color, dark: Color) -> Color {
-        Color(UIColor { traitCollection in
+        #if os(macOS)
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ?
+                NSColor(dark) : NSColor(light)
+        })
+        #else
+        Color(uiColor: UIColor { traitCollection in
             traitCollection.userInterfaceStyle == .dark ?
                 UIColor(dark) : UIColor(light)
         })
+        #endif
     }
 }
 
