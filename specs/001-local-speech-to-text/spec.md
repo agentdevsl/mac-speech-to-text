@@ -2,8 +2,9 @@
 
 **Feature Branch**: `001-local-speech-to-text`
 **Created**: 2026-01-02
+**Updated**: 2026-01-02 (Updated to use FluidAudio Swift SDK)
 **Status**: Draft
-**Input**: User description: "Build a macOS local speech-to-text application with a beautiful, privacy-focused design. The app should be invisible until triggered by a global hotkey (⌘⌃Space), then appear with an elegant recording modal. Key features: Tauri 2.0 + React + TypeScript frontend, Python + MLX + parakeet-tdt for local ML inference on Apple Silicon, Swift for native APIs (global hotkeys, audio capture, text insertion), 'Warm Minimalism' design aesthetic with frosted glass UI, Real-time audio waveform visualization, Automatic text insertion into active applications, Settings for hotkey customization, language selection, Onboarding flow with permission requests, Menu bar integration with quick stats, Complete privacy - 100% local processing"
+**Input**: User description: "Build a macOS local speech-to-text application with a beautiful, privacy-focused design. The app should be invisible until triggered by a global hotkey (⌘⌃Space), then appear with an elegant recording modal. Key features: Tauri 2.0 + React + TypeScript frontend, FluidAudio Swift SDK for local ML inference on Apple Silicon with Parakeet TDT v3, Swift for native APIs (global hotkeys, audio capture, text insertion), 'Warm Minimalism' design aesthetic with frosted glass UI, Real-time audio waveform visualization, Automatic text insertion into active applications, Settings for hotkey customization, language selection, Onboarding flow with permission requests, Menu bar integration with quick stats, Complete privacy - 100% local processing via Apple Neural Engine"
 
 ## User Scenarios & Testing
 
@@ -129,7 +130,7 @@ A multilingual user wants to dictate in different languages depending on context
 - **FR-002**: System MUST display a recording modal with real-time audio waveform visualization when the hotkey is activated
 - **FR-003**: System MUST capture audio from the default system microphone at minimum 16kHz sample rate
 - **FR-004**: System MUST detect silence periods (configurable threshold, default 1.5 seconds) to automatically stop recording
-- **FR-005**: System MUST transcribe captured audio locally using the parakeet-tdt ML model without network calls
+- **FR-005**: System MUST transcribe captured audio locally using FluidAudio SDK with Parakeet TDT v3 model on Apple Neural Engine without network calls
 - **FR-006**: System MUST insert transcribed text at the current cursor position in the active application
 - **FR-007**: System MUST request and verify microphone access permission during onboarding
 - **FR-008**: System MUST request and verify accessibility permissions for text insertion during onboarding
@@ -173,7 +174,7 @@ A multilingual user wants to dictate in different languages depending on context
 - **SC-004**: Zero network calls are made during normal operation (verifiable via network monitoring tools)
 - **SC-005**: Users can complete the onboarding flow and perform their first successful transcription within 2 minutes of installation
 - **SC-006**: The recording modal appears within 50 milliseconds of pressing the global hotkey
-- **SC-007**: The application uses less than 200MB of RAM during idle state and less than 500MB during active transcription
+transcription
 - **SC-008**: Real-time waveform visualization updates at minimum 30 frames per second during recording
 - **SC-009**: 90% of users successfully grant all required permissions during onboarding without external help
 - **SC-010**: Language switching completes within 2 seconds for already-downloaded models
@@ -188,7 +189,7 @@ A multilingual user wants to dictate in different languages depending on context
 - Users dictate in environments with moderate noise levels (typical office/home settings)
 - Default hotkey (⌘⌃Space) does not conflict with user's existing shortcuts
 - Users understand basic macOS permission dialogs and System Settings navigation
-- The parakeet-tdt-0.6b-v3 model provides baseline accuracy for all 25 supported languages
+- FluidAudio SDK with Parakeet TDT v3 model provides baseline accuracy for all 25 supported European languages
 - Users will primarily dictate short to medium-length text (10 seconds to 2 minutes per recording)
 - Accessibility permissions allow programmatic text insertion into most standard macOS applications
 - Users prefer automatic silence detection over manual stop controls for typical use cases
