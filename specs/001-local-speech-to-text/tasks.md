@@ -156,12 +156,12 @@
 
 - [X] T043 [P] [US3] Create MenuBarViewModel at `/workspace/Sources/Views/MenuBarViewModel.swift` as @Observable class fetching daily statistics and handling menu actions
 - [X] T044 [US3] Create MenuBarView at `/workspace/Sources/Views/MenuBarView.swift` with quick stats display and menu options (Start Recording, Open Settings, Quit)
-- [ ] T045 [US3] Implement menu bar icon management in AppDelegate using NSStatusBar and NSStatusItem
-- [ ] T046 [US3] Add "Start Recording" action in MenuBarView to trigger RecordingModal programmatically
-- [ ] T047 [US3] Add "Open Settings" action in MenuBarView to show SettingsView window
+- [X] T045 [US3] Implement menu bar icon management in AppDelegate using NSStatusBar and NSStatusItem
+- [X] T046 [US3] Add "Start Recording" action in MenuBarView to trigger RecordingModal programmatically
+- [X] T047 [US3] Add "Open Settings" action in MenuBarView to show SettingsView window
 - [X] T048 [US3] Fetch daily statistics in MenuBarViewModel from StatisticsService (words transcribed today, total sessions)
 - [X] T049 [US3] Add real-time stats updates in MenuBarView when statistics change using Combine or @Observable updates
-- [ ] T050 [US3] Create menu bar icon assets in `/workspace/Resources/Assets.xcassets/MenuBarIcons/` with light and dark mode variants
+- [X] T050 [US3] Create menu bar icon assets in `/workspace/Resources/Assets.xcassets/MenuBarIcons/` with light and dark mode variants
 
 **Checkpoint**: User Story 3 complete - menu bar provides quick access to app functionality and usage stats
 
