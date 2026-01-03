@@ -6,17 +6,19 @@ final class SettingsServiceTests: XCTestCase {
 
     var userDefaults: UserDefaults!
     var service: SettingsService!
+    var suiteName: String!
 
     override func setUp() async throws {
         try await super.setUp()
-        // Use a test suite name to avoid interfering with actual app data
-        userDefaults = UserDefaults(suiteName: "com.speechtotext.tests")!
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.tests")
+        // Use unique suite name per test to ensure isolation during parallel execution
+        suiteName = "com.speechtotext.tests.\(UUID().uuidString)"
+        userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
         service = SettingsService(userDefaults: userDefaults)
     }
 
     override func tearDown() async throws {
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.tests")
+        userDefaults.removePersistentDomain(forName: suiteName)
         try await super.tearDown()
     }
 
@@ -64,18 +66,17 @@ final class SettingsServiceTests: XCTestCase {
 
     func test_save_updatesLastModifiedDate() throws {
         // Given
-        let originalSettings = UserSettings.default
-        let originalDate = originalSettings.lastModified
-
-        // Wait a bit to ensure time difference
-        Thread.sleep(forTimeInterval: 0.01)
+        // Create settings with a date in the past to ensure save updates it
+        var originalSettings = UserSettings.default
+        let pastDate = Date().addingTimeInterval(-60) // 1 minute ago
+        originalSettings.lastModified = pastDate
 
         // When
         try service.save(originalSettings)
 
         // Then
         let loadedSettings = service.load()
-        XCTAssertGreaterThan(loadedSettings.lastModified, originalDate)
+        XCTAssertGreaterThan(loadedSettings.lastModified, pastDate)
     }
 
     // MARK: - Reset Tests

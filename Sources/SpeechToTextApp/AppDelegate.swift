@@ -107,7 +107,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func showOnboarding() {
         let contentView = OnboardingView()
-            .onDisappear {
+            .onDisappear { [weak self] in
+                guard let self else { return }
                 self.onboardingWindow?.close()
                 self.onboardingWindow = nil
 
@@ -147,9 +148,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create SwiftUI view
         let contentView = RecordingModal()
-            .onDisappear {
-                self.recordingWindow?.close()
-                self.recordingWindow = nil
+            .onDisappear { [weak self] in
+                self?.recordingWindow?.close()
+                self?.recordingWindow = nil
             }
 
         // Create window for modal
@@ -184,9 +185,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Create settings view (Phase 6 implementation)
         let contentView = SettingsView()
-            .onDisappear {
-                self.settingsWindow?.close()
-                self.settingsWindow = nil
+            .onDisappear { [weak self] in
+                self?.settingsWindow?.close()
+                self?.settingsWindow = nil
             }
 
         // Create settings window
