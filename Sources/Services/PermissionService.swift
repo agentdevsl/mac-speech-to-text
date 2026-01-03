@@ -54,7 +54,15 @@ class PermissionService: PermissionChecker {
     func checkAccessibilityPermission() -> Bool {
         // Use string literal to avoid Swift 6 concurrency warnings with global kAXTrustedCheckOptionPrompt
         let options: NSDictionary = ["AXTrustedCheckOptionPrompt": false]
-        return AXIsProcessTrustedWithOptions(options)
+        let isTrusted = AXIsProcessTrustedWithOptions(options)
+
+        // Debug logging for accessibility permission status
+        let bundleID = Bundle.main.bundleIdentifier ?? "unknown"
+        AppLogger.system.debug(
+            "Accessibility check: trusted=\(isTrusted), bundleID=\(bundleID, privacy: .public)"
+        )
+
+        return isTrusted
     }
 
     /// Request accessibility permission
