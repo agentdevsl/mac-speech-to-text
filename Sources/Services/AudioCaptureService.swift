@@ -57,8 +57,8 @@ class AudioCaptureService {
             throw AudioCaptureError.noDataRecorded
         }
 
-        streamingBuffer.markComplete()
-        let samples = streamingBuffer.allSamples
+        await streamingBuffer.markComplete()
+        let samples = await streamingBuffer.allSamples
 
         // Clear buffer
         self.streamingBuffer = nil
@@ -76,8 +76,11 @@ class AudioCaptureService {
         // Create audio buffer
         let audioBuffer = AudioBuffer(samples: samples)
 
-        // Add to streaming buffer
-        streamingBuffer?.append(audioBuffer)
+        // Add to streaming buffer (using Task for non-blocking async execution
+        // since Core Audio callbacks run in a synchronous context)
+        Task { [weak self] in
+            await self?.streamingBuffer?.append(audioBuffer)
+        }
 
         // Calculate and report audio level
         let level = audioBuffer.rmsLevel / 32768.0 // Normalize to 0-1 range

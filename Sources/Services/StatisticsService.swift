@@ -123,11 +123,16 @@ class StatisticsService {
     // MARK: - Private Helpers
 
     private func loadAllStats() -> [UsageStatistics] {
-        guard let data = userDefaults.data(forKey: statsKey),
-              let stats = try? JSONDecoder().decode([UsageStatistics].self, from: data) else {
+        guard let data = userDefaults.data(forKey: statsKey) else {
             return []
         }
-        return stats
+
+        do {
+            return try JSONDecoder().decode([UsageStatistics].self, from: data)
+        } catch {
+            print("[StatisticsService] ERROR: Failed to decode statistics: \(error). Returning empty array. Historical statistics may be lost.")
+            return []
+        }
     }
 
     private func saveAllStats(_ stats: [UsageStatistics]) throws {

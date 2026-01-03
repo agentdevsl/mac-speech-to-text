@@ -11,11 +11,16 @@ class SettingsService {
 
     /// Load settings from UserDefaults
     func load() -> UserSettings {
-        guard let data = userDefaults.data(forKey: settingsKey),
-              let settings = try? JSONDecoder().decode(UserSettings.self, from: data) else {
+        guard let data = userDefaults.data(forKey: settingsKey) else {
             return .default
         }
-        return settings
+
+        do {
+            return try JSONDecoder().decode(UserSettings.self, from: data)
+        } catch {
+            print("[SettingsService] ERROR: Failed to decode settings: \(error). Returning defaults. User may have lost customizations.")
+            return .default
+        }
     }
 
     /// Save settings to UserDefaults
