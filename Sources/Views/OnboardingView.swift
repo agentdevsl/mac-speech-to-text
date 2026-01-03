@@ -335,23 +335,6 @@ struct OnboardingView: View {
         }
     }
 
-    /// Step header with icon, title, and subtitle
-    private func stepHeader(icon: String, title: String, subtitle: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-
-            Text(title)
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text(subtitle)
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-    }
-
     // MARK: - Computed Properties
 
     /// Progress percentage (0.0 - 1.0)
@@ -383,77 +366,6 @@ struct OnboardingView: View {
             return viewModel.inputMonitoringGranted ? nil : "Input monitoring is required for the global hotkey"
         default:
             return nil
-        }
-    }
-}
-
-// MARK: - Helper Views
-
-private struct FeatureRow: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-            Text(text)
-        }
-    }
-}
-
-private struct StepInstruction: View {
-    let number: Int
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(number).")
-                .fontWeight(.semibold)
-            Text(text)
-        }
-        .font(.callout)
-    }
-}
-
-private struct DemoInstruction: View {
-    let number: Int
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(number).")
-                .fontWeight(.semibold)
-                .foregroundStyle(.green)
-            Text(text)
-        }
-    }
-}
-
-private struct KeyCapView: View {
-    var symbol: String?
-    var text: String?
-
-    var body: some View {
-        Text(symbol ?? text ?? "")
-            .font(.title2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-}
-
-private struct QuickTip: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-            Text(text)
         }
     }
 }
