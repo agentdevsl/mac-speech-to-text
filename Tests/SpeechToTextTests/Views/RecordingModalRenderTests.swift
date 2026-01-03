@@ -21,8 +21,9 @@ final class RecordingModalRenderTests: XCTestCase {
     /// Test that RecordingModal can be instantiated without crashing
     /// This catches issues like the @Observable + actor existential crash
     func test_recordingModal_instantiatesWithoutCrash() {
-        // Given/When - Simply creating the view should not crash
-        let modal = RecordingModal()
+        // Given/When - Create ViewModel OUTSIDE the view (this is the fix pattern)
+        let viewModel = RecordingViewModel()
+        let modal = RecordingModal(viewModel: viewModel)
 
         // Then - If we get here, no crash occurred
         XCTAssertNotNil(modal)
@@ -31,13 +32,36 @@ final class RecordingModalRenderTests: XCTestCase {
     /// Test that RecordingModal body can be accessed without crashing
     /// The original crash occurred in RecordingModal.body.getter
     func test_recordingModal_bodyAccessDoesNotCrash() {
-        // Given
-        let modal = RecordingModal()
+        // Given - Create ViewModel OUTSIDE the view (this is the fix pattern)
+        let viewModel = RecordingViewModel()
+        let modal = RecordingModal(viewModel: viewModel)
 
         // When - Access the body (this is where the crash occurred)
         let body = modal.body
 
         // Then - If we get here, no crash occurred
+        XCTAssertNotNil(body)
+    }
+
+    /// Test the critical pattern: ViewModel created BEFORE view creation
+    /// This is the exact fix for the actor existential crash
+    func test_recordingModal_externalViewModelCreation_noCrash() {
+        // This test verifies the fix for the crash where creating
+        // RecordingViewModel inline with @State triggered executor checks
+        // during SwiftUI body evaluation, causing EXC_BAD_ACCESS on ARM64.
+
+        // Given - Create ViewModel in a separate step (simulates AppDelegate pattern)
+        let viewModel = RecordingViewModel()
+
+        // Verify ViewModel has actor existential (the source of the crash)
+        // The fluidAudioService is `any FluidAudioServiceProtocol` which is Actor-constrained
+        XCTAssertFalse(viewModel.isRecording)
+
+        // When - Create view with pre-created ViewModel
+        let modal = RecordingModal(viewModel: viewModel)
+
+        // Then - Access body without crash
+        let body = modal.body
         XCTAssertNotNil(body)
     }
 
@@ -91,8 +115,9 @@ final class RecordingModalRenderTests: XCTestCase {
 
     /// Test RecordingModal view structure using ViewInspector
     func test_recordingModal_viewHierarchy() throws {
-        // Given
-        let modal = RecordingModal()
+        // Given - Create ViewModel externally
+        let viewModel = RecordingViewModel()
+        let modal = RecordingModal(viewModel: viewModel)
 
         // When
         let view = try modal.inspect()
