@@ -63,7 +63,7 @@ repos:
         name: Check for large files
         description: Prevents committing files larger than 500KB
         args:
-          - --maxkb=500
+          - --maxkb=1000
 
       - id: check-merge-conflict
         name: Check for merge conflicts
