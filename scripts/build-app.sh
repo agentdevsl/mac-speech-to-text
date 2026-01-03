@@ -67,7 +67,12 @@ CHECK_SIGNING_ONLY=false
 # Check for .signing-identity file
 SIGNING_IDENTITY_FILE="${PROJECT_ROOT}/.signing-identity"
 if [ -f "${SIGNING_IDENTITY_FILE}" ]; then
-    SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n')
+    SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n\r\t ')
+    # Validate file is not empty or whitespace-only
+    if [ -z "${SIGN_IDENTITY}" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} .signing-identity file is empty - using ad-hoc signing"
+        SIGN_IDENTITY=""
+    fi
 fi
 
 # =============================================================================
@@ -382,11 +387,18 @@ if [ "$SYNC_CODE" = true ]; then
             echo "  --sync will discard ALL uncommitted changes (staged and unstaged)."
             echo "  This operation cannot be undone."
             echo ""
-            echo -n "  Continue? (y/N): "
-            read -r response
-            if [[ ! "$response" =~ ^[Yy]$ ]]; then
-                print_info "Sync cancelled. Commit or stash your changes first."
-                exit 0
+            # Check if running interactively (TTY available)
+            if [ -t 0 ]; then
+                echo -n "  Continue? (y/N): "
+                read -r response
+                if [[ ! "$response" =~ ^[Yy]$ ]]; then
+                    print_info "Sync cancelled. Commit or stash your changes first."
+                    exit 0
+                fi
+            else
+                print_error "Cannot prompt for confirmation in non-interactive mode"
+                print_info "Stash or commit changes before using --sync in CI/scripts"
+                exit 1
             fi
         fi
         git fetch origin

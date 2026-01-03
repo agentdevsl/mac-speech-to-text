@@ -400,9 +400,22 @@ fi
 
 # Launch app
 print_info "Launching app for ${DURATION} seconds..."
-open "$APP_PATH" &
+open "$APP_PATH"
 
-# Wait
+# Verify app actually started
+LAUNCH_ATTEMPTS=0
+while ! pgrep -f "${APP_PATH}/Contents/MacOS/SpeechToText" >/dev/null 2>&1; do
+    sleep 0.5
+    LAUNCH_ATTEMPTS=$((LAUNCH_ATTEMPTS + 1))
+    if [ "$LAUNCH_ATTEMPTS" -ge 10 ]; then
+        print_error "App failed to launch within 5 seconds"
+        print_info "Check Console.app for launch errors"
+        exit 3
+    fi
+done
+print_success "App launched successfully"
+
+# Wait for test duration
 sleep "$DURATION"
 
 # Kill app gracefully using osascript (safer than pkill pattern matching)
