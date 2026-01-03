@@ -78,9 +78,11 @@ struct WaveformView: View {
 
     /// Update level history for smooth wave animation
     private func updateLevelHistory(newLevel: Float) {
+        // Guard against empty array to prevent index out of bounds crash
+        guard !levelHistory.isEmpty else { return }
         // Shift history and add new level
         levelHistory.removeFirst()
-        levelHistory.append(newLevel)
+        levelHistory.append(min(1.0, max(0.0, newLevel))) // Clamp to valid range
     }
 
     /// Determine color based on audio level

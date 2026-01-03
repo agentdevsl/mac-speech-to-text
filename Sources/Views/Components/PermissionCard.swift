@@ -56,8 +56,8 @@ struct PermissionCard: View {
                 Button {
                     Task {
                         isProcessing = true
+                        defer { isProcessing = false } // Ensure reset even if action throws
                         await action()
-                        isProcessing = false
                     }
                 } label: {
                     HStack {

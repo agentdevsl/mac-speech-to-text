@@ -44,6 +44,9 @@ final class MenuBarViewModel {
     private let statisticsService: StatisticsService
     private let settingsService: SettingsService
 
+    /// Task for initial data loading (stored for cleanup)
+    @ObservationIgnored private var initTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     init(
@@ -53,11 +56,16 @@ final class MenuBarViewModel {
         self.statisticsService = statisticsService
         self.settingsService = settingsService
 
-        // Load initial stats and language settings
-        Task { [weak self] in
+        // Load initial stats and language settings (store task for cleanup)
+        initTask = Task { [weak self] in
             await self?.refreshStatistics()
             await self?.loadLanguageSettings()
         }
+    }
+
+    deinit {
+        // Cancel any pending init task to prevent accessing deallocated memory
+        initTask?.cancel()
     }
 
     // MARK: - Public Methods

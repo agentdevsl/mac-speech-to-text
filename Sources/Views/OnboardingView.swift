@@ -17,8 +17,8 @@ struct OnboardingView: View {
 
     @State private var viewModel = OnboardingViewModel()
 
-    /// Timer to periodically check permission status when on permission steps
-    private let permissionCheckTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    /// Task for permission checking loop (cancellable)
+    @State private var permissionCheckTask: Task<Void, Never>?
 
     // MARK: - Body
 
@@ -27,24 +27,39 @@ struct OnboardingView: View {
             // Progress indicator
             progressBar
 
-            // Main content area
-            contentView
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(40)
+            // Main content area with scroll support for overflow
+            ScrollView {
+                contentView
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 24)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Navigation buttons
             navigationButtons
-                .padding(20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
         }
-        .frame(width: 600, height: 500)
+        .frame(width: 640, height: 560)
         .background(.ultraThinMaterial)
-        .onReceive(permissionCheckTimer) { _ in
-            // Only check permissions when on permission steps (1-3)
-            if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
-                Task {
-                    await viewModel.checkAllPermissions()
+        .onAppear {
+            // Start permission checking loop for permission steps
+            permissionCheckTask = Task { @MainActor in
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    guard !Task.isCancelled else { break }
+                    // Only check permissions when on permission steps (1-3)
+                    if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
+                        await viewModel.checkAllPermissions()
+                    }
                 }
             }
+        }
+        .onDisappear {
+            // Cancel the permission checking task when view disappears
+            permissionCheckTask?.cancel()
+            permissionCheckTask = nil
         }
         .alert(
             "Skip This Step?",
