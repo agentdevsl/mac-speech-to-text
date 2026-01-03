@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import AppKit
 import AVFoundation
 
 /// OnboardingViewModel manages the onboarding flow and permission state
@@ -167,7 +168,11 @@ final class OnboardingViewModel {
         settings.onboarding.permissionsGranted.accessibility = accessibilityGranted
         settings.onboarding.permissionsGranted.inputMonitoring = inputMonitoringGranted
 
-        settingsService.save(settings)
+        do {
+            try settingsService.save(settings)
+        } catch {
+            print("Failed to save onboarding settings: \(error)")
+        }
     }
 
     /// Open System Settings for specific permission
