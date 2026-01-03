@@ -46,6 +46,7 @@ struct LanguagePicker: View {
 
                 TextField("Search languages...", text: $searchText)
                     .textFieldStyle(.plain)
+                    .accessibilityLabel("Search languages")
 
                 if !searchText.isEmpty {
                     Button {
@@ -122,6 +123,22 @@ private struct LanguageRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(language.name), \(isSelected ? "selected" : "not selected"), \(downloadStatusText)")
+        .accessibilityHint(isSelected ? "Currently selected language" : "Double tap to select this language")
+    }
+
+    /// Accessibility text for download status
+    private var downloadStatusText: String {
+        switch language.downloadStatus {
+        case .downloaded:
+            return "downloaded"
+        case .downloading:
+            return "downloading"
+        case .notDownloaded:
+            return "not downloaded"
+        case .error:
+            return "download error"
+        }
     }
 
     /// Download status badge

@@ -20,6 +20,10 @@ struct RecordingModal: View {
     @State private var showError: Bool = false
     @State private var isVisible: Bool = false
     @State private var isDismissing: Bool = false
+    /// Task for starting recording - stored for cancellation
+    @State private var startRecordingTask: Task<Void, Never>?
+    /// Task for dismissal - stored for cancellation
+    @State private var dismissTask: Task<Void, Never>?
 
     // MARK: - Body
 
@@ -66,17 +70,24 @@ struct RecordingModal: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 isVisible = true
             }
-            // Auto-start recording
-            Task {
+            // Auto-start recording - store task for cancellation
+            startRecordingTask = Task {
                 do {
                     try await viewModel.startRecording()
                 } catch {
+                    guard !Task.isCancelled else { return }
                     viewModel.errorMessage = "Failed to start recording: \(error.localizedDescription)"
                     AppLogger.viewModel.error("startRecording failed: \(error.localizedDescription, privacy: .public)")
                 }
             }
         }
         .onDisappear {
+            // Cancel any pending tasks
+            startRecordingTask?.cancel()
+            startRecordingTask = nil
+            dismissTask?.cancel()
+            dismissTask = nil
+
             // Cleanup - only cancel if not already dismissing (prevents double-cancellation)
             guard !isDismissing else { return }
             Task {
@@ -250,12 +261,16 @@ struct RecordingModal: View {
         guard !isDismissing else { return }
         isDismissing = true
 
+        // Cancel any pending start recording task
+        startRecordingTask?.cancel()
+        startRecordingTask = nil
+
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             isVisible = false
         }
 
-        // Cancel recording and dismiss after animation delay using structured concurrency
-        Task { @MainActor in
+        // Cancel recording and dismiss after animation delay - store task for cleanup
+        dismissTask = Task { @MainActor in
             await viewModel.cancelRecording()
             try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
