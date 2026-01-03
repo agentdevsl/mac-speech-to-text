@@ -52,17 +52,20 @@ final class RecordingViewModel {
     }
 
     // MARK: - Dependencies
+    // All services are @ObservationIgnored to prevent @Observable from tracking them
+    // This is critical for fluidAudioService which is an actor existential type -
+    // tracking it can cause executor check crashes (pointer authentication failures)
 
-    private let audioService: AudioCaptureService
-    private let fluidAudioService: any FluidAudioServiceProtocol
-    private let textInsertionService: TextInsertionService
-    private let settingsService: SettingsService
-    private let statisticsService: StatisticsService
+    @ObservationIgnored private let audioService: AudioCaptureService
+    @ObservationIgnored private let fluidAudioService: any FluidAudioServiceProtocol
+    @ObservationIgnored private let textInsertionService: TextInsertionService
+    @ObservationIgnored private let settingsService: SettingsService
+    @ObservationIgnored private let statisticsService: StatisticsService
 
     // MARK: - Private State
 
     @ObservationIgnored private var silenceTimer: Timer?
-    private let silenceThreshold: TimeInterval
+    @ObservationIgnored private let silenceThreshold: TimeInterval
     @ObservationIgnored private var languageSwitchObserver: NSObjectProtocol?
 
     /// Track if audio capture is active to prevent double-stop
