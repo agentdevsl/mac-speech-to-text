@@ -3,12 +3,14 @@ import OSLog
 import SwiftUI
 
 @MainActor
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var hotkeyService: HotkeyService?
     private var onboardingWindow: NSWindow?
     private let settingsService = SettingsService()
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
+    /// Flag to prevent race condition when showing recording modal
+    private var isShowingRecordingModal = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure only one instance of the app runs
@@ -50,6 +52,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // Keep app running in menu bar even if windows are closed
         return false
+    }
+
+    // MARK: - NSWindowDelegate
+
+    /// Properly cleanup window references when user closes window via close button
+    /// This prevents memory leaks and ensures window can be reopened
+    nonisolated func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            if window === self.onboardingWindow {
+                self.onboardingWindow = nil
+            } else if window === self.recordingWindow {
+                self.recordingWindow = nil
+                self.recordingViewModel = nil
+                self.isShowingRecordingModal = false
+            } else if window === self.settingsWindow {
+                self.settingsWindow = nil
+            }
+        }
     }
 
     // MARK: - Menu Action Observers
@@ -123,6 +147,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.title = "Welcome to Speech-to-Text"
         window.contentView = NSHostingView(rootView: contentView)
+        window.delegate = self  // Handle window close via close button
         window.center()
 
         // Ensure app is active and window is visible
@@ -141,14 +166,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func showRecordingModal() {
-        // Don't show multiple modals
-        if recordingWindow != nil {
+        // Don't show multiple modals - check both window and in-progress flag
+        // The flag prevents race condition during async permission check
+        if recordingWindow != nil || isShowingRecordingModal {
             return
         }
+
+        // Set flag before async work to prevent concurrent calls
+        isShowingRecordingModal = true
 
         // Check permissions before showing modal
         Task {
             await checkPermissionsAndShowModal()
+            // Reset flag if we didn't show the modal (permissions denied)
+            if recordingWindow == nil {
+                isShowingRecordingModal = false
+            }
         }
     }
 
@@ -220,6 +253,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         window.contentView = NSHostingView(rootView: contentView)
+        window.delegate = self  // Handle window close via close button
         window.isOpaque = false
         window.backgroundColor = .clear
         window.level = .floating
@@ -258,6 +292,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.title = "Settings"
         window.contentView = NSHostingView(rootView: contentView)
+        window.delegate = self  // Handle window close via close button
         window.center()
         window.makeKeyAndOrderFront(nil)
 

@@ -345,7 +345,9 @@ struct SettingsView: View {
 
             // Reset button (T060)
             Button("Reset to Defaults") {
-                viewModel.resetToDefaults()
+                Task {
+                    await viewModel.resetToDefaults()
+                }
             }
             .buttonStyle(.borderless)
 
