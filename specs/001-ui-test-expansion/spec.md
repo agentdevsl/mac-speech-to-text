@@ -159,6 +159,7 @@ As a developer, I want improved test infrastructure with screenshot capture and 
 - **FR-003**: Test suite MUST verify that the audio level indicator reflects input levels
 - **FR-004**: Test suite MUST verify that the "Cancel" button dismisses the modal
 - **FR-005**: Test suite MUST verify that "Stop Recording" transitions to transcription state
+- **FR-026**: Test suite MUST verify auto-stop after 1.5 seconds of silence (US1 scenario 5)
 
 #### Language Selection Tests
 
@@ -168,9 +169,9 @@ As a developer, I want improved test infrastructure with screenshot capture and 
 
 #### Settings Tests
 
-- **FR-009**: Test suite MUST verify that hotkey customization UI is accessible
-- **FR-010**: Test suite MUST verify that "Launch at login" toggle works
-- **FR-011**: Test suite MUST verify that language model download status is displayed
+- **FR-009**: _(OUT OF SCOPE)_ Test suite MUST verify that hotkey customization UI is accessible - _deferred: hotkey customization UI not yet implemented_
+- **FR-010**: _(OUT OF SCOPE)_ Test suite MUST verify that "Launch at login" toggle works - _deferred: launch at login UI not yet implemented_
+- **FR-011**: _(OUT OF SCOPE)_ Test suite MUST verify that language model download status is displayed - _deferred: download status UI not yet implemented_
 
 #### Error State Tests
 

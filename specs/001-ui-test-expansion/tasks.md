@@ -110,6 +110,7 @@ Based on plan.md structure:
 - [ ] T025 [US1] Implement test_recording_cancelDismissesModal (RF-003) in UITests/P1/RecordingFlowTests.swift
 - [ ] T026 [US1] Implement test_recording_stopInitiatesTranscription (RF-004) in UITests/P1/RecordingFlowTests.swift
 - [ ] T027 [US1] Implement test_recording_escapeKeyDismisses (RF-005) in UITests/P1/RecordingFlowTests.swift
+- [ ] T027b [US1] Implement test_recording_silenceAutoStop (FR-026) in UITests/P1/RecordingFlowTests.swift - verify auto-stop after 1.5s silence
 - [ ] T028 [US1] Add accessibility identifiers to RecordingModal.swift for test element queries
 
 **Acceptance**:
@@ -118,7 +119,8 @@ Based on plan.md structure:
 - RF-003: Cancel button dismisses modal
 - RF-004: Stop button transitions to "Transcribing" state
 - RF-005: Escape key dismisses modal
-- All 5 recording flow tests pass
+- RF-006: Auto-stop triggers after 1.5 seconds of silence (FR-026)
+- All 6 recording flow tests pass
 
 **Checkpoint**: Core recording flow tested - User Story 1 complete
 
