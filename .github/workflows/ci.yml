@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, 001-agentpane]
+    branches: [main, 001-local-speech-to-text]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -11,273 +11,82 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  BUN_VERSION: 'latest'
-
 jobs:
-  lint-and-typecheck:
-    runs-on: ubuntu-latest
+  lint:
+    name: SwiftLint
+    runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
+      - name: Install SwiftLint
+        run: brew install swiftlint
 
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-packages-${{ runner.os }}-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            bun-packages-${{ runner.os }}-
+      - name: Run SwiftLint
+        run: swiftlint lint --strict
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run --filter @agentpane/shared build
-
-      - name: Generate Prisma client
-        run: bunx --bun prisma generate
-        working-directory: packages/backend
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-
-      - name: Type check
-        run: bun run typecheck
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Format check
-        run: bun run format:check
-
-  test-backend:
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
-    services:
-      postgres:
-        image: postgres:18-alpine
-        env:
-          POSTGRES_USER: agentpane
-          POSTGRES_PASSWORD: testpassword
-          POSTGRES_DB: agentpane_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+  test:
+    name: Build and Test
+    runs-on: macos-14
+    needs: lint
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-packages-${{ runner.os }}-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            bun-packages-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run --filter @agentpane/shared build
-
-      - name: Generate Prisma client
-        run: bun run --filter @agentpane/backend db:generate
-        env:
-          DATABASE_URL: postgresql://agentpane:testpassword@localhost:5432/agentpane_test
-
-      - name: Run migrations
-        run: bunx --bun prisma migrate deploy
-        working-directory: packages/backend
-        env:
-          DATABASE_URL: postgresql://agentpane:testpassword@localhost:5432/agentpane_test
-
-      - name: Run backend tests
-        run: bun run --filter @agentpane/backend test:coverage
-        env:
-          DATABASE_URL: postgresql://agentpane:testpassword@localhost:5432/agentpane_test
-          NODE_ENV: test
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: backend-coverage
-          path: packages/backend/coverage/
-
-  test-frontend:
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-packages-${{ runner.os }}-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            bun-packages-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run --filter @agentpane/shared build
-
-      - name: Run frontend unit tests
-        run: bun run --filter @agentpane/frontend test:coverage
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: frontend-coverage
-          path: packages/frontend/coverage/
-
-  # E2E tests using Playwright
-  # Single server, parallel test execution via Playwright workers
-  test-e2e:
-    runs-on: ubuntu-latest
-    needs: build
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-
-      - name: Cache Bun packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.bun/install/cache
-          key: bun-packages-${{ runner.os }}-${{ hashFiles('**/bun.lockb', '**/package.json') }}
-          restore-keys: |
-            bun-packages-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run --filter @agentpane/shared build
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: packages
-
-      - name: Verify build artifacts
+      - name: Show Xcode and Swift versions
         run: |
-          echo "Checking if dist folder exists..."
-          ls -la packages/frontend/
-          echo "Contents of dist folder:"
-          ls -la packages/frontend/dist/ || echo "dist folder not found!"
+          xcodebuild -version
+          swift --version
 
-      - name: Get Playwright version
-        id: playwright-version
-        run: echo "version=$(bunx playwright --version | head -1)" >> $GITHUB_OUTPUT
-        working-directory: packages/frontend
-
-      - name: Cache Playwright browsers
+      - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
-        id: playwright-cache
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: |
+            spm-${{ runner.os }}-
 
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: bunx playwright install --with-deps chromium
-        working-directory: packages/frontend
+      - name: Resolve dependencies
+        run: swift package resolve
 
-      - name: Install Playwright system dependencies
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: bunx playwright install-deps chromium
-        working-directory: packages/frontend
+      - name: Build
+        run: swift build -c release
 
-      # Run all tests - Playwright manages the server automatically
-      - name: Run Playwright E2E tests
-        run: bunx playwright test --project=chromium
-        working-directory: packages/frontend
-        env:
-          CI: true
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: packages/frontend/playwright-report/
-          retention-days: 30
-
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-test-results
-          path: packages/frontend/test-results/
-          retention-days: 7
+      - name: Run tests
+        run: swift test --parallel
 
   build:
-    runs-on: ubuntu-latest
-    needs: [test-backend, test-frontend]
+    name: Build Release
+    runs-on: macos-14
+    needs: test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
+      - name: Select Xcode version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
-      - name: Cache Bun packages
+      - name: Cache Swift Package Manager dependencies
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
-          key: bun-packages-${{ runner.os }}-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          path: |
+            .build
+            ~/Library/Developer/Xcode/DerivedData
+          key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved') }}
           restore-keys: |
-            bun-packages-${{ runner.os }}-
+            spm-${{ runner.os }}-
 
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Build shared package
-        run: bun run --filter @agentpane/shared build
-
-      - name: Generate Prisma client
-        run: bunx --bun prisma generate
-        working-directory: packages/backend
-        env:
-          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
-
-      - name: Build all packages
-        run: bun run build
+      - name: Build release
+        run: swift build -c release
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build
-          path: |
-            packages/backend/dist
-            packages/frontend/dist
-            packages/shared/dist
+          name: release-build
+          path: .build/release/
+          retention-days: 7

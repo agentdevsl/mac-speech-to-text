@@ -1,113 +1,88 @@
 repos:
+  # Swift-specific hooks
   - repo: local
     hooks:
-      - id: eslint
-        name: ESLint
-        description: Lints TypeScript/JavaScript files (blocks on warnings)
-        entry: bunx eslint --fix --max-warnings 0
+      - id: swiftlint
+        name: SwiftLint
+        description: Lints Swift code with SwiftLint
+        entry: swiftlint lint --strict --quiet
         language: system
-        types_or:
-          - javascript
-          - jsx
-          - ts
-          - tsx
-        pass_filenames: true
-        stages:
-          - pre-commit
-  - repo: local
-    hooks:
-      - id: prettier
-        name: Prettier
-        description: Formats code with Prettier
-        entry: bunx prettier --write --ignore-unknown
-        language: system
-        types_or:
-          - javascript
-          - jsx
-          - ts
-          - tsx
-          - json
-          - markdown
-          - yaml
-        pass_filenames: true
-        stages:
-          - pre-commit
-        exclude: ^.claude/
-  - repo: local
-    hooks:
-      - id: typecheck
-        name: TypeScript Type Check
-        description: Runs TypeScript compiler for type checking across all workspaces
-        entry: bun run typecheck
-        language: system
+        types: [swift]
         pass_filenames: false
         stages:
           - pre-commit
-        always_run: true
-  - repo: local
-    hooks:
-      - id: test
-        name: Tests
-        description: Runs test suite
-        entry: bun run test
+
+      - id: swiftlint-autocorrect
+        name: SwiftLint Autocorrect
+        description: Auto-fixes SwiftLint violations
+        entry: swiftlint --fix --quiet
         language: system
-        types:
-          - ts
-          - tsx
+        types: [swift]
         pass_filenames: false
         stages:
           - pre-commit
-  - repo: local
-    hooks:
-      - id: lint-check
-        name: Lint Check (CI)
-        description: Runs ESLint on all files without fixing
-        entry: bun run lint
+
+      - id: swift-build-check
+        name: Swift Build Check
+        description: Verifies Swift code compiles
+        entry: swift build
         language: system
+        types: [swift]
         pass_filenames: false
-        always_run: true
         stages:
           - pre-push
-      - id: format-check
-        name: Format Check (CI)
-        description: Checks formatting on all files
-        entry: bun run format:check
-        language: system
-        pass_filenames: false
-        always_run: true
-        stages:
-          - pre-push
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
-    hooks:
-      - id: markdownlint-fix
-        name: Lint Markdown
-        exclude: ^.claude/
+
+  # Security and secret detection
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.22.1
     hooks:
       - id: gitleaks
         name: Detect secrets
+        description: Scans for secrets and credentials
+
+  # General file quality hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
         name: Fix end of files
+        description: Ensures files end with newline
         exclude: ^.claude/
+
       - id: check-yaml
         name: Check YAML syntax
+        description: Validates YAML file syntax
         args:
           - --allow-multiple-documents
+
       - id: check-json
         name: Check JSON syntax
+        description: Validates JSON file syntax
+
       - id: check-added-large-files
         name: Check for large files
+        description: Prevents committing files larger than 500KB
         args:
           - --maxkb=500
+
       - id: check-merge-conflict
         name: Check for merge conflicts
+        description: Detects merge conflict markers
+
       - id: detect-private-key
         name: Detect private keys
+        description: Scans for private key files
+
       - id: trailing-whitespace
         name: Trim trailing whitespace
+        description: Removes trailing whitespace from lines
+        exclude: ^.claude/
+
+  # Markdown linting
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.43.0
+    hooks:
+      - id: markdownlint-fix
+        name: Lint Markdown
+        description: Lints and fixes Markdown files
         exclude: ^.claude/

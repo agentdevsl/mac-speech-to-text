@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     ca-certificates \
     gnupg2 \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js 24 LTS

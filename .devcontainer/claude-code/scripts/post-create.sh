@@ -83,6 +83,26 @@ if [ -f /workspace/.claude/settings.json ]; then
   fi
 fi
 
+# 4. Set up SSH directory for remote development
+echo "[4/4] Setting up SSH for remote development..."
+SSH_DIR="/home/node/.ssh"
+if [ ! -d "$SSH_DIR" ]; then
+  mkdir -p "$SSH_DIR"
+  chmod 700 "$SSH_DIR"
+  echo "      SSH directory created at $SSH_DIR"
+else
+  chmod 700 "$SSH_DIR"
+  echo "      SSH directory already exists - permissions verified"
+fi
+
+# Verify SSH client is installed
+if command -v ssh >/dev/null 2>&1; then
+  SSH_VERSION=$(ssh -V 2>&1 | head -1)
+  echo "      SSH client installed: $SSH_VERSION"
+else
+  echo "      WARNING: SSH client not found (should be in Docker image)"
+fi
+
 echo ""
 echo "=== Post-Create Setup Complete ==="
 echo ""
@@ -90,4 +110,13 @@ echo "Claude hooks status:"
 echo "  - Langfuse tracing: $([ -f /workspace/.claude/hooks/dist/langfuse-hook.js ] && echo 'Ready' || echo 'Not built')"
 echo "  - LANGFUSE_PUBLIC_KEY: $([ -n \"$LANGFUSE_PUBLIC_KEY\" ] && echo 'configured' || echo 'missing')"
 echo "  - LANGFUSE_SECRET_KEY: $([ -n \"$LANGFUSE_SECRET_KEY\" ] && echo 'configured' || echo 'missing')"
+echo ""
+echo "Remote Development:"
+echo "  - SSH client: $(command -v ssh >/dev/null 2>&1 && echo 'Ready' || echo 'Not installed')"
+echo "  - SSH directory: $([ -d /home/node/.ssh ] && echo 'Created' || echo 'Missing')"
+echo ""
+echo "Next steps for remote development:"
+echo "  1. Generate SSH key: ssh-keygen -t ed25519 -C \"your@email.com\""
+echo "  2. Copy key to Mac: ssh-copy-id your-username@your-mac-ip"
+echo "  3. See REMOTE_DEVELOPMENT.md for full setup guide"
 echo ""
