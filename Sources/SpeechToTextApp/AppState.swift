@@ -20,8 +20,8 @@ class AppState {
 
     /// Task for loading statistics - tracked for proper lifecycle management
     @ObservationIgnored private var loadingTask: Task<Void, Never>?
-    /// nonisolated(unsafe) copy for deinit access (deinit cannot access MainActor-isolated state)
-    private nonisolated(unsafe) var deinitLoadingTask: Task<Void, Never>?
+    /// nonisolated copy for deinit access (deinit cannot access MainActor-isolated state)
+    @ObservationIgnored private nonisolated(unsafe) var deinitLoadingTask: Task<Void, Never>?
 
     init() {
         // Initialize services

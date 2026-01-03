@@ -14,6 +14,9 @@ struct AudioBuffer: Sendable {
          sampleRate: Int = 16000,
          channels: Int = 1,
          timestamp: Date = Date()) {
+        precondition(sampleRate > 0, "Sample rate must be positive")
+        precondition(channels > 0, "Channels must be positive")
+
         self.samples = samples
         self.sampleRate = sampleRate
         self.channels = channels

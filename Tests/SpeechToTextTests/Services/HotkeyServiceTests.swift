@@ -1,18 +1,19 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class HotkeyServiceTests: XCTestCase {
 
     var service: HotkeyService!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         service = HotkeyService()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         service.unregisterHotkey()
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Registration Tests

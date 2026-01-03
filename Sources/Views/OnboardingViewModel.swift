@@ -202,7 +202,10 @@ final class OnboardingViewModel {
             return
         }
 
-        NSWorkspace.shared.open(url)
+        let opened = NSWorkspace.shared.open(url)
+        if !opened {
+            AppLogger.viewModel.error("Failed to open System Settings for \(permission, privacy: .public)")
+        }
     }
 
     // MARK: - Helper Methods

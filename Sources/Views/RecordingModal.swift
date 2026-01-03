@@ -256,13 +256,11 @@ struct RecordingModal: View {
             isVisible = false
         }
 
-        // Cancel recording once during dismissal
-        Task {
+        // Cancel recording and dismiss after animation delay using structured concurrency
+        Task { @MainActor in
             await viewModel.cancelRecording()
-        }
-
-        // Delay actual dismissal for animation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
             dismiss()
         }
     }

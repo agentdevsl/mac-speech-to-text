@@ -2,14 +2,14 @@ import FluidAudio
 import Foundation
 
 /// Result of transcription
-struct TranscriptionResult {
+struct TranscriptionResult: Sendable {
     let text: String
     let confidence: Float
     let durationMs: Int
 }
 
 /// Errors specific to FluidAudio integration
-enum FluidAudioError: Error, LocalizedError, Sendable {
+enum FluidAudioError: Error, LocalizedError, Sendable, Equatable {
     case notInitialized
     case modelNotLoaded
     case initializationFailed(String)
@@ -128,5 +128,6 @@ actor FluidAudioService {
         asrManager = nil
         models = nil
         isInitialized = false
+        currentLanguage = "en"  // Reset to default language
     }
 }

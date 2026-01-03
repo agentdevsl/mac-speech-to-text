@@ -151,6 +151,8 @@ private struct WaveformAnimatedPreview: View {
         }
         .padding()
         .onAppear {
+            // Invalidate existing timer to prevent accumulation on re-appear
+            previewTimer?.invalidate()
             // Simulate audio levels
             previewTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 Task { @MainActor in

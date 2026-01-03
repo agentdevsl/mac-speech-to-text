@@ -65,9 +65,9 @@ final class RecordingViewModel {
     private let silenceThreshold: TimeInterval
     @ObservationIgnored private var languageSwitchObserver: NSObjectProtocol?
 
-    // nonisolated(unsafe) copies for deinit access (deinit cannot access MainActor-isolated state)
-    private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
-    private nonisolated(unsafe) var deinitSilenceTimer: Timer?
+    // nonisolated copies for deinit access (deinit cannot access MainActor-isolated state)
+    @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
+    @ObservationIgnored private nonisolated(unsafe) var deinitSilenceTimer: Timer?
 
     // MARK: - Initialization
 

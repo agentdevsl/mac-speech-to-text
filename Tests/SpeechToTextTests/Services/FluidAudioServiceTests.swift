@@ -28,7 +28,8 @@ final class FluidAudioServiceTests: XCTestCase {
     func test_initialize_setsInitializedFlag() async throws {
         // Given
         let service = FluidAudioService()
-        XCTAssertFalse(await service.checkInitialized())
+        let initialState = await service.checkInitialized()
+        XCTAssertFalse(initialState)
 
         // When
         // Note: This will fail in tests because FluidAudio SDK is not available

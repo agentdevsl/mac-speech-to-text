@@ -141,7 +141,7 @@ class AudioCaptureService {
 }
 
 /// Audio capture errors
-enum AudioCaptureError: Error, LocalizedError {
+enum AudioCaptureError: Error, LocalizedError, Equatable {
     case invalidFormat
     case noDataRecorded
     case engineStartFailed(String)
@@ -166,7 +166,9 @@ final class PendingWritesCounter: @unchecked Sendable {
     private var continuation: CheckedContinuation<Void, Never>?
 
     var isEmpty: Bool {
-        pendingCount == 0
+        lock.lock()
+        defer { lock.unlock() }
+        return pendingCount == 0
     }
 
     func increment() {
@@ -178,7 +180,9 @@ final class PendingWritesCounter: @unchecked Sendable {
     func decrement() {
         lock.lock()
         pendingCount -= 1
-        let shouldResume = isEmpty && continuation != nil
+        // Use direct comparison instead of isEmpty to avoid deadlock
+        // (isEmpty also acquires lock, NSLock is not reentrant)
+        let shouldResume = pendingCount == 0 && continuation != nil
         let cont = continuation
         if shouldResume {
             continuation = nil
@@ -191,16 +195,11 @@ final class PendingWritesCounter: @unchecked Sendable {
     }
 
     func waitForCompletion() async {
-        lock.lock()
-        if isEmpty {
-            lock.unlock()
-            return
-        }
-        lock.unlock()
-
+        // Perform atomic check-and-wait in a single lock acquisition
+        // to prevent TOCTOU race condition
         await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             lock.lock()
-            if isEmpty {
+            if pendingCount == 0 {
                 lock.unlock()
                 cont.resume()
             } else {

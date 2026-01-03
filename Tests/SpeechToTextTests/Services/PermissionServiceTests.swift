@@ -1,6 +1,7 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class PermissionServiceTests: XCTestCase {
 
     // MARK: - Microphone Permission Tests

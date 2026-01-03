@@ -1,21 +1,20 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class AudioCaptureServiceTests: XCTestCase {
 
     var service: AudioCaptureService!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         service = AudioCaptureService()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         // Ensure capture is stopped
-        Task {
-            try? await service.stopCapture()
-        }
-        super.tearDown()
+        try? await service.stopCapture()
+        try await super.tearDown()
     }
 
     // MARK: - Initialization Tests

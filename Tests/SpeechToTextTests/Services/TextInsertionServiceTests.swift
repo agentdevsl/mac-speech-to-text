@@ -1,12 +1,13 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class TextInsertionServiceTests: XCTestCase {
 
     var service: TextInsertionService!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         service = TextInsertionService()
     }
 

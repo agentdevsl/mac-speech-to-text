@@ -1,13 +1,14 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class AppStateTests: XCTestCase {
 
     var appState: AppState!
     var userDefaults: UserDefaults!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         // Use test suite to avoid interfering with actual app data
         userDefaults = UserDefaults(suiteName: "com.speechtotext.appstate.tests")!
         userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
@@ -17,9 +18,9 @@ final class AppStateTests: XCTestCase {
         appState = AppState()
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Initialization Tests
@@ -130,38 +131,38 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Complete Session Tests
 
-    func test_completeSession_marksAsCompleted() {
+    func test_completeSession_marksAsCompleted() async {
         // Given
         appState.startRecording()
         appState.stopRecording()
 
         // When
-        appState.completeSession()
+        await appState.completeSession()
 
         // Then
         XCTAssertNil(appState.currentSession)
     }
 
-    func test_completeSession_recordsStatistics() {
+    func test_completeSession_recordsStatistics() async {
         // Given
         appState.startRecording()
         appState.stopRecording()
         let initialStats = appState.statistics
 
         // When
-        appState.completeSession()
+        await appState.completeSession()
 
         // Then
         // Statistics should be refreshed
         XCTAssertNotNil(appState.statistics)
     }
 
-    func test_completeSession_whenNoSession_doesNothing() {
+    func test_completeSession_whenNoSession_doesNothing() async {
         // Given
         XCTAssertNil(appState.currentSession)
 
         // When
-        appState.completeSession()
+        await appState.completeSession()
 
         // Then
         XCTAssertNil(appState.currentSession)
@@ -169,7 +170,7 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Cancel Session Tests
 
-    func test_cancelSession_clearsCurrent Session() {
+    func test_cancelSession_clearsCurrentSession() {
         // Given
         appState.startRecording()
         XCTAssertNotNil(appState.currentSession)
@@ -246,12 +247,12 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Refresh Statistics Tests
 
-    func test_refreshStatistics_updatesStatistics() {
+    func test_refreshStatistics_updatesStatistics() async {
         // Given
         let initialStats = appState.statistics
 
         // When
-        appState.refreshStatistics()
+        await appState.refreshStatistics()
 
         // Then
         XCTAssertNotNil(appState.statistics)
@@ -302,7 +303,7 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Recording Session Lifecycle Tests
 
-    func test_fullRecordingLifecycle() {
+    func test_fullRecordingLifecycle() async {
         // Given
         XCTAssertNil(appState.currentSession)
 
@@ -317,7 +318,7 @@ final class AppStateTests: XCTestCase {
         XCTAssertEqual(appState.currentSession?.state, .transcribing)
 
         // 3. Complete session
-        appState.completeSession()
+        await appState.completeSession()
 
         // Then
         XCTAssertNil(appState.currentSession)
@@ -370,17 +371,10 @@ final class AppStateTests: XCTestCase {
         let appState = AppState()
 
         // When
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                appState.startRecording()
-            }
-            group.addTask {
-                appState.refreshStatistics()
-            }
-            group.addTask {
-                _ = appState.settings
-            }
-        }
+        // Since AppState is MainActor isolated, these calls run sequentially
+        appState.startRecording()
+        await appState.refreshStatistics()
+        _ = appState.settings
 
         // Then
         // Should complete without crashes
@@ -389,12 +383,12 @@ final class AppStateTests: XCTestCase {
 
     // MARK: - Multiple Sessions Tests
 
-    func test_multipleSessions_workSequentially() {
+    func test_multipleSessions_workSequentially() async {
         // Given/When
         for _ in 0..<3 {
             appState.startRecording()
             appState.stopRecording()
-            appState.completeSession()
+            await appState.completeSession()
         }
 
         // Then

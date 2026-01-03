@@ -4,7 +4,8 @@ import OSLog
 /// Service for managing usage statistics with privacy preservation
 /// Actor provides thread-safe access to shared mutable state
 actor StatisticsService {
-    private let userDefaults: UserDefaults
+    /// UserDefaults is thread-safe, marked nonisolated(unsafe) for actor access
+    private nonisolated(unsafe) let userDefaults: UserDefaults
     private let statsKey = "com.speechtotext.statistics"
 
     init(userDefaults: UserDefaults = .standard) {
@@ -138,6 +139,10 @@ actor StatisticsService {
             return try decoder.decode([UsageStatistics].self, from: data)
         } catch {
             AppLogger.analytics.error("Failed to decode statistics: \(error.localizedDescription, privacy: .public). Returning empty array. Historical statistics may be lost.")
+            // Backup corrupted data for potential recovery
+            let backupKey = "\(statsKey).corrupted"
+            userDefaults.set(data, forKey: backupKey)
+            AppLogger.analytics.info("Corrupted statistics data backed up to key: \(backupKey, privacy: .public)")
             return []
         }
     }

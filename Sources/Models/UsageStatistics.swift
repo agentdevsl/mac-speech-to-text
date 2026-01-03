@@ -41,8 +41,9 @@ struct UsageStatistics: Codable, Identifiable, Sendable {
     }
 
     var averageWordsPerSession: Double {
-        guard totalSessions > 0 else { return 0.0 }
-        return Double(totalWordsTranscribed) / Double(totalSessions)
+        // Use successfulSessions since only successful sessions produce transcribed words
+        guard successfulSessions > 0 else { return 0.0 }
+        return Double(totalWordsTranscribed) / Double(successfulSessions)
     }
 }
 

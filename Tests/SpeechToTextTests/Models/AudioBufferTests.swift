@@ -120,131 +120,145 @@ final class AudioBufferTests: XCTestCase {
 
     // MARK: - StreamingAudioBuffer Tests
 
-    func test_streamingAudioBuffer_initialization_createsEmptyBuffer() {
+    func test_streamingAudioBuffer_initialization_createsEmptyBuffer() async {
         // Given/When
         let streamingBuffer = StreamingAudioBuffer()
 
         // Then
-        XCTAssertTrue(streamingBuffer.chunks.isEmpty)
-        XCTAssertEqual(streamingBuffer.maxChunkSize, 1600) // default 100ms at 16kHz
-        XCTAssertFalse(streamingBuffer.isComplete)
-        XCTAssertEqual(streamingBuffer.totalDuration, 0.0)
+        let chunks = await streamingBuffer.chunks
+        let maxChunkSize = await streamingBuffer.maxChunkSize
+        let isComplete = await streamingBuffer.isComplete
+        let totalDuration = await streamingBuffer.totalDuration
+
+        XCTAssertTrue(chunks.isEmpty)
+        XCTAssertEqual(maxChunkSize, 1600) // default 100ms at 16kHz
+        XCTAssertFalse(isComplete)
+        XCTAssertEqual(totalDuration, 0.0)
     }
 
-    func test_streamingAudioBuffer_append_addsChunk() {
+    func test_streamingAudioBuffer_append_addsChunk() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
         let samples: [Int16] = Array(repeating: 100, count: 160) // 10ms at 16kHz
         let audioBuffer = AudioBuffer(samples: samples)
 
         // When
-        streamingBuffer.append(audioBuffer)
+        await streamingBuffer.append(audioBuffer)
 
         // Then
-        XCTAssertEqual(streamingBuffer.chunks.count, 1)
-        XCTAssertEqual(streamingBuffer.totalDuration, 0.01, accuracy: 0.001)
+        let chunks = await streamingBuffer.chunks
+        let totalDuration = await streamingBuffer.totalDuration
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(totalDuration, 0.01, accuracy: 0.001)
     }
 
-    func test_streamingAudioBuffer_append_addsMultipleChunks() {
+    func test_streamingAudioBuffer_append_addsMultipleChunks() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
         let samples1: [Int16] = Array(repeating: 100, count: 160)
         let samples2: [Int16] = Array(repeating: 200, count: 160)
 
         // When
-        streamingBuffer.append(AudioBuffer(samples: samples1))
-        streamingBuffer.append(AudioBuffer(samples: samples2))
+        await streamingBuffer.append(AudioBuffer(samples: samples1))
+        await streamingBuffer.append(AudioBuffer(samples: samples2))
 
         // Then
-        XCTAssertEqual(streamingBuffer.chunks.count, 2)
-        XCTAssertEqual(streamingBuffer.totalDuration, 0.02, accuracy: 0.001)
+        let chunks = await streamingBuffer.chunks
+        let totalDuration = await streamingBuffer.totalDuration
+        XCTAssertEqual(chunks.count, 2)
+        XCTAssertEqual(totalDuration, 0.02, accuracy: 0.001)
     }
 
-    func test_streamingAudioBuffer_clear_removesAllChunks() {
+    func test_streamingAudioBuffer_clear_removesAllChunks() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
-        streamingBuffer.append(AudioBuffer(samples: [100, 200, 300]))
-        streamingBuffer.append(AudioBuffer(samples: [400, 500, 600]))
+        await streamingBuffer.append(AudioBuffer(samples: [100, 200, 300]))
+        await streamingBuffer.append(AudioBuffer(samples: [400, 500, 600]))
 
         // When
-        streamingBuffer.clear()
+        await streamingBuffer.clear()
 
         // Then
-        XCTAssertTrue(streamingBuffer.chunks.isEmpty)
-        XCTAssertFalse(streamingBuffer.isComplete)
+        let chunks = await streamingBuffer.chunks
+        let isComplete = await streamingBuffer.isComplete
+        XCTAssertTrue(chunks.isEmpty)
+        XCTAssertFalse(isComplete)
     }
 
-    func test_streamingAudioBuffer_markComplete_setsCompleteFlag() {
+    func test_streamingAudioBuffer_markComplete_setsCompleteFlag() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
-        XCTAssertFalse(streamingBuffer.isComplete)
+        let initialIsComplete = await streamingBuffer.isComplete
+        XCTAssertFalse(initialIsComplete)
 
         // When
-        streamingBuffer.markComplete()
+        await streamingBuffer.markComplete()
 
         // Then
-        XCTAssertTrue(streamingBuffer.isComplete)
+        let isComplete = await streamingBuffer.isComplete
+        XCTAssertTrue(isComplete)
     }
 
-    func test_streamingAudioBuffer_allSamples_concatenatesChunks() {
+    func test_streamingAudioBuffer_allSamples_concatenatesChunks() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
         let samples1: [Int16] = [100, 200]
         let samples2: [Int16] = [300, 400]
-        streamingBuffer.append(AudioBuffer(samples: samples1))
-        streamingBuffer.append(AudioBuffer(samples: samples2))
+        await streamingBuffer.append(AudioBuffer(samples: samples1))
+        await streamingBuffer.append(AudioBuffer(samples: samples2))
 
         // When
-        let allSamples = streamingBuffer.allSamples
+        let allSamples = await streamingBuffer.allSamples
 
         // Then
         XCTAssertEqual(allSamples, [100, 200, 300, 400])
     }
 
-    func test_streamingAudioBuffer_currentLevel_returnsZeroForEmptyBuffer() {
+    func test_streamingAudioBuffer_currentLevel_returnsZeroForEmptyBuffer() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
 
         // When
-        let level = streamingBuffer.currentLevel
+        let level = await streamingBuffer.currentLevel
 
         // Then
         XCTAssertEqual(level, 0.0)
     }
 
-    func test_streamingAudioBuffer_currentLevel_returnsLastChunkLevel() {
+    func test_streamingAudioBuffer_currentLevel_returnsLastChunkLevel() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
-        streamingBuffer.append(AudioBuffer(samples: [100, 200]))
-        streamingBuffer.append(AudioBuffer(samples: [300, 400, 500]))
+        await streamingBuffer.append(AudioBuffer(samples: [100, 200]))
+        await streamingBuffer.append(AudioBuffer(samples: [300, 400, 500]))
 
         // When
-        let level = streamingBuffer.currentLevel
+        let level = await streamingBuffer.currentLevel
 
         // Then
         XCTAssertGreaterThan(level, 0.0)
     }
 
-    func test_streamingAudioBuffer_peakLevel_returnsMaxPeakAcrossChunks() {
+    func test_streamingAudioBuffer_peakLevel_returnsMaxPeakAcrossChunks() async {
         // Given
         let streamingBuffer = StreamingAudioBuffer()
-        streamingBuffer.append(AudioBuffer(samples: [100, 200]))
-        streamingBuffer.append(AudioBuffer(samples: [-1000, 400]))
-        streamingBuffer.append(AudioBuffer(samples: [300, 500]))
+        await streamingBuffer.append(AudioBuffer(samples: [100, 200]))
+        await streamingBuffer.append(AudioBuffer(samples: [-1000, 400]))
+        await streamingBuffer.append(AudioBuffer(samples: [300, 500]))
 
         // When
-        let peakLevel = streamingBuffer.peakLevel
+        let peakLevel = await streamingBuffer.peakLevel
 
         // Then
         XCTAssertEqual(peakLevel, 1000)
     }
 
-    func test_streamingAudioBuffer_customMaxChunkSize() {
+    func test_streamingAudioBuffer_customMaxChunkSize() async {
         // Given/When
         let streamingBuffer = StreamingAudioBuffer(maxChunkSize: 3200) // 200ms at 16kHz
 
         // Then
-        XCTAssertEqual(streamingBuffer.maxChunkSize, 3200)
+        let maxChunkSize = await streamingBuffer.maxChunkSize
+        XCTAssertEqual(maxChunkSize, 3200)
     }
 
     // MARK: - Edge Cases
