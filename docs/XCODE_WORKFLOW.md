@@ -313,8 +313,11 @@ To avoid confusion:
 #### Quick Iterations
 
 ```bash
-# Faster for simple changes
-swift build && open .build/debug/SpeechToText
+# Faster for simple changes (builds proper app bundle)
+./scripts/build-app.sh --open
+
+# Or for raw executable only (no app bundle, limited functionality)
+swift build && .build/debug/SpeechToText
 ```
 
 #### Remote Development

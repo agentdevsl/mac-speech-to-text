@@ -326,10 +326,18 @@ show_help() {
 while [[ $# -gt 0 ]]; do
     case $1 in
         --name)
+            if [[ -z "${2:-}" || "${2:-}" == --* ]]; then
+                print_error "--name requires a value"
+                exit 1
+            fi
             CERT_NAME="$2"
             shift 2
             ;;
         --days)
+            if [[ -z "${2:-}" || ! "${2:-}" =~ ^[0-9]+$ ]]; then
+                print_error "--days requires a positive integer"
+                exit 1
+            fi
             VALIDITY_DAYS="$2"
             shift 2
             ;;
@@ -402,9 +410,18 @@ fi
 print_info "Creating self-signed certificate: ${CERT_NAME}"
 print_info "Validity: ${VALIDITY_DAYS} days ($(( VALIDITY_DAYS / 365 )) years)"
 
+# Create secure temporary directory for sensitive files (private keys)
+SECURE_TEMP_DIR=$(mktemp -d)
+chmod 700 "${SECURE_TEMP_DIR}"
+# Ensure cleanup on exit, error, or interrupt
+cleanup_temp() {
+    rm -rf "${SECURE_TEMP_DIR}" 2>/dev/null || true
+}
+trap cleanup_temp EXIT INT TERM
+
 # Create certificate using security command
 # This creates a self-signed certificate in the login keychain
-cat > /tmp/cert-config.txt << EOF
+cat > "${SECURE_TEMP_DIR}/cert-config.txt" << EOF
 [ req ]
 default_bits       = 2048
 distinguished_name = req_distinguished_name
@@ -419,13 +436,13 @@ keyUsage = critical, digitalSignature
 extendedKeyUsage = critical, codeSigning
 EOF
 
-# Generate private key and certificate
+# Generate private key and certificate in secure temp directory
 if ! openssl req -x509 -newkey rsa:2048 \
-    -keyout /tmp/cert-key.pem \
-    -out /tmp/cert.pem \
+    -keyout "${SECURE_TEMP_DIR}/cert-key.pem" \
+    -out "${SECURE_TEMP_DIR}/cert.pem" \
     -days ${VALIDITY_DAYS} \
     -nodes \
-    -config /tmp/cert-config.txt 2>/dev/null; then
+    -config "${SECURE_TEMP_DIR}/cert-config.txt" 2>/dev/null; then
     print_error "Failed to generate certificate with OpenSSL"
     echo ""
     echo "  Remediation: Check OpenSSL installation:"
@@ -435,20 +452,18 @@ if ! openssl req -x509 -newkey rsa:2048 \
     echo "    brew install openssl"
     echo ""
     show_keychain_fallback_instructions "$CERT_NAME"
-    rm -f /tmp/cert-config.txt /tmp/cert-key.pem /tmp/cert.pem
     exit 1
 fi
 
 # Create PKCS12 file (required for keychain import)
 if ! openssl pkcs12 -export \
-    -inkey /tmp/cert-key.pem \
-    -in /tmp/cert.pem \
-    -out /tmp/cert.p12 \
+    -inkey "${SECURE_TEMP_DIR}/cert-key.pem" \
+    -in "${SECURE_TEMP_DIR}/cert.pem" \
+    -out "${SECURE_TEMP_DIR}/cert.p12" \
     -passout pass: 2>/dev/null; then
     print_error "Failed to create PKCS12 file"
     echo ""
     show_keychain_fallback_instructions "$CERT_NAME"
-    rm -f /tmp/cert-config.txt /tmp/cert-key.pem /tmp/cert.pem
     exit 1
 fi
 
@@ -456,7 +471,7 @@ fi
 print_info "Importing certificate into login keychain..."
 print_warning "You may be prompted for your macOS password"
 
-if ! security import /tmp/cert.p12 \
+if ! security import "${SECURE_TEMP_DIR}/cert.p12" \
     -k ~/Library/Keychains/login.keychain-db \
     -P "" \
     -T /usr/bin/codesign \
@@ -472,7 +487,6 @@ if ! security import /tmp/cert.p12 \
     echo "    security unlock-keychain ~/Library/Keychains/login.keychain-db"
     echo ""
     show_keychain_fallback_instructions "$CERT_NAME"
-    rm -f /tmp/cert-config.txt /tmp/cert-key.pem /tmp/cert.pem /tmp/cert.p12
     exit 1
 fi
 
@@ -480,8 +494,7 @@ fi
 print_info "Setting certificate trust for code signing..."
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" ~/Library/Keychains/login.keychain-db 2>/dev/null || true
 
-# Clean up temp files
-rm -f /tmp/cert-config.txt /tmp/cert-key.pem /tmp/cert.pem /tmp/cert.p12
+# Temp files are cleaned up automatically via trap
 
 # Verify certificate was created
 if security find-identity -v -p codesigning 2>/dev/null | grep -q "${CERT_NAME}"; then

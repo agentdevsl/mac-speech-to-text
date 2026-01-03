@@ -336,6 +336,10 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --duration)
+            if [[ -z "${2:-}" || ! "${2:-}" =~ ^[0-9]+$ ]]; then
+                print_error "--duration requires a positive integer (seconds)"
+                exit 1
+            fi
             DURATION="$2"
             shift 2
             ;;
@@ -401,10 +405,12 @@ open "$APP_PATH" &
 # Wait
 sleep "$DURATION"
 
-# Kill app gracefully
+# Kill app gracefully using osascript (safer than pkill pattern matching)
 print_info "Stopping app..."
-pkill -f "SpeechToText" 2>/dev/null || true
+osascript -e 'quit app "SpeechToText"' 2>/dev/null || true
 sleep 1
+# Fallback: kill by bundle ID if app didn't quit cleanly
+pkill -f "${APP_PATH}/Contents/MacOS/SpeechToText" 2>/dev/null || true
 
 # Check for new crashes
 FINAL_CRASH_COUNT=$(ls "${CRASH_LOG_DIR}"/SpeechToText*.ips 2>/dev/null | wc -l | tr -d ' ' || echo "0")

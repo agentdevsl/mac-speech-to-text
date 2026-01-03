@@ -147,7 +147,7 @@ For more details, see [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md).
 
 ## Architecture
 
-- **Language**: Swift 5.9+ with Swift 6 concurrency
+- **Language**: Swift 5.9 language mode (Swift 6 compiler with concurrency)
 - **UI**: SwiftUI + AppKit (menu bar integration)
 - **Audio**: AVFoundation (16kHz mono capture)
 - **ML/ASR**: FluidAudio SDK (local speech recognition)

@@ -166,6 +166,8 @@ cat .signing-identity
 | `--clean` | Clean before building |
 | `--dmg` | Create DMG installer |
 | `--open` | Open app after building |
+| `--sign NAME` | Sign with specified identity |
+| `--sync` | Pull latest code from git before building |
 | `--check-signing` | Validate signing without building |
 
 ### Examples

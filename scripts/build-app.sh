@@ -295,6 +295,10 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         --sign)
+            if [[ -z "${2:-}" || "${2:-}" == --* ]]; then
+                print_error "--sign requires an identity name"
+                exit 1
+            fi
             SIGN_IDENTITY="$2"
             shift 2
             ;;
@@ -371,6 +375,20 @@ cd "${PROJECT_ROOT}"
 if [ "$SYNC_CODE" = true ]; then
     print_info "Syncing code from git..."
     if git rev-parse --git-dir > /dev/null 2>&1; then
+        # Check for uncommitted changes and warn user
+        if [ -n "$(git status --porcelain)" ]; then
+            print_warning "Uncommitted changes detected!"
+            echo ""
+            echo "  --sync will discard ALL uncommitted changes (staged and unstaged)."
+            echo "  This operation cannot be undone."
+            echo ""
+            echo -n "  Continue? (y/N): "
+            read -r response
+            if [[ ! "$response" =~ ^[Yy]$ ]]; then
+                print_info "Sync cancelled. Commit or stash your changes first."
+                exit 0
+            fi
+        fi
         git fetch origin
         git reset --hard origin/main
         print_success "Code synced from origin/main"
