@@ -54,7 +54,7 @@ struct PermissionCard: View {
             // Action button
             if !isGranted {
                 Button {
-                    Task {
+                    Task { @MainActor in
                         isProcessing = true
                         defer { isProcessing = false } // Ensure reset even if action throws
                         await action()

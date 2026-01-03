@@ -111,6 +111,7 @@ final class OnboardingViewModel {
     func confirmSkip() {
         skippedSteps.insert(currentStep)
         showSkipWarning = false
+        skipWarningMessage = ""
         nextStep()
     }
 
@@ -143,9 +144,11 @@ final class OnboardingViewModel {
             try permissionService.requestAccessibilityPermission()
             accessibilityGranted = permissionService.checkAccessibilityPermission()
 
-            // Note: Accessibility requires manual grant in System Settings
-            // Open System Settings for user
-            if !accessibilityGranted {
+            // Auto-advance when permission is granted
+            if accessibilityGranted {
+                nextStep()
+            } else {
+                // Accessibility requires manual grant in System Settings
                 openSystemSettings(for: "accessibility")
             }
         } catch {
@@ -154,13 +157,16 @@ final class OnboardingViewModel {
         }
     }
 
-    /// Request input monitoring permission (not implemented yet)
+    /// Request input monitoring permission
     func requestInputMonitoringPermission() async {
         // Input monitoring permission is checked when registering hotkeys
         inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
 
-        // Note: Input monitoring requires manual grant in System Settings
-        if !inputMonitoringGranted {
+        // Auto-advance when permission is granted
+        if inputMonitoringGranted {
+            nextStep()
+        } else {
+            // Input monitoring requires manual grant in System Settings
             openSystemSettings(for: "input-monitoring")
         }
     }

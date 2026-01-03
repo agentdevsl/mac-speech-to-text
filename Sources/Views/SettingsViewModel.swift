@@ -74,8 +74,8 @@ final class SettingsViewModel {
         settings = UserSettings.default
         validationError = nil
 
-        Task {
-            await saveSettings()
+        Task { [weak self] in
+            await self?.saveSettings()
         }
     }
 

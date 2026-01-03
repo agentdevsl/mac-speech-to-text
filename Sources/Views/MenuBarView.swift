@@ -227,11 +227,16 @@ struct MenuBarView: View {
 
     // MARK: - Computed Properties
 
-    /// Formatted update time
-    private var formattedUpdateTime: String {
+    /// Cached DateFormatter for performance (avoid creating on every render)
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: viewModel.lastUpdated)
+        return formatter
+    }()
+
+    /// Formatted update time
+    private var formattedUpdateTime: String {
+        Self.timeFormatter.string(from: viewModel.lastUpdated)
     }
 }
 

@@ -44,6 +44,8 @@ struct OnboardingView: View {
         .frame(width: 640, height: 560)
         .background(.ultraThinMaterial)
         .onAppear {
+            // Cancel any existing task before creating a new one to prevent multiple loops
+            permissionCheckTask?.cancel()
             // Start permission checking loop for permission steps
             permissionCheckTask = Task { @MainActor in
                 while !Task.isCancelled {

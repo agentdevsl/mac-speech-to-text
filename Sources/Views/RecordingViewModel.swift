@@ -65,6 +65,9 @@ final class RecordingViewModel {
     private let silenceThreshold: TimeInterval
     @ObservationIgnored private var languageSwitchObserver: NSObjectProtocol?
 
+    /// Track if audio capture is active to prevent double-stop
+    @ObservationIgnored private var isAudioCaptureActive: Bool = false
+
     // nonisolated copies for deinit access (deinit cannot access MainActor-isolated state)
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
     @ObservationIgnored private nonisolated(unsafe) var deinitSilenceTimer: Timer?
@@ -151,12 +154,13 @@ final class RecordingViewModel {
         transcribedText = ""
         confidence = 0.0
 
-        // Create new recording session
+        // Create new recording session with state set to recording
         let settings = settingsService.load()
         currentSession = RecordingSession(
             id: UUID(),
             startTime: Date(),
-            language: settings.language.defaultLanguage
+            language: settings.language.defaultLanguage,
+            state: .recording
         )
 
         isRecording = true
@@ -169,6 +173,7 @@ final class RecordingViewModel {
                     self?.resetSilenceTimer()
                 }
             }
+            isAudioCaptureActive = true
         } catch {
             isRecording = false
             currentSession = nil
@@ -188,7 +193,11 @@ final class RecordingViewModel {
         deinitSilenceTimer = nil
 
         do {
-            // Stop audio capture and get samples
+            // Stop audio capture and get samples (only if active)
+            guard isAudioCaptureActive else {
+                throw RecordingError.notRecording
+            }
+            isAudioCaptureActive = false
             let samples = try await audioService.stopCapture()
 
             guard !samples.isEmpty else {
@@ -218,14 +227,18 @@ final class RecordingViewModel {
         silenceTimer = nil
         deinitSilenceTimer = nil
 
-        // Stop audio capture
-        do {
-            _ = try await audioService.stopCapture()
-        } catch {
-            AppLogger.audio.warning("Non-fatal error during recording cancellation: \(error.localizedDescription, privacy: .public)")
+        // Stop audio capture only if active (prevents double-stop)
+        if isAudioCaptureActive {
+            isAudioCaptureActive = false
+            do {
+                _ = try await audioService.stopCapture()
+            } catch {
+                AppLogger.audio.warning("Non-fatal error during recording cancellation: \(error.localizedDescription, privacy: .public)")
+            }
         }
 
         // Mark session as cancelled
+        currentSession?.state = .cancelled
         currentSession?.errorMessage = "User cancelled"
         currentSession = nil
 
@@ -245,6 +258,8 @@ final class RecordingViewModel {
         }
 
         isTranscribing = true
+        session.state = .transcribing
+        currentSession = session
 
         do {
             // Initialize FluidAudio if needed
@@ -273,6 +288,7 @@ final class RecordingViewModel {
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription
+            session.state = .cancelled
             currentSession = session
             throw RecordingError.transcriptionFailed(error.localizedDescription)
         }
@@ -285,12 +301,15 @@ final class RecordingViewModel {
         }
 
         isInserting = true
+        session.state = .inserting
+        currentSession = session
 
         do {
             // Try text insertion via Accessibility API
             try await textInsertionService.insertText(text)
 
             session.insertionSuccess = true
+            session.state = .completed
             currentSession = session
 
             isInserting = false
@@ -303,6 +322,7 @@ final class RecordingViewModel {
             errorMessage = "Text insertion failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription
             session.insertionSuccess = false
+            session.state = .cancelled
             currentSession = session
             throw RecordingError.textInsertionFailed(error.localizedDescription)
         }

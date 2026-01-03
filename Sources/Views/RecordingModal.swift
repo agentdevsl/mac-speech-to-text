@@ -135,14 +135,13 @@ struct RecordingModal: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6))
             }
 
-            // Close button
+            // Close button (keyboard shortcut handled by .onKeyPress above)
             Button(action: handleDismiss) {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 20))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .keyboardShortcut(.cancelAction)
         }
     }
 
@@ -218,12 +217,11 @@ struct RecordingModal: View {
                 .keyboardShortcut(.return)
             }
 
-            // Cancel button
+            // Cancel button (keyboard shortcut handled by .onKeyPress above)
             Button("Cancel") {
                 handleDismiss()
             }
             .buttonStyle(.bordered)
-            .keyboardShortcut(.escape)
         }
     }
 
