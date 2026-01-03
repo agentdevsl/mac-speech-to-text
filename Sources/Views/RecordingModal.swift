@@ -86,7 +86,7 @@ struct RecordingModal: View {
         }
         // Dismiss task - runs when dismissTaskId is set, auto-cancelled on view disappear
         .task(id: dismissTaskId) {
-            guard let dismissTaskId else { return }
+            guard dismissTaskId != nil else { return }
             // Capture dismiss action eagerly before any async work to avoid dangling @Environment
             let dismissAction = dismiss
             await viewModel.cancelRecording()
