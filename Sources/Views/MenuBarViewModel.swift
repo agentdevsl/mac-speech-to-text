@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import AppKit
 
 /// MenuBarViewModel manages menu bar state and statistics
 @Observable

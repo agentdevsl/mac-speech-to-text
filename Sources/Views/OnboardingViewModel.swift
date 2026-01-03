@@ -109,7 +109,8 @@ final class OnboardingViewModel {
     /// Request microphone permission
     func requestMicrophonePermission() async {
         do {
-            microphoneGranted = try await permissionService.requestMicrophonePermission()
+            try await permissionService.requestMicrophonePermission()
+            microphoneGranted = await permissionService.checkMicrophonePermission()
 
             if microphoneGranted {
                 nextStep()
@@ -122,7 +123,8 @@ final class OnboardingViewModel {
     /// Request accessibility permission
     func requestAccessibilityPermission() async {
         do {
-            accessibilityGranted = try await permissionService.requestAccessibilityPermission()
+            try permissionService.requestAccessibilityPermission()
+            accessibilityGranted = permissionService.checkAccessibilityPermission()
 
             // Note: Accessibility requires manual grant in System Settings
             // Open System Settings for user
@@ -134,25 +136,22 @@ final class OnboardingViewModel {
         }
     }
 
-    /// Request input monitoring permission
+    /// Request input monitoring permission (not implemented yet)
     func requestInputMonitoringPermission() async {
-        do {
-            inputMonitoringGranted = try await permissionService.requestInputMonitoringPermission()
+        // Input monitoring permission is checked when registering hotkeys
+        inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
 
-            // Note: Input monitoring requires manual grant in System Settings
-            if !inputMonitoringGranted {
-                openSystemSettings(for: "input-monitoring")
-            }
-        } catch {
-            print("Input monitoring permission error: \(error)")
+        // Note: Input monitoring requires manual grant in System Settings
+        if !inputMonitoringGranted {
+            openSystemSettings(for: "input-monitoring")
         }
     }
 
     /// Check all permissions status
     func checkAllPermissions() async {
         microphoneGranted = await permissionService.checkMicrophonePermission()
-        accessibilityGranted = await permissionService.checkAccessibilityPermission()
-        inputMonitoringGranted = await permissionService.checkInputMonitoringPermission()
+        accessibilityGranted = permissionService.checkAccessibilityPermission()
+        inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
     }
 
     /// Complete onboarding

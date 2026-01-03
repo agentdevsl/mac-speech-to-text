@@ -37,7 +37,7 @@ struct RecordingModal: View {
                 headerView
 
                 // Waveform visualization (T026)
-                WaveformView(audioLevel: viewModel.audioLevel)
+                WaveformView(audioLevel: Float(viewModel.audioLevel))
                     .frame(height: 80)
 
                 // Status text
