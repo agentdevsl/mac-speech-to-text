@@ -148,14 +148,16 @@ class AudioCaptureService {
         bufferProcessor = processor
 
         // Install tap - processor handles everything, no self reference needed
+        // CRITICAL: Mark closure as @Sendable to break @MainActor isolation inheritance.
+        // This closure is called from Core Audio's real-time thread, NOT MainActor.
         let chunkSize = Constants.Audio.chunkSize
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Installing tap with bufferSize=\(chunkSize)")
         inputNode.installTap(
             onBus: 0,
             bufferSize: AVAudioFrameCount(chunkSize),
             format: nativeFormat
-        ) { buffer, time in
-            // processor is captured directly - no actor isolation issues
+        ) { @Sendable buffer, time in
+            // processor is @unchecked Sendable and handles its own thread safety
             processor.process(buffer, time: time)
         }
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Tap installed successfully")
