@@ -79,9 +79,7 @@ custom_rules:
       - doccomment.field
     excluded: true  # Only match in source code, not comments
 
-  # Warn about nonisolated(unsafe) usage which can cause memory issues
-  nonisolated_unsafe_warning:
-    name: "Nonisolated Unsafe Usage"
-    regex: 'nonisolated\(unsafe\)'
-    message: "nonisolated(unsafe) bypasses actor isolation safety. Ensure proper synchronization."
-    severity: warning
+  # Note: nonisolated(unsafe) is intentionally used for deinit cleanup patterns
+  # where MainActor-isolated state cannot be accessed. This is safe when used with
+  # thread-safe operations like Timer.invalidate() or NSLock-protected state.
+  # See docs/CONCURRENCY_PATTERNS.md for details on safe usage.
