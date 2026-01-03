@@ -250,14 +250,22 @@ final class AppStateTests: XCTestCase {
     }
 
     func test_completeOnboarding_updatesSettings() {
-        // Given
-        XCTAssertFalse(appState.settings.onboarding.completed)
+        // Given - ensure fresh state
+        UserDefaults.standard.removeObject(forKey: settingsKey)
+        UserDefaults.standard.synchronize()
+        let freshAppState = AppState()
+        XCTAssertFalse(freshAppState.settings.onboarding.completed)
+        XCTAssertNil(freshAppState.errorMessage, "Should have no error before onboarding")
 
         // When
-        appState.completeOnboarding()
+        freshAppState.completeOnboarding()
 
         // Then
-        XCTAssertTrue(appState.settings.onboarding.completed)
+        XCTAssertNil(freshAppState.errorMessage, "Should have no error after completeOnboarding")
+        XCTAssertTrue(
+            freshAppState.settings.onboarding.completed,
+            "Settings should be updated after completeOnboarding"
+        )
     }
 
     // MARK: - Refresh Statistics Tests
