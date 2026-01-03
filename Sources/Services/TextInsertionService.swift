@@ -80,6 +80,10 @@ class TextInsertionService {
         // Copy to clipboard first
         try await copyToClipboard(text)
 
+        // Small delay to ensure clipboard content is fully committed
+        // This prevents race condition where keyboard events execute before pasteboard is ready
+        try await Task.sleep(nanoseconds: 50_000_000) // 50ms
+
         // Simulate Cmd+V
         guard let source = CGEventSource(stateID: .hidSystemState) else {
             throw TextInsertionError.eventSourceCreationFailed

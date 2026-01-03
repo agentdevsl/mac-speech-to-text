@@ -115,7 +115,10 @@ actor StatisticsService {
     func cleanupOldStats(retentionDays: Int) throws {
         guard retentionDays > 0 else { return }
 
-        let cutoffDate = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date())!
+        guard let cutoffDate = Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date()) else {
+            AppLogger.analytics.error("Failed to calculate cutoff date for cleanup with retention \(retentionDays) days")
+            return
+        }
         let allStats = loadAllStats()
         let recentStats = allStats.filter { $0.date >= cutoffDate }
 

@@ -17,14 +17,8 @@ struct WaveformView: View {
     /// Number of waveform bars
     private let barCount: Int = 60
 
-    /// Animation timer for smooth updates
-    @State private var animationPhase: Double = 0.0
-
     /// Previous audio levels for smooth transitions
     @State private var levelHistory: [Float] = Array(repeating: 0.0, count: 60)
-
-    /// Timer for animation updates (needs to be invalidated on disappear)
-    @State private var animationTimer: Timer?
 
     // MARK: - Body
 
@@ -78,12 +72,6 @@ struct WaveformView: View {
         .onChange(of: audioLevel) { _, newValue in
             updateLevelHistory(newLevel: newValue)
         }
-        .onAppear {
-            startAnimation()
-        }
-        .onDisappear {
-            stopAnimation()
-        }
     }
 
     // MARK: - Private Methods
@@ -93,21 +81,6 @@ struct WaveformView: View {
         // Shift history and add new level
         levelHistory.removeFirst()
         levelHistory.append(newLevel)
-    }
-
-    /// Start continuous animation for smooth transitions
-    private func startAnimation() {
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            Task { @MainActor in
-                animationPhase += 0.1
-            }
-        }
-    }
-
-    /// Stop animation timer
-    private func stopAnimation() {
-        animationTimer?.invalidate()
-        animationTimer = nil
     }
 
     /// Determine color based on audio level

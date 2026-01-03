@@ -10,6 +10,9 @@ class AudioCaptureService {
     private var streamingBuffer: StreamingAudioBuffer?
     private var levelCallback: ((Double) -> Void)?
 
+    /// Counter for pending buffer append operations to ensure all audio is flushed before stop
+    private let pendingWrites = PendingWritesCounter()
+
     init() {
         inputNode = audioEngine.inputNode
     }
@@ -60,6 +63,11 @@ class AudioCaptureService {
         audioEngine.stop()
         inputNode.removeTap(onBus: 0)
 
+        // Wait for all pending buffer writes to complete before retrieving samples
+        // This prevents race condition where in-flight Tasks from processAudioBuffer
+        // haven't finished appending audio data yet
+        await pendingWrites.waitForCompletion()
+
         guard let streamingBuffer = streamingBuffer else {
             throw AudioCaptureError.noDataRecorded
         }
@@ -90,7 +98,11 @@ class AudioCaptureService {
 
         // Add to streaming buffer (using Task for non-blocking async execution
         // since Core Audio callbacks run in a synchronous context)
+        // Track pending writes to prevent race condition in stopCapture
+        let pendingWrites = self.pendingWrites
+        pendingWrites.increment()
         Task { [weak self] in
+            defer { pendingWrites.decrement() }
             do {
                 try await self?.appendToStreamingBuffer(audioBuffer)
             } catch {
@@ -142,6 +154,59 @@ enum AudioCaptureError: Error, LocalizedError {
             return "No audio data was recorded"
         case .engineStartFailed(let message):
             return "Failed to start audio engine: \(message)"
+        }
+    }
+}
+
+/// Thread-safe counter for tracking pending buffer write operations
+/// Used to ensure all audio data is flushed before stopCapture returns
+final class PendingWritesCounter: @unchecked Sendable {
+    private var pendingCount: Int = 0
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    var isEmpty: Bool {
+        pendingCount == 0
+    }
+
+    func increment() {
+        lock.lock()
+        pendingCount += 1
+        lock.unlock()
+    }
+
+    func decrement() {
+        lock.lock()
+        pendingCount -= 1
+        let shouldResume = isEmpty && continuation != nil
+        let cont = continuation
+        if shouldResume {
+            continuation = nil
+        }
+        lock.unlock()
+
+        if shouldResume {
+            cont?.resume()
+        }
+    }
+
+    func waitForCompletion() async {
+        lock.lock()
+        if isEmpty {
+            lock.unlock()
+            return
+        }
+        lock.unlock()
+
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            if isEmpty {
+                lock.unlock()
+                cont.resume()
+            } else {
+                continuation = cont
+                lock.unlock()
+            }
         }
     }
 }

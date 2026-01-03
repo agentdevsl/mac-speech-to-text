@@ -24,3 +24,4 @@ Workflow - autonomously complete the tasks,
 10. perform and complete code review using concurrent opus agents, resolves issues, repeate 2 times
 11. once fully tested ensure full test coverage and tests completed successfully create a Git PR with summary once all successful otherwise work to resolve issues
 12. /ralph-wiggum:ralph-loop monitor the gh action run for success,fix any issues --max-iterations 30 --completion-promise gh actions successful
+

@@ -1,0 +1,1 @@
+/ralph-wiggum:ralph-loop use 8 concurrent opus agents to complete code review for bugs and test coverage, fix all issues and rerun complete code review --max-iterations 30 --completion-promise no critical bugs found

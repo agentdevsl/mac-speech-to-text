@@ -14,14 +14,21 @@ class HotkeyService {
 
     deinit {
         // Clean up Carbon resources directly - safe due to nonisolated(unsafe) properties
+        // Note: userDataPointer is NOT released here because unregisterHotkey() handles it.
+        // Double-release protection: if unregisterHotkey() was called, userDataPointer will be nil.
+        // If unregisterHotkey() was NOT called (abnormal teardown), we need to clean up.
         if let ref = hotKeyRef {
             UnregisterEventHotKey(ref)
+            hotKeyRef = nil
         }
         if let handler = eventHandler {
             RemoveEventHandler(handler)
+            eventHandler = nil
         }
+        // Only release userData if it hasn't been released by unregisterHotkey()
         if let userData = userDataPointer {
             Unmanaged<HotkeyService>.fromOpaque(userData).release()
+            userDataPointer = nil
         }
     }
 
@@ -66,7 +73,12 @@ class HotkeyService {
         )
         let eventHandlerCallback: EventHandlerUPP = { _, _, userData -> OSStatus in
             guard let userData = userData else { return OSStatus(eventNotHandledErr) }
-            Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue().callback?()
+            let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
+            // Dispatch callback to MainActor since this callback runs on Carbon's event loop thread
+            // and HotkeyService is @MainActor isolated
+            Task { @MainActor in
+                service.callback?()
+            }
             return noErr
         }
 

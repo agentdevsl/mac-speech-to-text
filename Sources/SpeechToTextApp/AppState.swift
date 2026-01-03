@@ -18,6 +18,9 @@ class AppState {
     let settingsService: SettingsService
     let statisticsService: StatisticsService
 
+    /// Task for loading statistics - tracked for proper lifecycle management
+    private var loadingTask: Task<Void, Never>?
+
     init() {
         // Initialize services
         self.fluidAudioService = FluidAudioService()
@@ -29,13 +32,19 @@ class AppState {
         self.settings = settingsService.load()
 
         // Load statistics asynchronously (actor isolation)
+        // Track the task for proper lifecycle management
         self.statistics = .empty
-        Task {
+        loadingTask = Task { [weak self] in
+            guard let self else { return }
             self.statistics = await statisticsService.getAggregatedStats()
         }
 
         // Check if onboarding needed
         self.showOnboarding = !settings.onboarding.completed
+    }
+
+    deinit {
+        loadingTask?.cancel()
     }
 
     /// Initialize FluidAudio on app startup

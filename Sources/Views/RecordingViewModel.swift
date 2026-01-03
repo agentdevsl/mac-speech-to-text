@@ -65,6 +65,10 @@ final class RecordingViewModel {
     private let silenceThreshold: TimeInterval
     private var languageSwitchObserver: NSObjectProtocol?
 
+    // nonisolated(unsafe) copies for deinit access (deinit cannot access MainActor-isolated state)
+    private nonisolated(unsafe) var _languageSwitchObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var _silenceTimer: Timer?
+
     // MARK: - Initialization
 
     init(
@@ -92,16 +96,20 @@ final class RecordingViewModel {
     }
 
     deinit {
-        // NotificationCenter.removeObserver(self) is thread-safe and removes all observers
-        // associated with this object, avoiding MainActor-isolated property access issues
-        NotificationCenter.default.removeObserver(self)
+        // For closure-based observers, we must remove via the returned token
+        // Store observer in nonisolated(unsafe) property for deinit access
+        if let observer = _languageSwitchObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        // Invalidate any pending timer
+        _silenceTimer?.invalidate()
     }
 
     // MARK: - Language Switch Observer
 
     private func setupLanguageSwitchObserver() {
         // Listen for language switch notifications (T064, T067)
-        languageSwitchObserver = NotificationCenter.default.addObserver(
+        let observer = NotificationCenter.default.addObserver(
             forName: .switchLanguage,
             object: nil,
             queue: .main
@@ -125,6 +133,8 @@ final class RecordingViewModel {
                 self.isLanguageSwitching = false
             }
         }
+        languageSwitchObserver = observer
+        _languageSwitchObserver = observer
     }
 
     // MARK: - Public Methods
@@ -298,10 +308,11 @@ final class RecordingViewModel {
     /// Reset silence detection timer (T029)
     private func resetSilenceTimer() {
         silenceTimer?.invalidate()
+        _silenceTimer?.invalidate()
 
         // Check if audio level is below threshold (silence)
         if audioLevel < 0.01 { // Very low threshold for silence
-            silenceTimer = Timer.scheduledTimer(
+            let timer = Timer.scheduledTimer(
                 withTimeInterval: silenceThreshold,
                 repeats: false
             ) { [weak self] _ in
@@ -309,6 +320,11 @@ final class RecordingViewModel {
                     await self?.onSilenceDetected()
                 }
             }
+            silenceTimer = timer
+            _silenceTimer = timer
+        } else {
+            silenceTimer = nil
+            _silenceTimer = nil
         }
     }
 

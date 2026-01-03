@@ -185,16 +185,21 @@ final class OnboardingViewModel {
 
     /// Open System Settings for specific permission
     func openSystemSettings(for permission: String) {
-        let url: URL
+        let urlString: String
         switch permission {
         case "microphone":
-            url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
         case "accessibility":
-            url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
         case "input-monitoring":
-            url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
+            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
         default:
-            url = URL(string: "x-apple.systempreferences:com.apple.preference.security")!
+            urlString = "x-apple.systempreferences:com.apple.preference.security"
+        }
+
+        guard let url = URL(string: urlString) else {
+            AppLogger.viewModel.error("Failed to create URL for system settings: \(urlString)")
+            return
         }
 
         NSWorkspace.shared.open(url)

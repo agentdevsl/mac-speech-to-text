@@ -19,6 +19,7 @@ struct RecordingModal: View {
     @State private var viewModel = RecordingViewModel()
     @State private var showError: Bool = false
     @State private var isVisible: Bool = false
+    @State private var isDismissing: Bool = false
 
     // MARK: - Body
 
@@ -76,7 +77,8 @@ struct RecordingModal: View {
             }
         }
         .onDisappear {
-            // Cleanup
+            // Cleanup - only cancel if not already dismissing (prevents double-cancellation)
+            guard !isDismissing else { return }
             Task {
                 await viewModel.cancelRecording()
             }
@@ -246,18 +248,22 @@ struct RecordingModal: View {
 
     /// Handle modal dismissal with animation
     private func handleDismiss() {
+        // Prevent double-cancellation if already dismissing
+        guard !isDismissing else { return }
+        isDismissing = true
+
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             isVisible = false
+        }
+
+        // Cancel recording once during dismissal
+        Task {
+            await viewModel.cancelRecording()
         }
 
         // Delay actual dismissal for animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             dismiss()
-        }
-
-        // Cancel recording
-        Task {
-            await viewModel.cancelRecording()
         }
     }
 }
