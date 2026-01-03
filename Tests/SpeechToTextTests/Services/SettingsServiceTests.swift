@@ -1,22 +1,23 @@
 import XCTest
 @testable import SpeechToText
 
+@MainActor
 final class SettingsServiceTests: XCTestCase {
 
     var userDefaults: UserDefaults!
     var service: SettingsService!
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
+        try await super.setUp()
         // Use a test suite name to avoid interfering with actual app data
         userDefaults = UserDefaults(suiteName: "com.speechtotext.tests")!
         userDefaults.removePersistentDomain(forName: "com.speechtotext.tests")
         service = SettingsService(userDefaults: userDefaults)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         userDefaults.removePersistentDomain(forName: "com.speechtotext.tests")
-        super.tearDown()
+        try await super.tearDown()
     }
 
     // MARK: - Load Tests
@@ -126,7 +127,7 @@ final class SettingsServiceTests: XCTestCase {
         originalSettings.audio.sensitivity = 0.9
         try service.save(originalSettings)
 
-        var newLanguage = LanguageConfiguration(
+        let newLanguage = LanguageConfiguration(
             defaultLanguage: "es",
             recentLanguages: ["en", "es"],
             autoDetectEnabled: true,
@@ -217,7 +218,7 @@ final class SettingsServiceTests: XCTestCase {
 
     func test_updateOnboarding_updatesOnlyOnboardingState() throws {
         // Given
-        var newOnboarding = OnboardingState(
+        let newOnboarding = OnboardingState(
             completed: true,
             currentStep: 5,
             permissionsGranted: PermissionsGranted(
@@ -292,8 +293,7 @@ final class SettingsServiceTests: XCTestCase {
 
     // MARK: - Multiple Updates Test
 
-    @MainActor
-    func test_multipleUpdates_allPersistCorrectly() async throws {
+    func test_multipleUpdates_allPersistCorrectly() throws {
         // Given
         let newHotkey = HotkeyConfiguration(
             enabled: false,
