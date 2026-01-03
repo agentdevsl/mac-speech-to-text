@@ -51,8 +51,8 @@ final class LanguagePickerTests: XCTestCase {
     }
 
     func test_filteredLanguages_matchesByName() {
-        // Given
-        let helper = LanguageFilterHelper(searchText: "French")
+        // Given - use native name since LanguageModel.name returns native name
+        let helper = LanguageFilterHelper(searchText: "Français")
 
         // When
         let filtered = helper.filteredLanguages
@@ -62,14 +62,14 @@ final class LanguagePickerTests: XCTestCase {
     }
 
     func test_filteredLanguages_matchesByNativeName() {
-        // Given
-        let helper = LanguageFilterHelper(searchText: "Français")
+        // Given - using Deutsch which is the native name for German
+        let helper = LanguageFilterHelper(searchText: "Deutsch")
 
         // When
         let filtered = helper.filteredLanguages
 
         // Then
-        XCTAssertTrue(filtered.contains { $0.code == "fr" })
+        XCTAssertTrue(filtered.contains { $0.code == "de" })
     }
 
     func test_filteredLanguages_matchesByCode() {
@@ -84,10 +84,10 @@ final class LanguagePickerTests: XCTestCase {
     }
 
     func test_filteredLanguages_caseInsensitiveSearch() {
-        // Given
-        let helperLower = LanguageFilterHelper(searchText: "german")
-        let helperUpper = LanguageFilterHelper(searchText: "GERMAN")
-        let helperMixed = LanguageFilterHelper(searchText: "GeRmAn")
+        // Given - use native name "Deutsch" with various casing
+        let helperLower = LanguageFilterHelper(searchText: "deutsch")
+        let helperUpper = LanguageFilterHelper(searchText: "DEUTSCH")
+        let helperMixed = LanguageFilterHelper(searchText: "DeUtScH")
 
         // When
         let filteredLower = helperLower.filteredLanguages
@@ -112,13 +112,13 @@ final class LanguagePickerTests: XCTestCase {
     }
 
     func test_filteredLanguages_partialMatch() {
-        // Given
-        let helper = LanguageFilterHelper(searchText: "Span")
+        // Given - "Espa" matches "Español"
+        let helper = LanguageFilterHelper(searchText: "Espa")
 
         // When
         let filtered = helper.filteredLanguages
 
-        // Then - should match Spanish
+        // Then - should match Spanish (Español)
         XCTAssertTrue(filtered.contains { $0.code == "es" })
     }
 

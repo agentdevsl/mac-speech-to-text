@@ -174,33 +174,36 @@ final class SettingsViewModelTests: XCTestCase {
 
     // MARK: - resetToDefaults Tests
 
-    func test_resetToDefaults_setsDefaultSettings() async {
+    func test_resetToDefaults_setsDefaultSettings() {
         // Given
         sut.settings.general.launchAtLogin = true
         sut.settings.audio.sensitivity = 0.9
 
         // When
-        await sut.resetToDefaults()
+        sut.resetToDefaults()
 
-        // Then
+        // Then - settings are updated immediately, save happens in background
         XCTAssertEqual(sut.settings.general.launchAtLogin, UserSettings.default.general.launchAtLogin)
         XCTAssertEqual(sut.settings.audio.sensitivity, UserSettings.default.audio.sensitivity)
     }
 
-    func test_resetToDefaults_clearsValidationError() async {
+    func test_resetToDefaults_clearsValidationError() {
         // Given
         sut.validationError = "Some error"
 
         // When
-        await sut.resetToDefaults()
+        sut.resetToDefaults()
 
-        // Then
+        // Then - error is cleared immediately
         XCTAssertNil(sut.validationError)
     }
 
-    func test_resetToDefaults_savesSettingsToDisk() async {
+    func test_resetToDefaults_savesSettingsToDisk() async throws {
         // When
-        await sut.resetToDefaults()
+        sut.resetToDefaults()
+
+        // Wait for the internal Task to complete (resetToDefaults spawns fire-and-forget Task)
+        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
         // Then
         XCTAssertTrue(mockSettingsService.saveWasCalled)
