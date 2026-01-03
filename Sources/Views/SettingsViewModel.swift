@@ -74,8 +74,8 @@ final class SettingsViewModel {
         settings = UserSettings.default
         validationError = nil
 
-        Task {
-            await saveSettings()
+        Task { [weak self] in
+            await self?.saveSettings()
         }
     }
 
@@ -91,6 +91,23 @@ final class SettingsViewModel {
         settings.hotkey.modifiers = modifiers
 
         await saveSettings()
+
+        // Only register hotkey if settings were saved successfully
+        if validationError == nil {
+            // Register the new hotkey with the system
+            // Note: UserSettings.HotkeyModifier is a typealias for KeyModifier, so direct cast works
+            do {
+                try await hotkeyService.registerHotkey(
+                    keyCode: keyCode,
+                    modifiers: modifiers // KeyModifier array is compatible directly
+                ) {
+                    // Hotkey triggered - post notification to show recording modal
+                    NotificationCenter.default.post(name: .showRecordingModal, object: nil)
+                }
+            } catch {
+                validationError = "Failed to register hotkey: \(error.localizedDescription)"
+            }
+        }
     }
 
     /// Update selected language and trigger model download if needed

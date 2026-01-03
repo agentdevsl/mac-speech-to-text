@@ -15,8 +15,6 @@ struct LanguagePicker: View {
     // MARK: - State
 
     @State private var searchText = ""
-    @State private var isDownloading = false
-    @State private var downloadProgress = 0.0
 
     // MARK: - Properties
 
@@ -57,6 +55,7 @@ struct LanguagePicker: View {
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Clear search")
                 }
             }
             .padding(8)
@@ -82,25 +81,6 @@ struct LanguagePicker: View {
             }
             .frame(maxHeight: 300)
 
-            // Download progress (T061)
-            if isDownloading {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack {
-                        Text("Downloading model...")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        Spacer()
-
-                        Text("\(Int(downloadProgress * 100))%")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    ProgressView(value: downloadProgress)
-                }
-                .padding(.top, 8)
-            }
         }
     }
 }
