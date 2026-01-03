@@ -188,12 +188,16 @@ tccutil reset Microphone com.speechtotext.app
 | Task | Command |
 |------|---------|
 | Setup signing (one-time) | `./scripts/setup-signing.sh` |
+| Verify signing setup | `./scripts/setup-signing.sh --verify` |
+| Force recreate cert | `./scripts/setup-signing.sh --force` |
 | Build app | `./scripts/build-app.sh` |
 | Release build | `./scripts/build-app.sh --release` |
 | Build and open | `./scripts/build-app.sh --open` |
 | Clean build | `./scripts/build-app.sh --clean` |
+| Check signing config | `./scripts/build-app.sh --check-signing` |
 | Create DMG | `./scripts/build-app.sh --release --dmg` |
-| Check signing | `codesign -dv build/SpeechToText.app` |
+| Smoke test | `./scripts/smoke-test.sh --build` |
+| Check permissions | `./scripts/smoke-test.sh --check-permissions` |
 | List certificates | `security find-identity -v -p codesigning` |
 
 ---
@@ -203,5 +207,7 @@ tccutil reset Microphone com.speechtotext.app
 After successful setup:
 
 1. Test the recording workflow (hotkey, transcription, text insertion)
-2. Review `docs/CONCURRENCY_PATTERNS.md` for Swift development patterns
-3. Run tests: `swift test --parallel`
+2. Run smoke test: `./scripts/smoke-test.sh --build`
+3. Review `docs/LOCAL_DEVELOPMENT.md` for detailed development guide
+4. Review `docs/XCODE_WORKFLOW.md` for Xcode-specific workflow
+5. Run tests: `swift test --parallel`
