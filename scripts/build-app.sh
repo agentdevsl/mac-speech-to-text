@@ -3,7 +3,6 @@
 # build-app.sh
 # =============================================================================
 # Creates a macOS .app bundle from Swift Package Manager build
-# For local testing without code signing
 #
 # Usage: ./scripts/build-app.sh [options]
 #
@@ -12,7 +11,13 @@
 #   --dmg           Also create a DMG installer
 #   --open          Open the app after building
 #   --clean         Clean build directory before building
+#   --sign NAME     Sign with specified identity (use "ad-hoc" for ad-hoc)
 #   --help          Show this help message
+#
+# Signing:
+#   If .signing-identity file exists in project root, uses that identity.
+#   Otherwise defaults to ad-hoc signing.
+#   Create consistent signing with: ./scripts/setup-signing.sh
 #
 # Output:
 #   build/SpeechToText.app     - The macOS application bundle
@@ -53,6 +58,13 @@ BUILD_CONFIG="debug"
 CREATE_DMG=false
 OPEN_APP=false
 CLEAN_BUILD=false
+SIGN_IDENTITY=""
+
+# Check for .signing-identity file
+SIGNING_IDENTITY_FILE="${PROJECT_ROOT}/.signing-identity"
+if [ -f "${SIGNING_IDENTITY_FILE}" ]; then
+    SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n')
+fi
 
 # =============================================================================
 # Functions
@@ -125,6 +137,10 @@ while [[ $# -gt 0 ]]; do
         --clean)
             CLEAN_BUILD=true
             shift
+            ;;
+        --sign)
+            SIGN_IDENTITY="$2"
+            shift 2
             ;;
         --help|-h)
             show_help
@@ -291,13 +307,36 @@ print_success "Created PkgInfo"
 chmod -R 755 "${APP_BUNDLE}"
 
 # =============================================================================
-# Ad-hoc Sign for Local Testing
+# Code Signing
 # =============================================================================
 
-print_info "Ad-hoc signing for local testing..."
-codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || {
-    print_warning "Could not ad-hoc sign app (may require Xcode)"
-}
+if [ -n "${SIGN_IDENTITY}" ] && [ "${SIGN_IDENTITY}" != "ad-hoc" ]; then
+    print_info "Signing with identity: ${SIGN_IDENTITY}"
+    if [ -f "${ENTITLEMENTS_FILE}" ]; then
+        codesign --force --deep --sign "${SIGN_IDENTITY}" \
+            --entitlements "${ENTITLEMENTS_FILE}" \
+            --options runtime \
+            "${APP_BUNDLE}" 2>&1 || {
+            print_error "Code signing failed. Check that the identity exists:"
+            echo "  security find-identity -v -p codesigning"
+            exit 1
+        }
+    else
+        codesign --force --deep --sign "${SIGN_IDENTITY}" \
+            --options runtime \
+            "${APP_BUNDLE}" 2>&1 || {
+            print_error "Code signing failed"
+            exit 1
+        }
+    fi
+    print_success "Signed with: ${SIGN_IDENTITY}"
+else
+    print_info "Ad-hoc signing for local testing..."
+    codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || {
+        print_warning "Could not ad-hoc sign app (may require Xcode)"
+    }
+    print_warning "Ad-hoc signed - permissions may not persist across builds"
+fi
 print_success "App bundle created"
 
 # =============================================================================
