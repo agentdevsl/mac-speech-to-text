@@ -291,14 +291,23 @@ print_success "Created PkgInfo"
 chmod -R 755 "${APP_BUNDLE}"
 
 # =============================================================================
-# Ad-hoc Sign for Local Testing
+# Ad-hoc Sign for Local Testing (with entitlements)
 # =============================================================================
 
-print_info "Ad-hoc signing for local testing..."
-codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || {
-    print_warning "Could not ad-hoc sign app (may require Xcode)"
-}
-print_success "App bundle created"
+print_info "Ad-hoc signing with entitlements for local testing..."
+if [ -f "${ENTITLEMENTS_FILE}" ]; then
+    codesign --force --deep --sign - --entitlements "${ENTITLEMENTS_FILE}" "${APP_BUNDLE}" 2>/dev/null || {
+        print_warning "Could not ad-hoc sign app with entitlements (may require Xcode)"
+        # Fallback to signing without entitlements
+        codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
+    }
+    print_success "App bundle signed with entitlements"
+else
+    codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || {
+        print_warning "Could not ad-hoc sign app (may require Xcode)"
+    }
+    print_success "App bundle signed (no entitlements file found)"
+fi
 
 # =============================================================================
 # Create DMG (if requested)

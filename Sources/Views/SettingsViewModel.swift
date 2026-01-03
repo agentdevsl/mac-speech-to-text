@@ -70,13 +70,11 @@ final class SettingsViewModel {
     }
 
     /// Reset settings to defaults (T060)
-    func resetToDefaults() {
+    /// Note: This is async to ensure settings are saved before returning
+    func resetToDefaults() async {
         settings = UserSettings.default
         validationError = nil
-
-        Task { [weak self] in
-            await self?.saveSettings()
-        }
+        await saveSettings()
     }
 
     /// Update hotkey configuration
