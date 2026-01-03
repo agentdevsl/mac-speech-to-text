@@ -72,7 +72,10 @@ class TextInsertionService {
     private func copyToClipboard(_ text: String) async throws {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(text, forType: .string)
+        let success = pasteboard.setString(text, forType: .string)
+        guard success else {
+            throw TextInsertionError.clipboardFailed
+        }
     }
 
     /// Simulate paste operation (alternative insertion method)
@@ -112,16 +115,19 @@ class TextInsertionService {
             throw TextInsertionError.keyEventCreationFailed("Command key up")
         }
 
-        // Post events
+        // Post events with small delays for reliable processing across all applications
         cmdDown.post(tap: .cghidEventTap)
+        try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         vDown.post(tap: .cghidEventTap)
+        try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         vUp.post(tap: .cghidEventTap)
+        try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         cmdUp.post(tap: .cghidEventTap)
     }
 }
 
 /// Text insertion errors
-enum TextInsertionError: Error, LocalizedError {
+enum TextInsertionError: Error, LocalizedError, Equatable, Sendable {
     case noFocusedElement
     case insertionFailed
     case clipboardFailed

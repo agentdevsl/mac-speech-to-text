@@ -75,13 +75,22 @@ final class OnboardingViewModel {
 
         currentStep += 1
 
-        // Auto-skip already-granted permissions
-        if currentStep == 1 && microphoneGranted {
-            nextStep()
-        } else if currentStep == 2 && accessibilityGranted {
-            nextStep()
-        } else if currentStep == 3 && inputMonitoringGranted {
-            nextStep()
+        // Auto-skip already-granted permissions using a loop to avoid stack overflow
+        while currentStep < totalSteps {
+            if currentStep == 1 && microphoneGranted {
+                currentStep += 1
+            } else if currentStep == 2 && accessibilityGranted {
+                currentStep += 1
+            } else if currentStep == 3 && inputMonitoringGranted {
+                currentStep += 1
+            } else {
+                break
+            }
+        }
+
+        // Check if we've reached the end after skipping
+        if currentStep >= totalSteps {
+            completeOnboarding()
         }
     }
 

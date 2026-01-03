@@ -141,7 +141,7 @@ class AudioCaptureService {
 }
 
 /// Audio capture errors
-enum AudioCaptureError: Error, LocalizedError, Equatable {
+enum AudioCaptureError: Error, LocalizedError, Equatable, Sendable {
     case invalidFormat
     case noDataRecorded
     case engineStartFailed(String)

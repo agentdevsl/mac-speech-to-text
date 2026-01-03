@@ -175,7 +175,7 @@ class HotkeyService {
 }
 
 /// Errors related to hotkey registration
-enum HotkeyError: Error, LocalizedError {
+enum HotkeyError: Error, LocalizedError, Equatable, Sendable {
     case installationFailed(String)
     case registrationFailed(String)
     case conflictDetected(String)

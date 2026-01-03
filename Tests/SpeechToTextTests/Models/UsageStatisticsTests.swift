@@ -114,8 +114,11 @@ final class UsageStatisticsTests: XCTestCase {
 
     func test_averageWordsPerSession_calculatesCorrectly() {
         // Given
+        // averageWordsPerSession uses successfulSessions (not totalSessions)
+        // since only successful sessions produce transcribed words
         let stats = UsageStatistics(
             totalSessions: 5,
+            successfulSessions: 5,
             totalWordsTranscribed: 250
         )
 

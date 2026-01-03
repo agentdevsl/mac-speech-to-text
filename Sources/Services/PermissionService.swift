@@ -4,7 +4,7 @@ import AVFoundation
 import Foundation
 
 /// Permission-related errors
-enum PermissionError: Error, LocalizedError {
+enum PermissionError: Error, LocalizedError, Equatable, Sendable {
     case microphoneDenied
     case accessibilityDenied
     case inputMonitoringDenied

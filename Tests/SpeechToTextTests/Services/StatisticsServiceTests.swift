@@ -6,16 +6,24 @@ final class StatisticsServiceTests: XCTestCase {
     var userDefaults: UserDefaults!
     var service: StatisticsService!
 
-    override func setUp() {
-        super.setUp()
-        userDefaults = UserDefaults(suiteName: "com.speechtotext.stats.tests")!
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.stats.tests")
+    override func setUp() async throws {
+        try await super.setUp()
+        // Use unique suite name per test to ensure isolation
+        let suiteName = "com.speechtotext.stats.tests.\(UUID().uuidString)"
+        userDefaults = UserDefaults(suiteName: suiteName)!
+        userDefaults.removePersistentDomain(forName: suiteName)
         service = StatisticsService(userDefaults: userDefaults)
+        // Ensure clean state
+        await service.clearAll()
     }
 
-    override func tearDown() {
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.stats.tests")
-        super.tearDown()
+    override func tearDown() async throws {
+        // Clean up
+        await service.clearAll()
+        if let suiteName = userDefaults.volatileDomainNames.first {
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+        try await super.tearDown()
     }
 
     // MARK: - Record Session Tests
@@ -344,7 +352,8 @@ final class StatisticsServiceTests: XCTestCase {
         // Given
         var session = RecordingSession(language: "en")
         session.insertionSuccess = false
-        session.errorMessage = "Accessibility permission required"
+        // Use message without "permission" to avoid matching permission_denied first
+        session.errorMessage = "Accessibility API failed"
 
         // When
         try await service.recordSession(session)

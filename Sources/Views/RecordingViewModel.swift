@@ -114,12 +114,13 @@ final class RecordingViewModel {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self = self,
-                  let languageCode = notification.userInfo?["languageCode"] as? String else {
+            guard let languageCode = notification.userInfo?["languageCode"] as? String else {
                 return
             }
 
-            Task { @MainActor in
+            // Use [weak self] inside Task to avoid strong capture after guard
+            Task { @MainActor [weak self] in
+                guard let self else { return }
                 self.isLanguageSwitching = true
                 self.currentLanguage = languageCode
 
@@ -184,6 +185,7 @@ final class RecordingViewModel {
         isRecording = false
         silenceTimer?.invalidate()
         silenceTimer = nil
+        deinitSilenceTimer = nil
 
         do {
             // Stop audio capture and get samples
@@ -214,6 +216,7 @@ final class RecordingViewModel {
 
         silenceTimer?.invalidate()
         silenceTimer = nil
+        deinitSilenceTimer = nil
 
         // Stop audio capture
         do {
@@ -352,7 +355,7 @@ final class RecordingViewModel {
 
 // MARK: - Recording Errors
 
-enum RecordingError: LocalizedError {
+enum RecordingError: LocalizedError, Equatable, Sendable {
     case alreadyRecording
     case notRecording
     case audioCaptureFailed(String)
