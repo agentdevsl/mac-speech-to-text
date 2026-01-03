@@ -228,15 +228,15 @@
 
 **Purpose**: Improvements that affect multiple user stories and final quality assurance
 
-- [ ] T070 [P] Add SwiftUI Previews to all view files for rapid UI development and visual regression testing
-- [ ] T071 [P] Implement comprehensive error messages in all services with user-friendly descriptions
-- [ ] T072 [P] Add haptic feedback to RecordingModal using NSHapticFeedbackManager for recording start/stop
-- [ ] T073 [P] Optimize FluidAudioService memory usage by clearing audio buffers immediately after transcription
-- [ ] T074 [P] Add accessibility labels and VoiceOver support to all SwiftUI views for screen reader compatibility
+- [X] T070 [P] Add SwiftUI Previews to all view files for rapid UI development and visual regression testing
+- [X] T071 [P] Implement comprehensive error messages in all services with user-friendly descriptions
+- [X] T072 [P] Add haptic feedback to RecordingModal using NSHapticFeedbackManager for recording start/stop
+- [X] T073 [P] Optimize FluidAudioService memory usage by clearing audio buffers immediately after transcription
+- [X] T074 [P] Add accessibility labels and VoiceOver support to all SwiftUI views for screen reader compatibility
 - [ ] T075 Implement singleton pattern in AppDelegate to prevent multiple app instances
 - [ ] T076 Add app icon assets to `/workspace/Resources/Assets.xcassets/AppIcon.appiconset/` with all required sizes
-- [ ] T077 [P] Add sound effects for recording start/stop in `/workspace/Resources/Sounds/` with subtle audio cues
-- [ ] T078 [P] Create localization strings files in `/workspace/Resources/Localizations/` for UI text in 25 languages
+- [X] T077 [P] Add sound effects for recording start/stop in `/workspace/Resources/Sounds/` with subtle audio cues
+- [X] T078 [P] Create localization strings files in `/workspace/Resources/Localizations/` for UI text in 25 languages
 - [ ] T079 Verify all performance targets via Xcode Instruments (hotkey <50ms, transcription <100ms, waveform 30+fps, idle RAM <200MB)
 - [ ] T080 Validate quickstart.md instructions by following setup steps on clean macOS system
 - [ ] T081 Code cleanup: run SwiftLint with auto-fix and SwiftFormat across entire codebase
