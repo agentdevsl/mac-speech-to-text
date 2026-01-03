@@ -12,6 +12,7 @@
 #   --open          Open the app after building
 #   --clean         Clean build directory before building
 #   --sign NAME     Sign with specified identity (use "ad-hoc" for ad-hoc)
+#   --sync          Pull latest code from git before building
 #   --help          Show this help message
 #
 # Signing:
@@ -59,6 +60,7 @@ CREATE_DMG=false
 OPEN_APP=false
 CLEAN_BUILD=false
 SIGN_IDENTITY=""
+SYNC_CODE=false
 
 # Check for .signing-identity file
 SIGNING_IDENTITY_FILE="${PROJECT_ROOT}/.signing-identity"
@@ -142,6 +144,10 @@ while [[ $# -gt 0 ]]; do
             SIGN_IDENTITY="$2"
             shift 2
             ;;
+        --sync)
+            SYNC_CODE=true
+            shift
+            ;;
         --help|-h)
             show_help
             ;;
@@ -164,6 +170,18 @@ check_macos
 check_swift
 
 cd "${PROJECT_ROOT}"
+
+# Sync code from git if requested
+if [ "$SYNC_CODE" = true ]; then
+    print_info "Syncing code from git..."
+    if git rev-parse --git-dir > /dev/null 2>&1; then
+        git fetch origin
+        git reset --hard origin/main
+        print_success "Code synced from origin/main"
+    else
+        print_warning "Not a git repository, skipping sync"
+    fi
+fi
 
 # Clean if requested
 if [ "$CLEAN_BUILD" = true ]; then
