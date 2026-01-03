@@ -176,6 +176,15 @@ final class OnboardingViewModel {
         microphoneGranted = await permissionService.checkMicrophonePermission()
         accessibilityGranted = permissionService.checkAccessibilityPermission()
         inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
+
+        // Clear permission error if the relevant permission is now granted
+        if permissionError != nil {
+            if (currentStep == 1 && microphoneGranted) ||
+               (currentStep == 2 && accessibilityGranted) ||
+               (currentStep == 3 && inputMonitoringGranted) {
+                permissionError = nil
+            }
+        }
     }
 
     /// Complete onboarding
