@@ -20,10 +20,10 @@ enum AppLogger {
     private static let subsystem = Bundle.main.bundleIdentifier ?? Constants.App.bundleIdentifier
 
     /// Current log level - set to .trace for maximum debug output
-    static var currentLevel: LogLevel = .trace
+    nonisolated(unsafe) static var currentLevel: LogLevel = .trace
 
     /// Enable expensive debug checks (object addresses, etc.)
-    static var enableExpensiveLogging = true
+    nonisolated(unsafe) static var enableExpensiveLogging = true
 
     /// Logger for app lifecycle and delegate events
     static let app = Logger(subsystem: subsystem, category: "app")
@@ -47,7 +47,7 @@ enum AppLogger {
 
     static func trace(
         _ logger: Logger,
-        _ message: @autoclosure () -> String,
+        _ message: String,
         file: String = #file,
         function: String = #function,
         line: Int = #line
@@ -55,51 +55,51 @@ enum AppLogger {
         guard currentLevel >= .trace else { return }
         let fileName = (file as NSString).lastPathComponent
         logger.debug(
-            "TRACE [\(fileName, privacy: .public):\(line, privacy: .public)] \(function, privacy: .public) - \(message(), privacy: .public)"
+            "TRACE [\(fileName, privacy: .public):\(line, privacy: .public)] \(function, privacy: .public) - \(message, privacy: .public)"
         )
     }
 
     static func debug(
         _ logger: Logger,
-        _ message: @autoclosure () -> String,
+        _ message: String,
         file: String = #file,
         line: Int = #line
     ) {
         guard currentLevel >= .debug else { return }
         let fileName = (file as NSString).lastPathComponent
-        logger.debug("DEBUG [\(fileName, privacy: .public):\(line, privacy: .public)] \(message(), privacy: .public)")
+        logger.debug("DEBUG [\(fileName, privacy: .public):\(line, privacy: .public)] \(message, privacy: .public)")
     }
 
     static func info(
         _ logger: Logger,
-        _ message: @autoclosure () -> String,
+        _ message: String,
         file: String = #file,
         line: Int = #line
     ) {
         guard currentLevel >= .info else { return }
         let fileName = (file as NSString).lastPathComponent
-        logger.info("INFO [\(fileName, privacy: .public):\(line, privacy: .public)] \(message(), privacy: .public)")
+        logger.info("INFO [\(fileName, privacy: .public):\(line, privacy: .public)] \(message, privacy: .public)")
     }
 
     static func warning(
         _ logger: Logger,
-        _ message: @autoclosure () -> String,
+        _ message: String,
         file: String = #file,
         line: Int = #line
     ) {
         guard currentLevel >= .warning else { return }
         let fileName = (file as NSString).lastPathComponent
-        logger.warning("WARN [\(fileName, privacy: .public):\(line, privacy: .public)] \(message(), privacy: .public)")
+        logger.warning("WARN [\(fileName, privacy: .public):\(line, privacy: .public)] \(message, privacy: .public)")
     }
 
     static func error(
         _ logger: Logger,
-        _ message: @autoclosure () -> String,
+        _ message: String,
         file: String = #file,
         line: Int = #line
     ) {
         let fileName = (file as NSString).lastPathComponent
-        logger.error("ERROR [\(fileName, privacy: .public):\(line, privacy: .public)] \(message(), privacy: .public)")
+        logger.error("ERROR [\(fileName, privacy: .public):\(line, privacy: .public)] \(message, privacy: .public)")
     }
 
     static func lifecycle(
