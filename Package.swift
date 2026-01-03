@@ -14,6 +14,10 @@ let package = Package(
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
             branch: "main"
+        ),
+        .package(
+            url: "https://github.com/nalexn/ViewInspector.git",
+            from: "0.10.0"
         )
     ],
     targets: [
@@ -34,7 +38,10 @@ let package = Package(
         ),
         .testTarget(
             name: "SpeechToTextTests",
-            dependencies: ["SpeechToText"],
+            dependencies: [
+                "SpeechToText",
+                .product(name: "ViewInspector", package: "ViewInspector")
+            ],
             path: "Tests/SpeechToTextTests"
         )
     ]

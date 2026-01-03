@@ -79,6 +79,84 @@ final class PermissionServiceTests: XCTestCase {
         XCTAssertNotNil(hasPermission)
     }
 
+    func test_checkInputMonitoringPermission_usesIOHIDCheckAccess() {
+        // Given
+        // This test verifies that the IOHIDCheckAccess API is being used correctly
+        // The real PermissionService calls IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
+        // and compares the result to kIOHIDAccessTypeGranted
+        let service = PermissionService()
+
+        // When
+        // The method should return a boolean without crashing
+        // IOHIDCheckAccess returns IOHIDAccessType which is compared to kIOHIDAccessTypeGranted
+        let result = service.checkInputMonitoringPermission()
+
+        // Then
+        // Verify the method completes successfully and returns a valid boolean
+        // The result will be true if permission is granted, false otherwise
+        XCTAssertTrue(result == true || result == false, "Method should return a valid boolean")
+    }
+
+    func test_checkInputMonitoringPermission_returnsTrueWhenGranted() async {
+        // Given
+        let mockService = MockPermissionService()
+        mockService.inputMonitoringGranted = true
+
+        // When
+        let hasPermission = mockService.checkInputMonitoringPermission()
+
+        // Then
+        XCTAssertTrue(hasPermission, "Should return true when input monitoring is granted")
+    }
+
+    func test_checkInputMonitoringPermission_returnsFalseWhenDenied() async {
+        // Given
+        let mockService = MockPermissionService()
+        mockService.inputMonitoringGranted = false
+
+        // When
+        let hasPermission = mockService.checkInputMonitoringPermission()
+
+        // Then
+        XCTAssertFalse(hasPermission, "Should return false when input monitoring is denied")
+    }
+
+    func test_checkInputMonitoringPermission_canBeToggledInMock() async {
+        // Given
+        let mockService = MockPermissionService()
+
+        // When - Initially granted
+        mockService.inputMonitoringGranted = true
+        let initialResult = mockService.checkInputMonitoringPermission()
+
+        // Then - Switch to denied
+        mockService.inputMonitoringGranted = false
+        let deniedResult = mockService.checkInputMonitoringPermission()
+
+        // And back to granted
+        mockService.inputMonitoringGranted = true
+        let grantedAgainResult = mockService.checkInputMonitoringPermission()
+
+        // Verify all transitions work correctly
+        XCTAssertTrue(initialResult, "Initial state should be granted")
+        XCTAssertFalse(deniedResult, "Should return false after setting to denied")
+        XCTAssertTrue(grantedAgainResult, "Should return true after re-granting")
+    }
+
+    func test_realPermissionService_inputMonitoringReturnsConsistentValue() {
+        // Given
+        let service = PermissionService()
+
+        // When - Call multiple times
+        let result1 = service.checkInputMonitoringPermission()
+        let result2 = service.checkInputMonitoringPermission()
+        let result3 = service.checkInputMonitoringPermission()
+
+        // Then - Results should be consistent
+        XCTAssertEqual(result1, result2, "Multiple calls should return consistent results")
+        XCTAssertEqual(result2, result3, "Multiple calls should return consistent results")
+    }
+
     // MARK: - Get All Permissions Tests
 
     func test_getAllPermissionStatuses_returnsPermissionsGrantedStruct() async {

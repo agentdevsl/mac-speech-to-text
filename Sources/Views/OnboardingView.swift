@@ -17,6 +17,9 @@ struct OnboardingView: View {
 
     @State private var viewModel = OnboardingViewModel()
 
+    /// Timer to periodically check permission status when on permission steps
+    private let permissionCheckTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
     // MARK: - Body
 
     var body: some View {
@@ -35,6 +38,14 @@ struct OnboardingView: View {
         }
         .frame(width: 600, height: 500)
         .background(.ultraThinMaterial)
+        .onReceive(permissionCheckTimer) { _ in
+            // Only check permissions when on permission steps (1-3)
+            if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
+                Task {
+                    await viewModel.checkAllPermissions()
+                }
+            }
+        }
         .alert(
             "Skip This Step?",
             isPresented: $viewModel.showSkipWarning,
