@@ -157,7 +157,7 @@ final class StatisticsServiceTests: XCTestCase {
 
     // MARK: - Get Today Stats Tests
 
-    func test_getTodayStats_returnsEmptyStatsWhenNoSessions() {
+    func test_getTodayStats_returnsEmptyStatsWhenNoSessions() async {
         // Given/When
         let stats = await service.getTodayStats()
 
@@ -183,12 +183,12 @@ final class StatisticsServiceTests: XCTestCase {
 
     // MARK: - Get Stats For Date Tests
 
-    func test_getStatsForDate_returnsEmptyStatsForDateWithNoSessions() {
+    func test_getStatsForDate_returnsEmptyStatsForDateWithNoSessions() async {
         // Given
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
 
         // When
-        let stats = service.getStatsForDate(yesterday)
+        let stats = await service.getStatsForDate(yesterday)
 
         // Then
         XCTAssertEqual(stats.totalSessions, 0)
@@ -196,7 +196,7 @@ final class StatisticsServiceTests: XCTestCase {
 
     // MARK: - Get Aggregated Stats Tests
 
-    func test_getAggregatedStats_returnsEmptyStatsWhenNoSessions() {
+    func test_getAggregatedStats_returnsEmptyStatsWhenNoSessions() async {
         // Given/When
         let aggregated = await service.getAggregatedStats()
 
@@ -230,7 +230,8 @@ final class StatisticsServiceTests: XCTestCase {
         // Given
         let session = RecordingSession(language: "en")
         try await service.recordSession(session)
-        XCTAssertEqual(service.getTodayStats().totalSessions, 1)
+        let initialStats = await service.getTodayStats()
+        XCTAssertEqual(initialStats.totalSessions, 1)
 
         // When
         await service.clearAll()

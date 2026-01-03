@@ -105,8 +105,7 @@ final class SettingsServiceTests: XCTestCase {
             enabled: false,
             keyCode: 36,
             modifiers: [.command],
-            conflictDetected: true,
-            alternativeHotkey: nil
+            conflictDetected: true
         )
 
         // When
@@ -200,7 +199,8 @@ final class SettingsServiceTests: XCTestCase {
         let newPrivacy = PrivacyConfiguration(
             collectAnonymousStats: false,
             storagePolicy: .none,
-            dataRetentionDays: 30
+            dataRetentionDays: 30,
+            storeHistory: false
         )
 
         // When
@@ -292,17 +292,17 @@ final class SettingsServiceTests: XCTestCase {
 
     // MARK: - Multiple Updates Test
 
-    func test_multipleUpdates_allPersistCorrectly() throws {
+    @MainActor
+    func test_multipleUpdates_allPersistCorrectly() async throws {
         // Given
         let newHotkey = HotkeyConfiguration(
             enabled: false,
             keyCode: 36,
             modifiers: [.shift],
-            conflictDetected: false,
-            alternativeHotkey: nil
+            conflictDetected: false
         )
 
-        var newLanguage = LanguageConfiguration(
+        let newLanguage = LanguageConfiguration(
             defaultLanguage: "de",
             recentLanguages: ["en", "de"],
             autoDetectEnabled: false,
