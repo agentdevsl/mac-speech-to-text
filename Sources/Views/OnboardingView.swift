@@ -51,7 +51,17 @@ struct OnboardingView: View {
                 while !Task.isCancelled {
                     // Check permissions first for immediate responsiveness
                     if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
+                        let prevAccessibility = viewModel.accessibilityGranted
+                        let prevInputMonitoring = viewModel.inputMonitoringGranted
+
                         await viewModel.checkAllPermissions()
+
+                        // Auto-advance if permission was just granted
+                        if viewModel.currentStep == 2 && !prevAccessibility && viewModel.accessibilityGranted {
+                            viewModel.nextStep()
+                        } else if viewModel.currentStep == 3 && !prevInputMonitoring && viewModel.inputMonitoringGranted {
+                            viewModel.nextStep()
+                        }
                     }
                     // Sleep for 1 second before the next check
                     try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -190,12 +200,7 @@ struct OnboardingView: View {
             }
 
             if let error = viewModel.permissionError {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                PermissionErrorView(message: error)
             } else if let warning = permissionWarning {
                 Text(warning)
                     .font(.callout)
@@ -219,13 +224,10 @@ struct OnboardingView: View {
             }
 
             if let error = viewModel.permissionError {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else if !viewModel.accessibilityGranted {
+                PermissionErrorView(message: error)
+            } else if viewModel.accessibilityGranted {
+                PermissionGrantedView(message: "Accessibility access granted!")
+            } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("How to grant accessibility access:")
                         .font(.headline)
@@ -233,7 +235,7 @@ struct OnboardingView: View {
                     StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
                     StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
                     StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here and click \"Next\"")
+                    StepInstruction(number: 4, text: "Return here - it will auto-advance")
                 }
                 .padding()
                 .background(Color.blue.opacity(0.1))
@@ -255,7 +257,9 @@ struct OnboardingView: View {
                 await viewModel.requestInputMonitoringPermission()
             }
 
-            if !viewModel.inputMonitoringGranted {
+            if viewModel.inputMonitoringGranted {
+                PermissionGrantedView(message: "Input monitoring access granted!")
+            } else {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("How to grant input monitoring:")
                         .font(.headline)
@@ -263,7 +267,7 @@ struct OnboardingView: View {
                     StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
                     StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
                     StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here and click \"Next\"")
+                    StepInstruction(number: 4, text: "Return here - it will auto-advance")
                 }
                 .padding()
                 .background(Color.blue.opacity(0.1))
@@ -367,6 +371,41 @@ struct OnboardingView: View {
         default:
             return nil
         }
+    }
+}
+
+// MARK: - Permission Status Views
+
+/// Displays a success message when a permission is granted
+private struct PermissionGrantedView: View {
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.green)
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(.green)
+        }
+        .padding()
+        .background(Color.green.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+/// Displays an error message for permission issues
+private struct PermissionErrorView: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.callout)
+            .foregroundStyle(.red)
+            .padding()
+            .background(Color.red.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
