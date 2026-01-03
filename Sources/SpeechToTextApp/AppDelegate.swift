@@ -17,19 +17,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Check if first launch (T040)
-        let settings = settingsService.load()
-        if !settings.onboarding.completed {
-            showOnboarding()
-            return
-        }
-
-        // Setup notification observers for menu actions (works with MenuBarExtra from SpeechToTextApp)
+        // Always setup notification observers for menu actions
+        // (works with MenuBarExtra from SpeechToTextApp)
         setupMenuActionObservers()
 
         // Initialize global hotkey
         Task {
             await setupGlobalHotkey()
+        }
+
+        // Check if first launch - show onboarding (T040)
+        let settings = settingsService.load()
+        if !settings.onboarding.completed {
+            showOnboarding()
         }
     }
 
@@ -111,13 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 self.onboardingWindow?.close()
                 self.onboardingWindow = nil
-
-                // After onboarding completes, setup notification observers and hotkey
-                // Menu bar is handled by MenuBarExtra in SpeechToTextApp.swift
-                self.setupMenuActionObservers()
-                Task {
-                    await self.setupGlobalHotkey()
-                }
+                // Observers and hotkey are already set up in applicationDidFinishLaunching
             }
 
         let window = NSWindow(
@@ -130,7 +124,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Welcome to Speech-to-Text"
         window.contentView = NSHostingView(rootView: contentView)
         window.center()
+
+        // Ensure app is active and window is visible
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
 
         onboardingWindow = window
     }
