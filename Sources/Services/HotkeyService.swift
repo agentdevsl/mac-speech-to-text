@@ -5,26 +5,20 @@ import OSLog
 /// Service for managing global hotkey registration using Carbon Event Manager
 @MainActor
 class HotkeyService {
-    private var hotKeyRef: EventHotKeyRef?
-    private var eventHandler: EventHandlerRef?
+    // Mark cleanup resources as nonisolated(unsafe) to allow access from deinit
+    // This is safe because deinit guarantees exclusive access (no other references)
+    private nonisolated(unsafe) var hotKeyRef: EventHotKeyRef?
+    private nonisolated(unsafe) var eventHandler: EventHandlerRef?
+    private nonisolated(unsafe) var userDataPointer: UnsafeMutableRawPointer?
     private var callback: (@Sendable () -> Void)?
-    private var userDataPointer: UnsafeMutableRawPointer?
 
     deinit {
-        // Perform cleanup directly in deinit to avoid actor isolation issues
-        // Carbon APIs are thread-safe for cleanup operations
-        cleanupHotkeyResources()
-    }
-
-    /// Direct cleanup without actor isolation (safe for deinit)
-    private nonisolated func cleanupHotkeyResources() {
-        // Note: Accessing instance properties is safe here because deinit
-        // guarantees no other references exist
-        if let hotKeyRef = hotKeyRef {
-            UnregisterEventHotKey(hotKeyRef)
+        // Clean up Carbon resources directly - safe due to nonisolated(unsafe) properties
+        if let ref = hotKeyRef {
+            UnregisterEventHotKey(ref)
         }
-        if let eventHandler = eventHandler {
-            RemoveEventHandler(eventHandler)
+        if let handler = eventHandler {
+            RemoveEventHandler(handler)
         }
         if let userData = userDataPointer {
             Unmanaged<HotkeyService>.fromOpaque(userData).release()
