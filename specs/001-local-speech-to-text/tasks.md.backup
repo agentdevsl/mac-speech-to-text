@@ -31,13 +31,13 @@
 
 **Purpose**: Create Xcode project structure and configure Swift Package Manager dependencies
 
-- [X] T001 Create Xcode macOS app project at `/workspace/SpeechToText.xcodeproj` with Swift 5.9+ and macOS 12.0+ deployment target
-- [X] T002 Create Swift Package Manager manifest at `/workspace/Package.swift` with FluidAudio SDK v0.9.0+ dependency
-- [X] T003 Create project directory structure: `/workspace/Sources/`, `/workspace/Tests/`, `/workspace/Resources/`
-- [X] T004 [P] Configure Xcode build settings for Apple Silicon (arm64) with Release and Debug configurations
-- [X] T005 [P] Add required entitlements in `/workspace/SpeechToText.entitlements` (microphone, accessibility, input-monitoring)
-- [X] T006 [P] Create SwiftLint configuration at `/workspace/.swiftlint.yml` for code quality enforcement
-- [X] T007 Resolve Swift Package Manager dependencies via `swift package resolve` to download FluidAudio SDK
+- [ ] T001 Create Xcode macOS app project at `/workspace/SpeechToText.xcodeproj` with Swift 5.9+ and macOS 12.0+ deployment target
+- [ ] T002 Create Swift Package Manager manifest at `/workspace/Package.swift` with FluidAudio SDK v0.9.0+ dependency
+- [ ] T003 Create project directory structure: `/workspace/Sources/`, `/workspace/Tests/`, `/workspace/Resources/`
+- [ ] T004 [P] Configure Xcode build settings for Apple Silicon (arm64) with Release and Debug configurations
+- [ ] T005 [P] Add required entitlements in `/workspace/SpeechToText.entitlements` (microphone, accessibility, input-monitoring)
+- [ ] T006 [P] Create SwiftLint configuration at `/workspace/.swiftlint.yml` for code quality enforcement
+- [ ] T007 Resolve Swift Package Manager dependencies via `swift package resolve` to download FluidAudio SDK
 
 **Checkpoint**: Xcode project builds successfully with FluidAudio SDK linked
 
@@ -51,26 +51,26 @@
 
 ### Data Models
 
-- [X] T008 [P] Create RecordingSession model at `/workspace/Sources/Models/RecordingSession.swift` with state machine (idle, recording, transcribing, inserting, completed, cancelled)
-- [X] T009 [P] Create UserSettings model at `/workspace/Sources/Models/UserSettings.swift` with nested config structs (hotkey, language, audio, UI, privacy, onboarding)
-- [X] T010 [P] Create LanguageModel model at `/workspace/Sources/Models/LanguageModel.swift` with download status enum and 25 supported languages
-- [X] T011 [P] Create UsageStatistics model at `/workspace/Sources/Models/UsageStatistics.swift` with privacy-preserving aggregations
-- [X] T012 [P] Create AudioBuffer model at `/workspace/Sources/Models/AudioBuffer.swift` for in-memory audio handling (16kHz mono)
+- [ ] T008 [P] Create RecordingSession model at `/workspace/Sources/Models/RecordingSession.swift` with state machine (idle, recording, transcribing, inserting, completed, cancelled)
+- [ ] T009 [P] Create UserSettings model at `/workspace/Sources/Models/UserSettings.swift` with nested config structs (hotkey, language, audio, UI, privacy, onboarding)
+- [ ] T010 [P] Create LanguageModel model at `/workspace/Sources/Models/LanguageModel.swift` with download status enum and 25 supported languages
+- [ ] T011 [P] Create UsageStatistics model at `/workspace/Sources/Models/UsageStatistics.swift` with privacy-preserving aggregations
+- [ ] T012 [P] Create AudioBuffer model at `/workspace/Sources/Models/AudioBuffer.swift` for in-memory audio handling (16kHz mono)
 
 ### Core Services
 
-- [X] T013 Create FluidAudioService at `/workspace/Sources/Services/FluidAudioService.swift` as Swift actor with async transcribe() method using FluidAudio SDK
-- [X] T014 [P] Create PermissionService at `/workspace/Sources/Services/PermissionService.swift` with protocol-based interface for microphone, accessibility, and input monitoring checks
-- [X] T015 [P] Create SettingsService at `/workspace/Sources/Services/SettingsService.swift` wrapping UserDefaults with Codable persistence for UserSettings
-- [X] T016 [P] Create StatisticsService at `/workspace/Sources/Services/StatisticsService.swift` with SQLite database schema and privacy-preserving aggregation logic
+- [ ] T013 Create FluidAudioService at `/workspace/Sources/Services/FluidAudioService.swift` as Swift actor with async transcribe() method using FluidAudio SDK
+- [ ] T014 [P] Create PermissionService at `/workspace/Sources/Services/PermissionService.swift` with protocol-based interface for microphone, accessibility, and input monitoring checks
+- [ ] T015 [P] Create SettingsService at `/workspace/Sources/Services/SettingsService.swift` wrapping UserDefaults with Codable persistence for UserSettings
+- [ ] T016 [P] Create StatisticsService at `/workspace/Sources/Services/StatisticsService.swift` with SQLite database schema and privacy-preserving aggregation logic
 
 ### App Infrastructure
 
-- [X] T017 Create AppState at `/workspace/Sources/SpeechToTextApp/AppState.swift` as @Observable class with app-wide shared state (settings, statistics, current session)
-- [X] T018 Create main app entry point at `/workspace/Sources/SpeechToTextApp/SpeechToTextApp.swift` with @main attribute and MenuBarExtra scene
-- [X] T019 Create AppDelegate at `/workspace/Sources/SpeechToTextApp/AppDelegate.swift` for app lifecycle, menu bar management, and hotkey initialization
-- [X] T020 [P] Create Constants file at `/workspace/Sources/Utilities/Constants.swift` with app-wide constants (sample rates, thresholds, default values)
-- [X] T021 [P] Create Color+Theme extension at `/workspace/Sources/Utilities/Extensions/Color+Theme.swift` with Warm Minimalism color palette (amber accents, frosted glass)
+- [ ] T017 Create AppState at `/workspace/Sources/SpeechToTextApp/AppState.swift` as @Observable class with app-wide shared state (settings, statistics, current session)
+- [ ] T018 Create main app entry point at `/workspace/Sources/SpeechToTextApp/SpeechToTextApp.swift` with @main attribute and MenuBarExtra scene
+- [ ] T019 Create AppDelegate at `/workspace/Sources/SpeechToTextApp/AppDelegate.swift` for app lifecycle, menu bar management, and hotkey initialization
+- [ ] T020 [P] Create Constants file at `/workspace/Sources/Utilities/Constants.swift` with app-wide constants (sample rates, thresholds, default values)
+- [ ] T021 [P] Create Color+Theme extension at `/workspace/Sources/Utilities/Extensions/Color+Theme.swift` with Warm Minimalism color palette (amber accents, frosted glass)
 
 **Checkpoint**: Foundation ready - all models, services, and app infrastructure complete. User story implementation can now begin in parallel.
 
@@ -91,19 +91,19 @@
 
 ### Implementation for User Story 1
 
-- [X] T022 [P] [US1] Create AudioCaptureService at `/workspace/Sources/Services/AudioCaptureService.swift` using AVAudioEngine for 16kHz mono capture with real-time level callbacks
-- [X] T023 [P] [US1] Create HotkeyService at `/workspace/Sources/Services/HotkeyService.swift` using Carbon Event Manager APIs for global hotkey registration (default ⌘⌃Space)
-- [X] T024 [P] [US1] Create TextInsertionService at `/workspace/Sources/Services/TextInsertionService.swift` using AXUIElement APIs to insert text at cursor position
-- [X] T025 [US1] Create RecordingViewModel at `/workspace/Sources/Views/RecordingViewModel.swift` as @Observable class coordinating audio capture, FluidAudio transcription, and text insertion
-- [X] T026 [US1] Create WaveformView component at `/workspace/Sources/Views/Components/WaveformView.swift` with real-time audio level visualization (30+ fps, canvas-based)
-- [X] T027 [US1] Create RecordingModal view at `/workspace/Sources/Views/RecordingModal.swift` with frosted glass (.ultraThinMaterial), waveform, and spring animations
-- [X] T028 [US1] Integrate HotkeyService with AppDelegate to show RecordingModal on ⌘⌃Space press
-- [X] T029 [US1] Implement silence detection in RecordingViewModel using FluidAudio VAD to auto-stop recording after 1.5 seconds
-- [X] T030 [US1] Implement modal dismissal on Escape key or outside click in RecordingModal view
-- [X] T031 [US1] Add error handling in RecordingViewModel for permission failures, transcription errors, and insertion failures
-- [X] T032 [US1] Add clipboard fallback in TextInsertionService when no active text field detected
-- [X] T085 [US1] Add progress indicator to RecordingModal for recordings >10 seconds showing elapsed time and transcription status (FR-017)
-- [X] T086 [US1] Implement microphone disconnection detection and recovery in AudioCaptureService with user notification and auto-resume (FR-022)
+- [ ] T022 [P] [US1] Create AudioCaptureService at `/workspace/Sources/Services/AudioCaptureService.swift` using AVAudioEngine for 16kHz mono capture with real-time level callbacks
+- [ ] T023 [P] [US1] Create HotkeyService at `/workspace/Sources/Services/HotkeyService.swift` using Carbon Event Manager APIs for global hotkey registration (default ⌘⌃Space)
+- [ ] T024 [P] [US1] Create TextInsertionService at `/workspace/Sources/Services/TextInsertionService.swift` using AXUIElement APIs to insert text at cursor position
+- [ ] T025 [US1] Create RecordingViewModel at `/workspace/Sources/Views/RecordingViewModel.swift` as @Observable class coordinating audio capture, FluidAudio transcription, and text insertion
+- [ ] T026 [US1] Create WaveformView component at `/workspace/Sources/Views/Components/WaveformView.swift` with real-time audio level visualization (30+ fps, canvas-based)
+- [ ] T027 [US1] Create RecordingModal view at `/workspace/Sources/Views/RecordingModal.swift` with frosted glass (.ultraThinMaterial), waveform, and spring animations
+- [ ] T028 [US1] Integrate HotkeyService with AppDelegate to show RecordingModal on ⌘⌃Space press
+- [ ] T029 [US1] Implement silence detection in RecordingViewModel using FluidAudio VAD to auto-stop recording after 1.5 seconds
+- [ ] T030 [US1] Implement modal dismissal on Escape key or outside click in RecordingModal view
+- [ ] T031 [US1] Add error handling in RecordingViewModel for permission failures, transcription errors, and insertion failures
+- [ ] T032 [US1] Add clipboard fallback in TextInsertionService when no active text field detected
+- [ ] T085 [US1] Add progress indicator to RecordingModal for recordings >10 seconds showing elapsed time and transcription status (FR-017)
+- [ ] T086 [US1] Implement microphone disconnection detection and recovery in AudioCaptureService with user notification and auto-resume (FR-022)
 
 **Checkpoint**: User Story 1 complete - user can dictate text via global hotkey with automatic insertion. This is the MVP!
 
@@ -124,16 +124,16 @@
 
 ### Implementation for User Story 2
 
-- [X] T033 [P] [US2] Create PermissionCard component at `/workspace/Sources/Views/Components/PermissionCard.swift` with icon, title, description, and grant button
-- [X] T034 [P] [US2] Create OnboardingViewModel at `/workspace/Sources/Views/OnboardingViewModel.swift` as @Observable class managing onboarding state and permission flow
-- [X] T035 [US2] Create OnboardingView at `/workspace/Sources/Views/OnboardingView.swift` with multi-step flow (welcome, microphone, accessibility, demo, completion)
-- [X] T036 [US2] Implement microphone permission request step in OnboardingView using AVCaptureDevice.requestAccess(for: .audio)
-- [X] T037 [US2] Implement accessibility permission request step in OnboardingView with visual instructions to open System Settings
-- [X] T038 [US2] Create interactive demo step in OnboardingView allowing user to test hotkey and see sample transcription
-- [X] T039 [US2] Add skip option for each permission with warning about limited functionality
-- [X] T040 [US2] Update AppDelegate to show OnboardingView on first launch (check UserSettings.onboarding.completed flag)
-- [X] T041 [US2] Add deep link to System Settings for permission granting in PermissionCard component
-- [X] T042 [US2] Store onboarding completion state in UserSettings via SettingsService
+- [ ] T033 [P] [US2] Create PermissionCard component at `/workspace/Sources/Views/Components/PermissionCard.swift` with icon, title, description, and grant button
+- [ ] T034 [P] [US2] Create OnboardingViewModel at `/workspace/Sources/Views/OnboardingViewModel.swift` as @Observable class managing onboarding state and permission flow
+- [ ] T035 [US2] Create OnboardingView at `/workspace/Sources/Views/OnboardingView.swift` with multi-step flow (welcome, microphone, accessibility, demo, completion)
+- [ ] T036 [US2] Implement microphone permission request step in OnboardingView using AVCaptureDevice.requestAccess(for: .audio)
+- [ ] T037 [US2] Implement accessibility permission request step in OnboardingView with visual instructions to open System Settings
+- [ ] T038 [US2] Create interactive demo step in OnboardingView allowing user to test hotkey and see sample transcription
+- [ ] T039 [US2] Add skip option for each permission with warning about limited functionality
+- [ ] T040 [US2] Update AppDelegate to show OnboardingView on first launch (check UserSettings.onboarding.completed flag)
+- [ ] T041 [US2] Add deep link to System Settings for permission granting in PermissionCard component
+- [ ] T042 [US2] Store onboarding completion state in UserSettings via SettingsService
 
 **Checkpoint**: User Story 2 complete - new users can successfully set up the app with all required permissions
 
@@ -154,13 +154,13 @@
 
 ### Implementation for User Story 3
 
-- [X] T043 [P] [US3] Create MenuBarViewModel at `/workspace/Sources/Views/MenuBarViewModel.swift` as @Observable class fetching daily statistics and handling menu actions
-- [X] T044 [US3] Create MenuBarView at `/workspace/Sources/Views/MenuBarView.swift` with quick stats display and menu options (Start Recording, Open Settings, Quit)
+- [ ] T043 [P] [US3] Create MenuBarViewModel at `/workspace/Sources/Views/MenuBarViewModel.swift` as @Observable class fetching daily statistics and handling menu actions
+- [ ] T044 [US3] Create MenuBarView at `/workspace/Sources/Views/MenuBarView.swift` with quick stats display and menu options (Start Recording, Open Settings, Quit)
 - [ ] T045 [US3] Implement menu bar icon management in AppDelegate using NSStatusBar and NSStatusItem
 - [ ] T046 [US3] Add "Start Recording" action in MenuBarView to trigger RecordingModal programmatically
 - [ ] T047 [US3] Add "Open Settings" action in MenuBarView to show SettingsView window
-- [X] T048 [US3] Fetch daily statistics in MenuBarViewModel from StatisticsService (words transcribed today, total sessions)
-- [X] T049 [US3] Add real-time stats updates in MenuBarView when statistics change using Combine or @Observable updates
+- [ ] T048 [US3] Fetch daily statistics in MenuBarViewModel from StatisticsService (words transcribed today, total sessions)
+- [ ] T049 [US3] Add real-time stats updates in MenuBarView when statistics change using Combine or @Observable updates
 - [ ] T050 [US3] Create menu bar icon assets in `/workspace/Resources/Assets.xcassets/MenuBarIcons/` with light and dark mode variants
 
 **Checkpoint**: User Story 3 complete - menu bar provides quick access to app functionality and usage stats

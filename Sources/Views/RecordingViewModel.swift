@@ -1,0 +1,317 @@
+// RecordingViewModel.swift
+// macOS Local Speech-to-Text Application
+//
+// User Story 1: Quick Speech-to-Text Capture
+// Task T025: RecordingViewModel - @Observable class coordinating audio capture,
+// FluidAudio transcription, and text insertion
+
+import Foundation
+import Observation
+import AVFoundation
+
+/// RecordingViewModel coordinates the recording, transcription, and text insertion workflow
+@Observable
+@MainActor
+final class RecordingViewModel {
+    // MARK: - Published State
+
+    /// Current recording session state
+    var currentSession: RecordingSession?
+
+    /// Real-time audio level (0.0 - 1.0)
+    var audioLevel: Float = 0.0
+
+    /// Whether recording is active
+    var isRecording: Bool = false
+
+    /// Whether transcription is in progress
+    var isTranscribing: Bool = false
+
+    /// Whether text is being inserted
+    var isInserting: Bool = false
+
+    /// Current error message (if any)
+    var errorMessage: String?
+
+    /// Last transcribed text
+    var transcribedText: String = ""
+
+    /// Confidence score of last transcription (0.0 - 1.0)
+    var confidence: Double = 0.0
+
+    // MARK: - Dependencies
+
+    private let audioService: AudioCaptureService
+    private let fluidAudioService: FluidAudioService
+    private let textInsertionService: TextInsertionService
+    private let settingsService: SettingsService
+    private let statisticsService: StatisticsService
+
+    // MARK: - Private State
+
+    private var silenceTimer: Timer?
+    private let silenceThreshold: TimeInterval
+
+    // MARK: - Initialization
+
+    init(
+        audioService: AudioCaptureService = AudioCaptureService(),
+        fluidAudioService: FluidAudioService = FluidAudioService(),
+        textInsertionService: TextInsertionService = TextInsertionService(),
+        settingsService: SettingsService = SettingsService(),
+        statisticsService: StatisticsService = StatisticsService()
+    ) {
+        self.audioService = audioService
+        self.fluidAudioService = fluidAudioService
+        self.textInsertionService = textInsertionService
+        self.settingsService = settingsService
+        self.statisticsService = statisticsService
+
+        // Get silence threshold from settings
+        let settings = settingsService.load()
+        self.silenceThreshold = settings.audio.silenceThreshold
+    }
+
+    // MARK: - Public Methods
+
+    /// Start recording audio
+    func startRecording() async throws {
+        guard !isRecording else {
+            throw RecordingError.alreadyRecording
+        }
+
+        // Clear previous state
+        errorMessage = nil
+        transcribedText = ""
+        confidence = 0.0
+
+        // Create new recording session
+        let settings = settingsService.load()
+        currentSession = RecordingSession(
+            id: UUID(),
+            startTime: Date(),
+            language: settings.language.defaultLanguage
+        )
+
+        isRecording = true
+
+        do {
+            // Start audio capture with level callback
+            try await audioService.startCapture { [weak self] level in
+                Task { @MainActor in
+                    self?.audioLevel = level
+                    self?.resetSilenceTimer()
+                }
+            }
+        } catch {
+            isRecording = false
+            currentSession = nil
+            throw RecordingError.audioCaptureFailed(error.localizedDescription)
+        }
+    }
+
+    /// Stop recording and trigger transcription
+    func stopRecording() async throws {
+        guard isRecording else {
+            throw RecordingError.notRecording
+        }
+
+        isRecording = false
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+
+        do {
+            // Stop audio capture and get samples
+            let samples = try await audioService.stopCapture()
+
+            guard !samples.isEmpty else {
+                throw RecordingError.noAudioCaptured
+            }
+
+            // Update session
+            currentSession?.endTime = Date()
+            currentSession?.audioData = samples
+
+            // Transcribe audio
+            try await transcribe(samples: samples)
+
+        } catch {
+            errorMessage = error.localizedDescription
+            throw error
+        }
+    }
+
+    /// Cancel recording without transcription
+    func cancelRecording() async {
+        isRecording = false
+        isTranscribing = false
+        isInserting = false
+
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+
+        // Stop audio capture
+        do {
+            _ = try await audioService.stopCapture()
+        } catch {
+            // Ignore errors during cancellation
+        }
+
+        // Mark session as cancelled
+        currentSession?.errorMessage = "User cancelled"
+        currentSession = nil
+
+        // Reset state
+        audioLevel = 0.0
+        transcribedText = ""
+        confidence = 0.0
+        errorMessage = nil
+    }
+
+    // MARK: - Private Methods
+
+    /// Transcribe audio samples using FluidAudio
+    private func transcribe(samples: [Int16]) async throws {
+        guard var session = currentSession else {
+            throw RecordingError.noActiveSession
+        }
+
+        isTranscribing = true
+
+        do {
+            // Initialize FluidAudio if needed
+            let settings = settingsService.load()
+            try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
+
+            // Transcribe
+            let result = try await fluidAudioService.transcribe(samples: samples)
+
+            // Update session
+            session.transcribedText = result.text
+            session.confidenceScore = result.confidence
+            session.wordCount = result.text.split(separator: " ").count
+            currentSession = session
+
+            // Update local state
+            transcribedText = result.text
+            confidence = result.confidence
+
+            isTranscribing = false
+
+            // Insert text
+            try await insertText(result.text)
+
+        } catch {
+            isTranscribing = false
+            errorMessage = "Transcription failed: \(error.localizedDescription)"
+            session.errorMessage = error.localizedDescription
+            currentSession = session
+            throw RecordingError.transcriptionFailed(error.localizedDescription)
+        }
+    }
+
+    /// Insert transcribed text into active application
+    private func insertText(_ text: String) async throws {
+        guard var session = currentSession else {
+            throw RecordingError.noActiveSession
+        }
+
+        isInserting = true
+
+        do {
+            // Try text insertion via Accessibility API
+            let success = try await textInsertionService.insertText(text)
+
+            session.insertionSuccess = success
+            currentSession = session
+
+            isInserting = false
+
+            // Save statistics
+            await saveStatistics(session: session)
+
+        } catch {
+            isInserting = false
+            errorMessage = "Text insertion failed: \(error.localizedDescription)"
+            session.errorMessage = error.localizedDescription
+            session.insertionSuccess = false
+            currentSession = session
+            throw RecordingError.textInsertionFailed(error.localizedDescription)
+        }
+    }
+
+    /// Reset silence detection timer (T029)
+    private func resetSilenceTimer() {
+        silenceTimer?.invalidate()
+
+        // Check if audio level is below threshold (silence)
+        if audioLevel < 0.01 { // Very low threshold for silence
+            silenceTimer = Timer.scheduledTimer(
+                withTimeInterval: silenceThreshold,
+                repeats: false
+            ) { [weak self] _ in
+                Task { @MainActor in
+                    await self?.onSilenceDetected()
+                }
+            }
+        }
+    }
+
+    /// Called when silence is detected after threshold
+    private func onSilenceDetected() async {
+        guard isRecording else { return }
+
+        do {
+            try await stopRecording()
+        } catch {
+            errorMessage = "Failed to stop recording: \(error.localizedDescription)"
+        }
+    }
+
+    /// Save statistics to database
+    private func saveStatistics(session: RecordingSession) async {
+        do {
+            try await statisticsService.recordSession(
+                successful: session.insertionSuccess,
+                wordCount: session.wordCount,
+                duration: session.duration,
+                language: session.language,
+                confidence: session.confidenceScore
+            )
+        } catch {
+            // Log error but don't fail the workflow
+            print("Warning: Failed to save statistics: \(error)")
+        }
+    }
+}
+
+// MARK: - Recording Errors
+
+enum RecordingError: LocalizedError {
+    case alreadyRecording
+    case notRecording
+    case audioCaptureFailed(String)
+    case noAudioCaptured
+    case noActiveSession
+    case transcriptionFailed(String)
+    case textInsertionFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .alreadyRecording:
+            return "Recording is already in progress"
+        case .notRecording:
+            return "No active recording to stop"
+        case .audioCaptureFailed(let message):
+            return "Audio capture failed: \(message)"
+        case .noAudioCaptured:
+            return "No audio was captured"
+        case .noActiveSession:
+            return "No active recording session"
+        case .transcriptionFailed(let message):
+            return "Transcription failed: \(message)"
+        case .textInsertionFailed(let message):
+            return "Text insertion failed: \(message)"
+        }
+    }
+}
