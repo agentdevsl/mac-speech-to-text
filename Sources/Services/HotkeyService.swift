@@ -11,7 +11,24 @@ class HotkeyService {
     private var userDataPointer: UnsafeMutableRawPointer?
 
     deinit {
-        unregisterHotkey()
+        // Perform cleanup directly in deinit to avoid actor isolation issues
+        // Carbon APIs are thread-safe for cleanup operations
+        cleanupHotkeyResources()
+    }
+
+    /// Direct cleanup without actor isolation (safe for deinit)
+    private nonisolated func cleanupHotkeyResources() {
+        // Note: Accessing instance properties is safe here because deinit
+        // guarantees no other references exist
+        if let hotKeyRef = hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        if let eventHandler = eventHandler {
+            RemoveEventHandler(eventHandler)
+        }
+        if let userData = userDataPointer {
+            Unmanaged<HotkeyService>.fromOpaque(userData).release()
+        }
     }
 
     /// Register a global hotkey
