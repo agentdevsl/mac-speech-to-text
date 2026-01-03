@@ -11,7 +11,6 @@ class HotkeyService {
 
     deinit {
         unregisterHotkey()
-        // Note: The retained self reference is released in unregisterHotkey()
     }
 
     /// Register a global hotkey
@@ -20,85 +19,79 @@ class HotkeyService {
         modifiers: [KeyModifier],
         callback: @escaping () -> Void
     ) async throws {
-        // Unregister existing hotkey first
         unregisterHotkey()
-
-        // Store callback
         self.callback = callback
 
-        // Convert modifiers to Carbon format
-        var carbonModifiers: UInt32 = 0
-        for modifier in modifiers {
-            switch modifier {
-            case .command:
-                carbonModifiers |= UInt32(cmdKey)
-            case .control:
-                carbonModifiers |= UInt32(controlKey)
-            case .option:
-                carbonModifiers |= UInt32(optionKey)
-            case .shift:
-                carbonModifiers |= UInt32(shiftKey)
-            }
-        }
+        let carbonModifiers = convertModifiers(modifiers)
+        var hotkeyID = EventHotKeyID(signature: 0x53545458, id: UInt32(keyCode))
 
-        // Create hotkey ID
-        var hotkeyID = EventHotKeyID(signature: 0x53545458, id: UInt32(keyCode)) // "STXT"
-
-        // Install event handler
-        var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let eventHandlerCallback: EventHandlerUPP = { (_, _, userData) -> OSStatus in
-            guard let userData = userData else {
-                return OSStatus(eventNotHandledErr)
-            }
-            let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
-
-            service.callback?()
-            return noErr
-        }
-
-        // Create and store retained reference to self
         let userData = Unmanaged.passRetained(self).toOpaque()
         userDataPointer = userData
 
+        try installEventHandler(userData: userData)
+        try registerHotKey(keyCode: keyCode, modifiers: carbonModifiers, hotkeyID: &hotkeyID)
+    }
+
+    // MARK: - Private Helpers
+
+    private func convertModifiers(_ modifiers: [KeyModifier]) -> UInt32 {
+        var carbonModifiers: UInt32 = 0
+        for modifier in modifiers {
+            switch modifier {
+            case .command: carbonModifiers |= UInt32(cmdKey)
+            case .control: carbonModifiers |= UInt32(controlKey)
+            case .option: carbonModifiers |= UInt32(optionKey)
+            case .shift: carbonModifiers |= UInt32(shiftKey)
+            }
+        }
+        return carbonModifiers
+    }
+
+    private func installEventHandler(userData: UnsafeMutableRawPointer) throws {
+        var eventSpec = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
+        let eventHandlerCallback: EventHandlerUPP = { _, _, userData -> OSStatus in
+            guard let userData = userData else { return OSStatus(eventNotHandledErr) }
+            Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue().callback?()
+            return noErr
+        }
+
         let status = InstallEventHandler(
-            GetApplicationEventTarget(),
-            eventHandlerCallback,
-            1,
-            &eventSpec,
-            userData,
-            &eventHandler
+            GetApplicationEventTarget(), eventHandlerCallback, 1, &eventSpec, userData, &eventHandler
         )
 
         guard status == noErr else {
-            // Release the retained reference on failure
-            Unmanaged<HotkeyService>.fromOpaque(userData).release()
-            userDataPointer = nil
+            releaseUserData()
             throw HotkeyError.installationFailed("Failed to install event handler: \(status)")
         }
+    }
 
-        // Register hotkey
-        let registerStatus = RegisterEventHotKey(
-            UInt32(keyCode),
-            carbonModifiers,
-            hotkeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKeyRef
+    private func registerHotKey(keyCode: Int, modifiers: UInt32, hotkeyID: inout EventHotKeyID) throws {
+        let status = RegisterEventHotKey(
+            UInt32(keyCode), modifiers, hotkeyID, GetApplicationEventTarget(), 0, &hotKeyRef
         )
 
-        guard registerStatus == noErr else {
-            // Clean up the already-installed event handler
-            if let handler = eventHandler {
-                RemoveEventHandler(handler)
-                eventHandler = nil
-            }
-            // Release the retained reference
-            if let userData = userDataPointer {
-                Unmanaged<HotkeyService>.fromOpaque(userData).release()
-                userDataPointer = nil
-            }
-            throw HotkeyError.registrationFailed("Failed to register hotkey: \(registerStatus)")
+        guard status == noErr else {
+            cleanupEventHandler()
+            throw HotkeyError.registrationFailed("Failed to register hotkey: \(status)")
         }
+    }
+
+    private func releaseUserData() {
+        if let userData = userDataPointer {
+            Unmanaged<HotkeyService>.fromOpaque(userData).release()
+            userDataPointer = nil
+        }
+    }
+
+    private func cleanupEventHandler() {
+        if let handler = eventHandler {
+            RemoveEventHandler(handler)
+            eventHandler = nil
+        }
+        releaseUserData()
     }
 
     /// Unregister current hotkey
