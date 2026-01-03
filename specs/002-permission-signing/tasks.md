@@ -68,6 +68,7 @@ verify permissions remain granted after second build without re-auth
   - File: `/workspace/scripts/build-app.sh`
 - [ ] T013 [US1] Make ad-hoc signing warning more prominent
   - File: `/workspace/scripts/build-app.sh`
+  - Acceptance: Warning is visually distinct (box format) and visible without scroll
 - [ ] T014 [US1] Add recommendation to run setup-signing.sh on ad-hoc
   - File: `/workspace/scripts/build-app.sh`
 - [ ] T015 [US1] Verify .signing-identity entry in .gitignore
@@ -168,6 +169,7 @@ insertion into target application
 - [ ] T035 [P] [US4] Create manual validation checklist
   - File: `/workspace/specs/002-permission-signing/checklists/validation.md`
 - [ ] T036 [US4] Document E2E test steps in validation checklist
+  - File: `/workspace/specs/002-permission-signing/checklists/validation.md`
 
 **Checkpoint**: All user stories complete - full workflow validated
 

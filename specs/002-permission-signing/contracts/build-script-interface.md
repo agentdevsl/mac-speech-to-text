@@ -28,6 +28,8 @@ local development builds.
 |--------|------|---------|-------------|
 | `--name NAME` | String | `SpeechToText-Dev` | Certificate Common Name |
 | `--days DAYS` | Integer | `3650` | Validity period in days |
+| `--verify` | Flag | N/A | Verify existing identity only |
+| `--force` | Flag | N/A | Recreate certificate even if exists |
 | `--help` | Flag | N/A | Show help message |
 
 ### setup-signing Exit Codes
