@@ -52,16 +52,11 @@ final class MenuBarViewModel {
     func refreshStatistics() async {
         isLoading = true
 
-        do {
-            let today = Date()
-            let stats = try await statisticsService.getStatistics(for: today)
+        let stats = statisticsService.getTodayStats()
 
-            wordsToday = stats.totalWordsTranscribed
-            sessionsToday = stats.totalSessions
-            lastUpdated = Date()
-        } catch {
-            print("Failed to load statistics: \(error)")
-        }
+        wordsToday = stats.totalWordsTranscribed
+        sessionsToday = stats.totalSessions
+        lastUpdated = Date()
 
         isLoading = false
     }

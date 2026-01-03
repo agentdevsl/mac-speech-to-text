@@ -22,7 +22,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Initialize menu bar
-        setupMenuBar()
+        Task { @MainActor in
+            setupMenuBar()
+        }
 
         // Initialize global hotkey
         Task {
@@ -42,6 +44,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu Bar Setup
 
+    @MainActor
     private func setupMenuBar() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
@@ -61,9 +64,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             try await hotkeyService?.registerHotkey(
                 keyCode: 49, // Space
                 modifiers: [.command, .control]
-            ) {
+            ) { [weak self] in
                 // Hotkey triggered - show recording modal
-                self.showRecordingModal()
+                Task { @MainActor in
+                    self?.showRecordingModal()
+                }
             }
         } catch {
             print("Failed to register global hotkey: \(error.localizedDescription)")

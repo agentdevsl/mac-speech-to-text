@@ -1,7 +1,7 @@
 import Foundation
 
 /// Service for managing usage statistics with privacy preservation
-class StatisticsService {
+class StatisticsService: @unchecked Sendable {
     private let userDefaults: UserDefaults
     private let statsKey = "com.speechtotext.statistics"
 

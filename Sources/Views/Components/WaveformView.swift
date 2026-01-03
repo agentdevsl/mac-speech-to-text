@@ -91,8 +91,10 @@ struct WaveformView: View {
 
     /// Start continuous animation for smooth transitions
     private func startAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
-            animationPhase += 0.1
+        Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.animationPhase += 0.1
+            }
         }
     }
 
@@ -163,9 +165,11 @@ private struct WaveformAnimatedPreview: View {
         }
         .padding()
         .onAppear {
-            // Simulate audio levels
+            // Simulate audio levels (warning suppressed for preview code)
             Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-                level = Float.random(in: 0.0...1.0)
+                Task { @MainActor in
+                    level = Float.random(in: 0.0...1.0)
+                }
             }
         }
     }
