@@ -27,6 +27,17 @@ final class MenuBarViewModel {
     /// Last update timestamp
     var lastUpdated: Date = Date()
 
+    /// Recently used languages (max 5) (T066)
+    var recentLanguages: [LanguageModel] = []
+
+    /// Current language code
+    var currentLanguage: String = "en"
+
+    /// Current language model
+    var currentLanguageModel: LanguageModel? {
+        LanguageModel.supportedLanguages.first { $0.code == currentLanguage }
+    }
+
     // MARK: - Dependencies
 
     private let statisticsService: StatisticsService
@@ -41,9 +52,10 @@ final class MenuBarViewModel {
         self.statisticsService = statisticsService
         self.settingsService = settingsService
 
-        // Load initial stats
+        // Load initial stats and language settings
         Task {
             await refreshStatistics()
+            await loadLanguageSettings()
         }
     }
 
@@ -78,6 +90,53 @@ final class MenuBarViewModel {
     func quit() {
         NSApplication.shared.terminate(nil)
     }
+
+    /// Load language settings and recent languages (T066)
+    func loadLanguageSettings() async {
+        let settings = settingsService.load()
+        currentLanguage = settings.language.defaultLanguage
+        recentLanguages = settings.language.recentLanguages
+            .compactMap { code in
+                LanguageModel.supportedLanguages.first { $0.code == code }
+            }
+
+        // If no recent languages, add current language
+        if recentLanguages.isEmpty {
+            if let current = currentLanguageModel {
+                recentLanguages = [current]
+            }
+        }
+    }
+
+    /// Switch to a different language (T064, T066)
+    func switchLanguage(to language: LanguageModel) async {
+        currentLanguage = language.code
+
+        // Update recent languages (T066)
+        // Remove if already exists
+        recentLanguages.removeAll { $0.code == language.code }
+
+        // Add to front
+        recentLanguages.insert(language, at: 0)
+
+        // Keep max 5
+        if recentLanguages.count > 5 {
+            recentLanguages = Array(recentLanguages.prefix(5))
+        }
+
+        // Save to settings
+        var settings = settingsService.load()
+        settings.language.defaultLanguage = language.code
+        settings.language.recentLanguages = recentLanguages.map { $0.code }
+        try? settingsService.save(settings)
+
+        // Notify FluidAudioService to switch language (T064)
+        NotificationCenter.default.post(
+            name: .switchLanguage,
+            object: nil,
+            userInfo: ["languageCode": language.code]
+        )
+    }
 }
 
 // MARK: - Notification Names
@@ -85,4 +144,5 @@ final class MenuBarViewModel {
 extension Notification.Name {
     static let showRecordingModal = Notification.Name("showRecordingModal")
     static let showSettings = Notification.Name("showSettings")
+    static let switchLanguage = Notification.Name("switchLanguage")
 }

@@ -39,6 +39,7 @@ enum FluidAudioError: Error, LocalizedError, Sendable {
 actor FluidAudioService {
     private var asrManager: AsrManager?
     private var currentLanguage: String = "en"
+    private var isLanguageSwitching: Bool = false
     private var models: AsrModels?
     private var isInitialized = false
 

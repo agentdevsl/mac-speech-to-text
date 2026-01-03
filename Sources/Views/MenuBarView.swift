@@ -131,6 +131,9 @@ struct MenuBarView: View {
                 action: viewModel.openSettings
             )
 
+            // Language quick-switch (T063)
+            languageQuickSwitchMenu
+
             MenuButton(
                 icon: "arrow.clockwise",
                 title: "Refresh Stats",
@@ -142,6 +145,67 @@ struct MenuBarView: View {
                 }
             )
         }
+    }
+
+    /// Language quick-switch menu (T063)
+    private var languageQuickSwitchMenu: some View {
+        Menu {
+            ForEach(viewModel.recentLanguages, id: \.code) { language in
+                Button(action: {
+                    Task {
+                        await viewModel.switchLanguage(to: language)
+                    }
+                }) {
+                    HStack {
+                        Text(language.flag)
+                        Text(language.name)
+                        if language.code == viewModel.currentLanguage {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            Button("More Languages...") {
+                viewModel.openSettings()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "globe")
+                    .font(.title3)
+                    .foregroundStyle(Color("AmberPrimary", bundle: nil))
+                    .frame(width: 24, alignment: .center)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Language")
+                        .font(.callout)
+
+                    if let currentLang = viewModel.currentLanguageModel {
+                        Text("\(currentLang.flag) \(currentLang.name)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("English")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .menuStyle(.borderlessButton)
+        .buttonStyle(.plain)
     }
 
     /// Quit section

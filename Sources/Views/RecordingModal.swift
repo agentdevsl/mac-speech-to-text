@@ -110,6 +110,23 @@ struct RecordingModal: View {
 
             Spacer()
 
+            // Language indicator (T068)
+            if let language = viewModel.currentLanguageModel {
+                HStack(spacing: 4) {
+                    Text(language.flag)
+                        .font(.caption)
+
+                    if viewModel.isLanguageSwitching {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color("AmberPrimary", bundle: nil).opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
             // Close button
             Button(action: handleDismiss) {
                 Image(systemName: "xmark.circle.fill")

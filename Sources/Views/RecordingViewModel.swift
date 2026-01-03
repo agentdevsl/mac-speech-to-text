@@ -39,6 +39,17 @@ final class RecordingViewModel {
     /// Confidence score of last transcription (0.0 - 1.0)
     var confidence: Double = 0.0
 
+    /// Is language switching (T067)
+    var isLanguageSwitching: Bool = false
+
+    /// Current language code (T068)
+    var currentLanguage: String = "en"
+
+    /// Current language model for display (T068)
+    var currentLanguageModel: LanguageModel? {
+        LanguageModel.supportedLanguages.first { $0.code == currentLanguage }
+    }
+
     // MARK: - Dependencies
 
     private let audioService: AudioCaptureService
@@ -70,6 +81,42 @@ final class RecordingViewModel {
         // Get silence threshold from settings
         let settings = settingsService.load()
         self.silenceThreshold = settings.audio.silenceThreshold
+
+        // Get current language from settings (T068)
+        self.currentLanguage = settings.language.defaultLanguage
+
+        // Setup language switch observer (T064)
+        setupLanguageSwitchObserver()
+    }
+
+    // MARK: - Language Switch Observer
+
+    private func setupLanguageSwitchObserver() {
+        // Listen for language switch notifications (T064, T067)
+        NotificationCenter.default.addObserver(
+            forName: .switchLanguage,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let languageCode = notification.userInfo?["languageCode"] as? String else {
+                return
+            }
+
+            Task { @MainActor in
+                self.isLanguageSwitching = true
+                self.currentLanguage = languageCode
+
+                // Switch language in FluidAudioService
+                do {
+                    try await self.fluidAudioService.switchLanguage(to: languageCode)
+                } catch {
+                    self.errorMessage = "Failed to switch language: \(error.localizedDescription)"
+                }
+
+                self.isLanguageSwitching = false
+            }
+        }
     }
 
     // MARK: - Public Methods

@@ -212,13 +212,13 @@
 
 ### Implementation for User Story 5
 
-- [ ] T063 [P] [US5] Add language quick-switch dropdown to MenuBarView showing 5 most recently used languages
-- [ ] T064 [P] [US5] Implement language switching in FluidAudioService.switchLanguage(to:) method (Parakeet TDT v3 is multilingual - no model reload needed)
-- [ ] T065 [US5] Add auto-detect language toggle in SettingsView enabling FluidAudio automatic language detection
-- [ ] T066 [US5] Store recently used languages in UserSettings.language.recentLanguages array (max 5 items)
-- [ ] T067 [US5] Update RecordingViewModel to show loading indicator on first transcription after language switch
-- [ ] T068 [US5] Add language indicator to RecordingModal showing current language during recording
-- [ ] T069 [US5] Update StatisticsService to track language breakdown (LanguageStats per language)
+- [X] T063 [P] [US5] Add language quick-switch dropdown to MenuBarView showing 5 most recently used languages
+- [X] T064 [P] [US5] Implement language switching in FluidAudioService.switchLanguage(to:) method (Parakeet TDT v3 is multilingual - no model reload needed)
+- [X] T065 [US5] Add auto-detect language toggle in SettingsView enabling FluidAudio automatic language detection
+- [X] T066 [US5] Store recently used languages in UserSettings.language.recentLanguages array (max 5 items)
+- [X] T067 [US5] Update RecordingViewModel to show loading indicator on first transcription after language switch
+- [X] T068 [US5] Add language indicator to RecordingModal showing current language during recording
+- [X] T069 [US5] Update StatisticsService to track language breakdown (LanguageStats per language)
 
 **Checkpoint**: User Story 5 complete - all 25 languages supported with quick switching and auto-detection
 
