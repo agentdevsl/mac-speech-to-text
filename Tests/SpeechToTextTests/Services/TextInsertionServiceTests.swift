@@ -233,7 +233,7 @@ final class TextInsertionServiceTests: XCTestCase {
         let permissionService = PermissionService()
 
         // When
-        let hasPermission = permissionService.checkAccessibilityPermission()
+        let hasPermission = await permissionService.checkAccessibilityPermission()
 
         // Then
         if !hasPermission {
