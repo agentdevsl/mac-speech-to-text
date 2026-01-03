@@ -76,7 +76,7 @@ struct RecordingModal: View {
             }
         }
         // T030: Handle Escape key
-        .onKeyPress(.escape) { _ in
+        .onKeyPress(.escape) {
             handleDismiss()
             return .handled
         }

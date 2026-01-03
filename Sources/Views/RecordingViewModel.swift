@@ -19,7 +19,7 @@ final class RecordingViewModel {
     var currentSession: RecordingSession?
 
     /// Real-time audio level (0.0 - 1.0)
-    var audioLevel: Float = 0.0
+    var audioLevel: Double = 0.0
 
     /// Whether recording is active
     var isRecording: Bool = false
@@ -188,13 +188,13 @@ final class RecordingViewModel {
 
             // Update session
             session.transcribedText = result.text
-            session.confidenceScore = result.confidence
-            session.wordCount = result.text.split(separator: " ").count
+            session.confidenceScore = Double(result.confidence)
+            // Note: wordCount is a computed property, no need to set it
             currentSession = session
 
             // Update local state
             transcribedText = result.text
-            confidence = result.confidence
+            confidence = Double(result.confidence)
 
             isTranscribing = false
 
@@ -220,9 +220,9 @@ final class RecordingViewModel {
 
         do {
             // Try text insertion via Accessibility API
-            let success = try await textInsertionService.insertText(text)
+            try await textInsertionService.insertText(text)
 
-            session.insertionSuccess = success
+            session.insertionSuccess = true
             currentSession = session
 
             isInserting = false
@@ -271,13 +271,7 @@ final class RecordingViewModel {
     /// Save statistics to database
     private func saveStatistics(session: RecordingSession) async {
         do {
-            try await statisticsService.recordSession(
-                successful: session.insertionSuccess,
-                wordCount: session.wordCount,
-                duration: session.duration,
-                language: session.language,
-                confidence: session.confidenceScore
-            )
+            try statisticsService.recordSession(session)
         } catch {
             // Log error but don't fail the workflow
             print("Warning: Failed to save statistics: \(error)")
