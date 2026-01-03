@@ -46,11 +46,11 @@ struct OnboardingView: View {
         .onAppear {
             // Cancel any existing task before creating a new one to prevent multiple loops
             permissionCheckTask?.cancel()
-            // Start permission checking loop for permission steps
+            // Start permission checking loop (includes Welcome step for status summary)
             permissionCheckTask = Task { @MainActor in
                 while !Task.isCancelled {
-                    // Check permissions first for immediate responsiveness
-                    if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
+                    // Check permissions on Welcome step (0) and permission steps (1-3)
+                    if viewModel.currentStep >= 0 && viewModel.currentStep <= 3 {
                         await viewModel.checkAllPermissions()
                     }
                     // Sleep for 1 second before the next check
@@ -100,15 +100,15 @@ struct OnboardingView: View {
         case 0:
             welcomeStep
         case 1:
-            microphoneStep
+            microphoneStepView(viewModel: viewModel, permissionWarning: permissionWarning)
         case 2:
-            accessibilityStep
+            accessibilityStepView(viewModel: viewModel)
         case 3:
-            inputMonitoringStep
+            inputMonitoringStepView(viewModel: viewModel)
         case 4:
-            demoStep
+            demoStepView
         default:
-            completionStep
+            completionStepView
         }
     }
 
@@ -173,186 +173,54 @@ struct OnboardingView: View {
                 FeatureRow(icon: "bolt.fill", text: "<100ms transcription latency")
             }
             .padding(.top)
+
+            // Permission status summary
+            permissionStatusSummary
         }
     }
 
-    /// Step 1: Microphone permission
-    private var microphoneStep: some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "mic.fill",
-                title: "Microphone Access",
-                subtitle: "Required to capture your voice"
-            )
+    /// Permission status summary showing granted/missing permissions
+    private var permissionStatusSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Permission Status")
+                .font(.headline)
 
-            PermissionCard.microphone(isGranted: viewModel.microphoneGranted) {
-                await viewModel.requestMicrophonePermission()
+            HStack(spacing: 16) {
+                PermissionStatusBadge(
+                    icon: "mic.fill",
+                    label: "Microphone",
+                    isGranted: viewModel.microphoneGranted
+                )
+                PermissionStatusBadge(
+                    icon: "hand.point.up.left.fill",
+                    label: "Accessibility",
+                    isGranted: viewModel.accessibilityGranted
+                )
+                PermissionStatusBadge(
+                    icon: "keyboard.fill",
+                    label: "Input",
+                    isGranted: viewModel.inputMonitoringGranted
+                )
             }
 
-            if let error = viewModel.permissionError {
-                Text(error)
+            if viewModel.allPermissionsGranted {
+                Label("All permissions granted!", systemImage: "checkmark.seal.fill")
                     .font(.callout)
-                    .foregroundStyle(.red)
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else if let warning = permissionWarning {
-                Text(warning)
-                    .font(.callout)
-                    .foregroundStyle(.orange)
-                    .padding(.top)
+                    .foregroundStyle(.green)
+            } else {
+                Text("We'll guide you through granting the required permissions.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-    }
-
-    /// Step 2: Accessibility permission
-    private var accessibilityStep: some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "hand.point.up.left.fill",
-                title: "Accessibility Access",
-                subtitle: "Required to insert text into apps"
-            )
-
-            PermissionCard.accessibility(isGranted: viewModel.accessibilityGranted) {
-                await viewModel.requestAccessibilityPermission()
-            }
-
-            if let error = viewModel.permissionError {
-                Text(error)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-                    .padding()
-                    .background(Color.red.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-            } else if !viewModel.accessibilityGranted {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("How to grant accessibility access:")
-                        .font(.headline)
-
-                    StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
-                    StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
-                    StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here and click \"Next\"")
-                }
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    /// Step 3: Input monitoring permission
-    private var inputMonitoringStep: some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "keyboard.fill",
-                title: "Input Monitoring",
-                subtitle: "Required for global hotkey (⌘⌃Space)"
-            )
-
-            PermissionCard.inputMonitoring(isGranted: viewModel.inputMonitoringGranted) {
-                await viewModel.requestInputMonitoringPermission()
-            }
-
-            if !viewModel.inputMonitoringGranted {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("How to grant input monitoring:")
-                        .font(.headline)
-
-                    StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
-                    StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
-                    StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here and click \"Next\"")
-                }
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    /// Step 4: Demo/Try it now
-    private var demoStep: some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "star.fill",
-                title: "Try It Now!",
-                subtitle: "Test your setup with a quick demo"
-            )
-
-            Text("Press the global hotkey to start recording:")
-                .font(.title3)
-
-            HStack(spacing: 8) {
-                KeyCapView(symbol: "⌘")
-                Text("+")
-                KeyCapView(symbol: "⌃")
-                Text("+")
-                KeyCapView(text: "Space")
-            }
-            .font(.title2)
-
-            VStack(alignment: .leading, spacing: 12) {
-                DemoInstruction(number: 1, text: "Press ⌘⌃Space anywhere in macOS")
-                DemoInstruction(number: 2, text: "Speak naturally when the modal appears")
-                DemoInstruction(number: 3, text: "Recording stops automatically after 1.5s of silence")
-                DemoInstruction(number: 4, text: "Your text will be inserted at the cursor")
-            }
-            .padding()
-            .background(Color.green.opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-            Text("Try it in any text field, like TextEdit or Notes!")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    /// Step 5: Completion
-    private var completionStep: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 80))
-                .foregroundStyle(.green)
-                .symbolEffect(.bounce)
-
-            Text("You're All Set!")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Text("Your speech-to-text app is ready to use. Press ⌘⌃Space anytime to start dictating.")
-                .font(.title3)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
-
-            VStack(alignment: .leading, spacing: 12) {
-                QuickTip(icon: "mic.fill", text: "Hotkey: ⌘⌃Space")
-                QuickTip(icon: "gear", text: "Settings: Click menu bar icon")
-                QuickTip(icon: "chart.bar.fill", text: "Stats: View your usage in menu bar")
-            }
-            .padding(.top)
-        }
-    }
-
-    /// Step header with icon, title, and subtitle
-    private func stepHeader(icon: String, title: String, subtitle: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-
-            Text(title)
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text(subtitle)
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
+        .padding()
+        .background(Color.gray.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Computed Properties
+    // Note: Step views (microphoneStepView, accessibilityStepView, etc.)
+    // are defined in OnboardingStepViews.swift as an extension
 
     /// Progress percentage (0.0 - 1.0)
     private var progressPercentage: Double {
@@ -387,78 +255,8 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Helper Views
-
-private struct FeatureRow: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-            Text(text)
-        }
-    }
-}
-
-private struct StepInstruction: View {
-    let number: Int
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(number).")
-                .fontWeight(.semibold)
-            Text(text)
-        }
-        .font(.callout)
-    }
-}
-
-private struct DemoInstruction: View {
-    let number: Int
-    let text: String
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text("\(number).")
-                .fontWeight(.semibold)
-                .foregroundStyle(.green)
-            Text(text)
-        }
-    }
-}
-
-private struct KeyCapView: View {
-    var symbol: String?
-    var text: String?
-
-    var body: some View {
-        Text(symbol ?? text ?? "")
-            .font(.title2)
-            .fontWeight(.medium)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(Color.gray.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-}
-
-private struct QuickTip: View {
-    let icon: String
-    let text: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(.blue)
-            Text(text)
-        }
-    }
-}
-
 // MARK: - Previews
+// Note: Helper views (FeatureRow, StepInstruction, etc.) are in OnboardingComponents.swift
 
 #Preview("Welcome Step") {
     OnboardingView()
