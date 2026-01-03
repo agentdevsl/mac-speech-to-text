@@ -6,9 +6,17 @@ extension Notification.Name {
     static let settingsDidReset = Notification.Name("com.speechtotext.settingsDidReset")
 }
 
+/// Protocol for settings service (enables testing with mocks)
+@MainActor
+protocol SettingsServiceProtocol {
+    func load() -> UserSettings
+    func save(_ settings: UserSettings) throws
+    func reset() throws
+}
+
 /// Service for managing user settings persistence
 @MainActor
-class SettingsService {
+class SettingsService: SettingsServiceProtocol {
     private let userDefaults: UserDefaults
     private let settingsKey = "com.speechtotext.settings"
     private let corruptedBackupKey = "com.speechtotext.settings.corrupted"

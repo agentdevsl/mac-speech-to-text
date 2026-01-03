@@ -42,8 +42,8 @@ final class OnboardingViewModel {
 
     // MARK: - Dependencies
 
-    private let permissionService: PermissionService
-    private let settingsService: SettingsService
+    private let permissionService: any PermissionChecker
+    private let settingsService: any SettingsServiceProtocol
 
     // MARK: - Constants
 
@@ -52,8 +52,8 @@ final class OnboardingViewModel {
     // MARK: - Initialization
 
     init(
-        permissionService: PermissionService = PermissionService(),
-        settingsService: SettingsService = SettingsService()
+        permissionService: any PermissionChecker = PermissionService(),
+        settingsService: any SettingsServiceProtocol = SettingsService()
     ) {
         self.permissionService = permissionService
         self.settingsService = settingsService
