@@ -20,9 +20,9 @@
 
 **Purpose**: Project initialization and verification
 
-- [ ] T001 Verify scripts are executable in `/workspace/scripts/`
-- [ ] T002 [P] Verify entitlements has required permissions
-- [ ] T003 [P] Verify .signing-identity is in .gitignore
+- [X] T001 Verify scripts are executable in `/workspace/scripts/`
+- [X] T002 [P] Verify entitlements has required permissions
+- [X] T003 [P] Verify .signing-identity is in .gitignore
 
 ---
 
@@ -32,9 +32,9 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 Create backup of `/workspace/scripts/setup-signing.sh`
-- [ ] T005 [P] Create backup of `/workspace/scripts/build-app.sh`
-- [ ] T006 [P] Create `/workspace/docs/` directory if needed
+- [X] T004 Create backup of `/workspace/scripts/setup-signing.sh`
+- [X] T005 [P] Create backup of `/workspace/scripts/build-app.sh`
+- [X] T006 [P] Create `/workspace/docs/` directory if needed
 
 **Checkpoint**: Foundation ready - user story work can now begin
 
@@ -54,24 +54,24 @@ verify permissions remain granted after second build without re-auth
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Add --verify flag to check existing identity
+- [X] T007 [US1] Add --verify flag to check existing identity
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T008 [US1] Add identity validation function to verify cert in keychain
+- [X] T008 [US1] Add identity validation function to verify cert in keychain
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T009 [US1] Add expiration check for existing certificates
+- [X] T009 [US1] Add expiration check for existing certificates
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T010 [US1] Enhance error output with remediation steps
+- [X] T010 [US1] Enhance error output with remediation steps
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T011 [US1] Add pre-build identity validation function
+- [X] T011 [US1] Add pre-build identity validation function
   - File: `/workspace/scripts/build-app.sh`
-- [ ] T012 [US1] Add --check-signing flag for pre-flight validation
+- [X] T012 [US1] Add --check-signing flag for pre-flight validation
   - File: `/workspace/scripts/build-app.sh`
-- [ ] T013 [US1] Make ad-hoc signing warning more prominent
+- [X] T013 [US1] Make ad-hoc signing warning more prominent
   - File: `/workspace/scripts/build-app.sh`
   - Acceptance: Warning is visually distinct (box format) and visible without scroll
-- [ ] T014 [US1] Add recommendation to run setup-signing.sh on ad-hoc
+- [X] T014 [US1] Add recommendation to run setup-signing.sh on ad-hoc
   - File: `/workspace/scripts/build-app.sh`
-- [ ] T015 [US1] Verify .signing-identity entry in .gitignore
+- [X] T015 [US1] Verify .signing-identity entry in .gitignore
 
 **Checkpoint**: US1 functional - signing identity persists across rebuilds
 
@@ -91,21 +91,21 @@ builds maintain permission persistence
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Add prerequisite check (security, codesign, openssl)
+- [X] T016 [US2] Add prerequisite check (security, codesign, openssl)
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T017 [US2] Add Keychain Access GUI fallback instructions
+- [X] T017 [US2] Add Keychain Access GUI fallback instructions
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T018 [US2] Add --force flag to recreate certificate
+- [X] T018 [US2] Add --force flag to recreate certificate
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T019 [US2] Add certificate CN validation (1-64 chars)
+- [X] T019 [US2] Add certificate CN validation (1-64 chars)
   - File: `/workspace/scripts/setup-signing.sh`
-- [ ] T020 [P] [US2] Create comprehensive LOCAL_DEVELOPMENT.md
+- [X] T020 [P] [US2] Create comprehensive LOCAL_DEVELOPMENT.md
   - File: `/workspace/docs/LOCAL_DEVELOPMENT.md`
-- [ ] T021 [US2] Add quickstart reference section
+- [X] T021 [US2] Add quickstart reference section
   - File: `/workspace/docs/LOCAL_DEVELOPMENT.md`
-- [ ] T022 [US2] Add troubleshooting section
+- [X] T022 [US2] Add troubleshooting section
   - File: `/workspace/docs/LOCAL_DEVELOPMENT.md`
-- [ ] T023 [US2] Add TCC and code signing relationship explanation
+- [X] T023 [US2] Add TCC and code signing relationship explanation
   - File: `/workspace/docs/LOCAL_DEVELOPMENT.md`
 
 **Checkpoint**: US1 AND US2 work - first-time setup is streamlined
@@ -125,17 +125,17 @@ builds maintain permission persistence
 
 ### Implementation for User Story 3
 
-- [ ] T024 [P] [US3] Create XCODE_WORKFLOW.md
+- [X] T024 [P] [US3] Create XCODE_WORKFLOW.md
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
-- [ ] T025 [US3] Document automatic signing behavior
+- [X] T025 [US3] Document automatic signing behavior
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
-- [ ] T026 [US3] Document debugger integration (LLDB, breakpoints)
+- [X] T026 [US3] Document debugger integration (LLDB, breakpoints)
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
-- [ ] T027 [US3] Add troubleshooting section for Xcode signing
+- [X] T027 [US3] Add troubleshooting section for Xcode signing
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
-- [ ] T028 [US3] Document when to use Xcode vs CLI workflow
+- [X] T028 [US3] Document when to use Xcode vs CLI workflow
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
-- [ ] T029 [US3] Add permission persistence verification section
+- [X] T029 [US3] Add permission persistence verification section
   - File: `/workspace/docs/XCODE_WORKFLOW.md`
 
 **Checkpoint**: US1, US2, US3 work - CLI and Xcode workflows documented
@@ -156,19 +156,19 @@ insertion into target application
 
 ### Implementation for User Story 4
 
-- [ ] T030 [US4] Add --check-permissions flag
+- [X] T030 [US4] Add --check-permissions flag
   - File: `/workspace/scripts/smoke-test.sh`
-- [ ] T031 [US4] Add microphone permission check function
+- [X] T031 [US4] Add microphone permission check function
   - File: `/workspace/scripts/smoke-test.sh`
-- [ ] T032 [US4] Add accessibility permission check function
+- [X] T032 [US4] Add accessibility permission check function
   - File: `/workspace/scripts/smoke-test.sh`
-- [ ] T033 [US4] Add signing identity verification
+- [X] T033 [US4] Add signing identity verification
   - File: `/workspace/scripts/smoke-test.sh`
-- [ ] T034 [US4] Add permission status reporting output
+- [X] T034 [US4] Add permission status reporting output
   - File: `/workspace/scripts/smoke-test.sh`
-- [ ] T035 [P] [US4] Create manual validation checklist
+- [X] T035 [P] [US4] Create manual validation checklist
   - File: `/workspace/specs/002-permission-signing/checklists/validation.md`
-- [ ] T036 [US4] Document E2E test steps in validation checklist
+- [X] T036 [US4] Document E2E test steps in validation checklist
   - File: `/workspace/specs/002-permission-signing/checklists/validation.md`
 
 **Checkpoint**: All user stories complete - full workflow validated
@@ -179,11 +179,11 @@ insertion into target application
 
 **Purpose**: Improvements affecting multiple user stories
 
-- [ ] T037 [P] Add signing setup recommendation to README.md
-- [ ] T038 [P] Update quickstart.md with discovered improvements
-- [ ] T039 Verify all new documentation has consistent formatting
-- [ ] T040 Run quickstart.md validation manually
-- [ ] T041 Update plan.md to mark Phase 2 as complete
+- [X] T037 [P] Add signing setup recommendation to README.md
+- [X] T038 [P] Update quickstart.md with discovered improvements
+- [X] T039 Verify all new documentation has consistent formatting
+- [X] T040 Run quickstart.md validation manually
+- [X] T041 Update plan.md to mark Phase 2 as complete
 
 ---
 

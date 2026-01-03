@@ -118,3 +118,10 @@ configstore/
 
 .DS_Store
 Thumbs.db
+
+# =============================================================================
+# macOS Code Signing
+# =============================================================================
+
+# Local signing identity (per-developer, not committed)
+.signing-identity
