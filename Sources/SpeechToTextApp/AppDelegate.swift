@@ -193,19 +193,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Create placeholder settings view (will be replaced with SettingsView in Phase 6)
-        let contentView = VStack {
-            Text("Settings")
-                .font(.largeTitle)
-                .padding()
-            Text("Settings UI will be implemented in Phase 6")
-                .foregroundStyle(.secondary)
-        }
-        .frame(width: 640, height: 480)
-        .onDisappear {
-            self.settingsWindow?.close()
-            self.settingsWindow = nil
-        }
+        // Create settings view (Phase 6 implementation)
+        let contentView = SettingsView()
+            .onDisappear {
+                self.settingsWindow?.close()
+                self.settingsWindow = nil
+            }
 
         // Create settings window
         let window = NSWindow(
