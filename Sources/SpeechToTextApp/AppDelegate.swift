@@ -52,6 +52,45 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Speech to Text")
             button.imagePosition = .imageLeading
         }
+
+        // Create SwiftUI menu content (T045)
+        let menuBarView = MenuBarView()
+        let hostingView = NSHostingView(rootView: menuBarView)
+        hostingView.frame.size = CGSize(width: 250, height: 400)
+
+        // Create menu and attach to status item
+        let menu = NSMenu()
+        let menuItem = NSMenuItem()
+        menuItem.view = hostingView
+        menu.addItem(menuItem)
+
+        statusItem?.menu = menu
+
+        // Setup notification observers for menu actions (T046, T047)
+        setupMenuActionObservers()
+    }
+
+    // MARK: - Menu Action Observers
+
+    @MainActor
+    private func setupMenuActionObservers() {
+        // Observer for "Start Recording" action (T046)
+        NotificationCenter.default.addObserver(
+            forName: .showRecordingModal,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showRecordingModal()
+        }
+
+        // Observer for "Open Settings" action (T047)
+        NotificationCenter.default.addObserver(
+            forName: .showSettings,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.showSettingsWindow()
+        }
     }
 
     // MARK: - Global Hotkey Setup
@@ -140,5 +179,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
 
         recordingWindow = window
+    }
+
+    // MARK: - Settings Window
+
+    private var settingsWindow: NSWindow?
+
+    @MainActor
+    private func showSettingsWindow() {
+        // If settings window already exists, bring it to front
+        if let existingWindow = settingsWindow {
+            existingWindow.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        // Create placeholder settings view (will be replaced with SettingsView in Phase 6)
+        let contentView = VStack {
+            Text("Settings")
+                .font(.largeTitle)
+                .padding()
+            Text("Settings UI will be implemented in Phase 6")
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: 640, height: 480)
+        .onDisappear {
+            self.settingsWindow?.close()
+            self.settingsWindow = nil
+        }
+
+        // Create settings window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 640, height: 480),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.title = "Settings"
+        window.contentView = NSHostingView(rootView: contentView)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+
+        settingsWindow = window
     }
 }
