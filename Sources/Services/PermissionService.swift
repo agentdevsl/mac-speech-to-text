@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Foundation
+import IOKit
 
 /// Permission-related errors
 enum PermissionError: Error, LocalizedError, Equatable, Sendable {
@@ -34,15 +35,6 @@ protocol PermissionChecker {
 /// Real implementation of permission service
 @MainActor
 class PermissionService: PermissionChecker {
-    /// Tracks the last known input monitoring permission status based on hotkey registration result
-    private var lastKnownInputMonitoringStatus: Bool = false
-
-    /// Update the input monitoring status based on hotkey registration result
-    /// This should be called by HotkeyService after attempting to register a hotkey
-    func setInputMonitoringStatus(_ granted: Bool) {
-        lastKnownInputMonitoringStatus = granted
-    }
-
     /// Check microphone permission status
     func checkMicrophonePermission() async -> Bool {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -88,12 +80,12 @@ class PermissionService: PermissionChecker {
 
     /// Check input monitoring permission status
     /// This is required for global hotkeys on macOS 10.15+
-    /// Returns the last known status based on hotkey registration result
+    /// Uses IOHIDCheckAccess to check input monitoring permission
     func checkInputMonitoringPermission() -> Bool {
-        // Input monitoring permission is implicitly checked when registering global hotkeys
-        // If Carbon Event Manager APIs succeed, permission is granted
-        // Return the tracked status from the last hotkey registration attempt
-        return lastKnownInputMonitoringStatus
+        // Use IOHIDCheckAccess to check input monitoring permission (macOS 10.15+)
+        // This API returns true if the app has input monitoring permission
+        let status = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
+        return status == kIOHIDAccessTypeGranted
     }
 
     /// Get all permission statuses
