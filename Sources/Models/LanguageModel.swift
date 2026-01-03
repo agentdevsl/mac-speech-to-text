@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a downloaded ML model for a specific language
-struct LanguageModel: Codable, Identifiable {
+struct LanguageModel: Codable, Identifiable, Sendable {
     let id: UUID
     let languageCode: String
     let displayName: String
@@ -18,6 +18,11 @@ struct LanguageModel: Codable, Identifiable {
     var name: String { displayName }
     var flag: String {
         SupportedLanguage.from(code: languageCode)?.flag ?? "🌐"
+    }
+
+    /// Native name of the language (e.g., "Deutsch" for German)
+    var nativeName: String {
+        SupportedLanguage.from(code: languageCode)?.nativeName ?? displayName
     }
 
     /// Static property for all supported languages
@@ -56,7 +61,7 @@ struct LanguageModel: Codable, Identifiable {
 }
 
 /// Download status for language models
-enum DownloadStatus: Codable, Equatable {
+enum DownloadStatus: Codable, Equatable, Sendable {
     case notDownloaded
     case downloading(progress: Double, bytesDownloaded: Int64)
     case downloaded
@@ -91,7 +96,7 @@ enum DownloadStatus: Codable, Equatable {
 }
 
 /// Supported languages for FluidAudio Parakeet TDT v3
-enum SupportedLanguage: String, CaseIterable, Codable {
+enum SupportedLanguage: String, CaseIterable, Codable, Sendable {
     case en, es, fr, de, it, pt, ru, pl, nl, sv
     case da, no, fi, cs, ro, uk, el, bg, hr, sk
     case sl, et, lv, lt, mt

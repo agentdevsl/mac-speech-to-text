@@ -80,7 +80,7 @@ final class SettingsViewModel {
     }
 
     /// Update hotkey configuration
-    func updateHotkey(keyCode: UInt16, modifiers: [UserSettings.HotkeyModifier]) async {
+    func updateHotkey(keyCode: Int, modifiers: [UserSettings.HotkeyModifier]) async {
         // Check for conflicts (T055)
         if let conflict = detectHotkeyConflict(keyCode: keyCode, modifiers: modifiers) {
             validationError = "Hotkey conflict: \(conflict). Please choose a different combination."
@@ -107,13 +107,13 @@ final class SettingsViewModel {
 
     /// Update audio sensitivity threshold
     func updateAudioSensitivity(_ sensitivity: Double) async {
-        settings.audio.sensitivityThreshold = sensitivity
+        settings.audio.sensitivity = sensitivity
         await saveSettings()
     }
 
     /// Update silence detection threshold
     func updateSilenceThreshold(_ threshold: Double) async {
-        settings.audio.silenceDetectionThreshold = threshold
+        settings.audio.silenceThreshold = threshold
         await saveSettings()
     }
 
@@ -127,11 +127,11 @@ final class SettingsViewModel {
         }
 
         // Validate audio thresholds
-        if settings.audio.sensitivityThreshold < 0.1 || settings.audio.sensitivityThreshold > 1.0 {
+        if settings.audio.sensitivity < 0.1 || settings.audio.sensitivity > 1.0 {
             return "Audio sensitivity must be between 0.1 and 1.0"
         }
 
-        if settings.audio.silenceDetectionThreshold < 0.5 || settings.audio.silenceDetectionThreshold > 3.0 {
+        if settings.audio.silenceThreshold < 0.5 || settings.audio.silenceThreshold > 3.0 {
             return "Silence detection threshold must be between 0.5 and 3.0 seconds"
         }
 
@@ -146,7 +146,7 @@ final class SettingsViewModel {
 
     /// Detect hotkey conflicts with system shortcuts (T055)
     private func detectHotkeyConflict(
-        keyCode: UInt16,
+        keyCode: Int,
         modifiers: [UserSettings.HotkeyModifier]
     ) -> String? {
         // Common macOS system shortcuts to check
@@ -174,7 +174,13 @@ final class SettingsViewModel {
         // In real implementation, this would use FluidAudio SDK's download API
         for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
             downloadProgress = progress
-            try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            do {
+                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            } catch {
+                // Task was cancelled, exit early
+                isDownloadingModel = false
+                return
+            }
         }
 
         isDownloadingModel = false
@@ -187,6 +193,6 @@ final class SettingsViewModel {
 /// Represents a macOS system keyboard shortcut for conflict detection
 private struct SystemShortcut {
     let name: String
-    let keyCode: UInt16
+    let keyCode: Int
     let modifiers: [UserSettings.HotkeyModifier]
 }

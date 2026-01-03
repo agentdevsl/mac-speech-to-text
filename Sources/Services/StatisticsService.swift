@@ -2,7 +2,8 @@ import Foundation
 import OSLog
 
 /// Service for managing usage statistics with privacy preservation
-class StatisticsService: @unchecked Sendable {
+/// Actor provides thread-safe access to shared mutable state
+actor StatisticsService {
     private let userDefaults: UserDefaults
     private let statsKey = "com.speechtotext.statistics"
 

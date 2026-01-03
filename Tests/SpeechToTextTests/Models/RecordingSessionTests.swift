@@ -5,177 +5,311 @@ final class RecordingSessionTests: XCTestCase {
 
     // MARK: - Initialization Tests
 
-    func testInitialization_CreatesSessionWithIdleState() {
-        // Given/When
+    func test_initialization_setsDefaultValues() {
         let session = RecordingSession()
 
-        // Then
         XCTAssertNotNil(session.id)
         XCTAssertEqual(session.state, .idle)
-        XCTAssertNil(session.startTime)
         XCTAssertNil(session.endTime)
-        XCTAssertTrue(session.audioSegments.isEmpty)
-        XCTAssertEqual(session.languageCode, "en-US")
-        XCTAssertNil(session.transcriptionText)
-        XCTAssertEqual(session.confidence, 0.0)
+        XCTAssertEqual(session.transcribedText, "")
+        XCTAssertEqual(session.language, "en")
+        XCTAssertEqual(session.confidenceScore, 0.0)
+        XCTAssertFalse(session.insertionSuccess)
         XCTAssertNil(session.errorMessage)
-        XCTAssertFalse(session.wasCancelled)
-        XCTAssertTrue(session.metadata.isEmpty)
+        XCTAssertEqual(session.peakAmplitude, 0)
+        XCTAssertTrue(session.segments.isEmpty)
+        XCTAssertNil(session.audioData)
     }
 
-    // MARK: - State Transition Tests
+    func test_initialization_acceptsCustomLanguage() {
+        let session = RecordingSession(language: "de")
+        XCTAssertEqual(session.language, "de")
+    }
 
-    func testStartRecording_TransitionsFromIdleToRecording() {
-        // Given
-        var session = RecordingSession()
-        XCTAssertEqual(session.state, .idle)
-
-        // When
-        session.startRecording()
-
-        // Then
+    func test_initialization_acceptsCustomState() {
+        let session = RecordingSession(state: .recording)
         XCTAssertEqual(session.state, .recording)
-        XCTAssertNotNil(session.startTime)
     }
 
-    func testStopRecording_TransitionsFromRecordingToProcessing() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
-
-        // When
-        session.stopRecording()
-
-        // Then
-        XCTAssertEqual(session.state, .processing)
-        XCTAssertNotNil(session.endTime)
+    func test_initialization_acceptsCustomId() {
+        let customId = UUID()
+        let session = RecordingSession(id: customId)
+        XCTAssertEqual(session.id, customId)
     }
 
-    func testCompleteTranscription_TransitionsToCompleted() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
-        session.stopRecording()
-
-        // When
-        session.completeTranscription(text: "Hello world", confidence: 0.95)
-
-        // Then
-        XCTAssertEqual(session.state, .completed)
-        XCTAssertEqual(session.transcriptionText, "Hello world")
-        XCTAssertEqual(session.confidence, 0.95)
+    func test_initialization_acceptsCustomStartTime() {
+        let customStartTime = Date(timeIntervalSinceNow: -100)
+        let session = RecordingSession(startTime: customStartTime)
+        XCTAssertEqual(session.startTime, customStartTime)
     }
 
-    func testCancel_TransitionsToFailed() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
+    // MARK: - Computed Property Tests
 
-        // When
-        session.cancel()
+    func test_duration_withEndTime_returnsCorrectDuration() {
+        let startTime = Date(timeIntervalSinceNow: -10)
+        var session = RecordingSession(startTime: startTime)
+        session.endTime = Date()
 
-        // Then
-        XCTAssertEqual(session.state, .failed)
-        XCTAssertTrue(session.wasCancelled)
+        XCTAssertEqual(session.duration, 10.0, accuracy: 0.5)
     }
 
-    func testFail_TransitionsToFailedWithError() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
+    func test_duration_withoutEndTime_returnsDurationToNow() {
+        let session = RecordingSession(startTime: Date(timeIntervalSinceNow: -5))
 
-        // When
-        session.fail(error: "Network timeout")
-
-        // Then
-        XCTAssertEqual(session.state, .failed)
-        XCTAssertEqual(session.errorMessage, "Network timeout")
+        XCTAssertEqual(session.duration, 5.0, accuracy: 0.5)
     }
 
-    // MARK: - Audio Segment Tests
-
-    func testAddAudioSegment_AppendsToSegments() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
-        let buffer = AudioBuffer(samples: [0.1, 0.2, 0.3], sampleRate: 16000, channelCount: 1, duration: 0.01, timestamp: Date())
-
-        // When
-        session.addAudioSegment(buffer)
-
-        // Then
-        XCTAssertEqual(session.audioSegments.count, 1)
-        XCTAssertEqual(session.audioSegments[0].samples.count, 3)
-    }
-
-    // MARK: - Duration Tests
-
-    func testDuration_ReturnsNilWhenNotStarted() {
-        // Given
+    func test_wordCount_emptyText_returnsZero() {
         let session = RecordingSession()
-
-        // Then
-        XCTAssertNil(session.duration)
-    }
-
-    func testDuration_ReturnsElapsedTimeWhenRecording() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
-
-        // When
-        Thread.sleep(forTimeInterval: 0.1)
-
-        // Then
-        XCTAssertNotNil(session.duration)
-        XCTAssertGreaterThan(session.duration!, 0.0)
-    }
-
-    func testDuration_ReturnsFixedTimeWhenCompleted() {
-        // Given
-        var session = RecordingSession()
-        session.startRecording()
-        Thread.sleep(forTimeInterval: 0.1)
-        session.stopRecording()
-        session.completeTranscription(text: "Test", confidence: 0.9)
-
-        // When
-        let duration = session.duration
-
-        // Then
-        XCTAssertNotNil(duration)
-        XCTAssertGreaterThan(duration!, 0.0)
-    }
-
-    // MARK: - Word Count Tests
-
-    func testWordCount_ReturnsZeroWhenNoTranscription() {
-        // Given
-        let session = RecordingSession()
-
-        // Then
         XCTAssertEqual(session.wordCount, 0)
     }
 
-    func testWordCount_CountsWordsCorrectly() {
-        // Given
+    func test_wordCount_withText_returnsCorrectCount() {
         var session = RecordingSession()
-        session.completeTranscription(text: "Hello world this is a test", confidence: 0.9)
-
-        // Then
+        session.transcribedText = "Hello world this is a test"
         XCTAssertEqual(session.wordCount, 6)
     }
 
-    // MARK: - Invalid State Transition Tests
-
-    func testStartRecording_ThrowsWhenNotIdle() {
-        // Given
+    func test_wordCount_handlesMultipleSpaces() {
         var session = RecordingSession()
-        session.startRecording()
+        session.transcribedText = "Hello   world"
+        XCTAssertEqual(session.wordCount, 2)
+    }
 
-        // When/Then
-        XCTAssertThrowsError(try session.startRecording()) { error in
-            XCTAssertEqual(error as? RecordingError, .invalidStateTransition)
+    func test_wordCount_handlesSingleWord() {
+        var session = RecordingSession()
+        session.transcribedText = "Hello"
+        XCTAssertEqual(session.wordCount, 1)
+    }
+
+    func test_wordCount_handlesWhitespaceOnly() {
+        var session = RecordingSession()
+        session.transcribedText = "   "
+        XCTAssertEqual(session.wordCount, 0)
+    }
+
+    // MARK: - Validation Tests
+
+    func test_isValid_returnsTrueForValidSession() {
+        var session = RecordingSession()
+        session.endTime = Date(timeIntervalSinceNow: 10)
+        session.confidenceScore = 0.85
+
+        XCTAssertTrue(session.isValid)
+    }
+
+    func test_isValid_returnsTrueWithNoEndTime() {
+        let session = RecordingSession()
+        XCTAssertTrue(session.isValid)
+    }
+
+    func test_isValid_returnsFalseWhenEndTimeBeforeStartTime() {
+        var session = RecordingSession()
+        session.endTime = Date(timeIntervalSinceNow: -10)
+
+        XCTAssertFalse(session.isValid)
+    }
+
+    func test_isValid_returnsFalseWhenConfidenceNegative() {
+        var session = RecordingSession()
+        session.endTime = Date()
+        session.confidenceScore = -0.1
+
+        XCTAssertFalse(session.isValid)
+    }
+
+    func test_isValid_returnsFalseWhenConfidenceExceedsOne() {
+        var session = RecordingSession()
+        session.endTime = Date()
+        session.confidenceScore = 1.1
+
+        XCTAssertFalse(session.isValid)
+    }
+
+    func test_isValid_returnsFalseWhenLanguageEmpty() {
+        let session = RecordingSession(language: "")
+        XCTAssertFalse(session.isValid)
+    }
+
+    func test_isValid_returnsTrueAtConfidenceBoundaries() {
+        var session = RecordingSession()
+
+        session.confidenceScore = 0.0
+        XCTAssertTrue(session.isValid)
+
+        session.confidenceScore = 1.0
+        XCTAssertTrue(session.isValid)
+    }
+
+    // MARK: - SessionState Tests
+
+    func test_sessionState_isActive_recording() {
+        XCTAssertTrue(SessionState.recording.isActive)
+    }
+
+    func test_sessionState_isActive_transcribing() {
+        XCTAssertTrue(SessionState.transcribing.isActive)
+    }
+
+    func test_sessionState_isActive_inserting() {
+        XCTAssertTrue(SessionState.inserting.isActive)
+    }
+
+    func test_sessionState_isActive_idle() {
+        XCTAssertFalse(SessionState.idle.isActive)
+    }
+
+    func test_sessionState_isActive_completed() {
+        XCTAssertFalse(SessionState.completed.isActive)
+    }
+
+    func test_sessionState_isActive_cancelled() {
+        XCTAssertFalse(SessionState.cancelled.isActive)
+    }
+
+    func test_sessionState_description() {
+        XCTAssertEqual(SessionState.idle.description, "Idle")
+        XCTAssertEqual(SessionState.recording.description, "Recording...")
+        XCTAssertEqual(SessionState.transcribing.description, "Transcribing...")
+        XCTAssertEqual(SessionState.inserting.description, "Inserting text...")
+        XCTAssertEqual(SessionState.completed.description, "Completed")
+        XCTAssertEqual(SessionState.cancelled.description, "Cancelled")
+    }
+
+    func test_sessionState_allCases() {
+        XCTAssertEqual(SessionState.allCases.count, 6)
+        XCTAssertTrue(SessionState.allCases.contains(.idle))
+        XCTAssertTrue(SessionState.allCases.contains(.recording))
+        XCTAssertTrue(SessionState.allCases.contains(.transcribing))
+        XCTAssertTrue(SessionState.allCases.contains(.inserting))
+        XCTAssertTrue(SessionState.allCases.contains(.completed))
+        XCTAssertTrue(SessionState.allCases.contains(.cancelled))
+    }
+
+    func test_sessionState_codableRoundtrip() throws {
+        for state in SessionState.allCases {
+            let data = try JSONEncoder().encode(state)
+            let decoded = try JSONDecoder().decode(SessionState.self, from: data)
+            XCTAssertEqual(decoded, state)
         }
+    }
+
+    // MARK: - TranscriptionSegment Tests
+
+    func test_transcriptionSegment_initialization() {
+        let segment = TranscriptionSegment(
+            text: "Hello",
+            startTime: 0.0,
+            endTime: 1.5,
+            confidence: 0.95
+        )
+
+        XCTAssertNotNil(segment.id)
+        XCTAssertEqual(segment.text, "Hello")
+        XCTAssertEqual(segment.startTime, 0.0)
+        XCTAssertEqual(segment.endTime, 1.5)
+        XCTAssertEqual(segment.confidence, 0.95)
+    }
+
+    func test_transcriptionSegment_customId() {
+        let customId = UUID()
+        let segment = TranscriptionSegment(
+            id: customId,
+            text: "Test",
+            startTime: 0.0,
+            endTime: 0.5,
+            confidence: 0.9
+        )
+
+        XCTAssertEqual(segment.id, customId)
+    }
+
+    // MARK: - Mutability Tests
+
+    func test_session_stateCanBeModified() {
+        var session = RecordingSession()
+        XCTAssertEqual(session.state, .idle)
+
+        session.state = .recording
+        XCTAssertEqual(session.state, .recording)
+
+        session.state = .transcribing
+        XCTAssertEqual(session.state, .transcribing)
+
+        session.state = .completed
+        XCTAssertEqual(session.state, .completed)
+    }
+
+    func test_session_transcribedTextCanBeModified() {
+        var session = RecordingSession()
+        session.transcribedText = "Hello world"
+
+        XCTAssertEqual(session.transcribedText, "Hello world")
+    }
+
+    func test_session_confidenceScoreCanBeModified() {
+        var session = RecordingSession()
+        session.confidenceScore = 0.95
+
+        XCTAssertEqual(session.confidenceScore, 0.95)
+    }
+
+    func test_session_insertionSuccessCanBeModified() {
+        var session = RecordingSession()
+        session.insertionSuccess = true
+
+        XCTAssertTrue(session.insertionSuccess)
+    }
+
+    func test_session_errorMessageCanBeModified() {
+        var session = RecordingSession()
+        session.errorMessage = "An error occurred"
+
+        XCTAssertEqual(session.errorMessage, "An error occurred")
+    }
+
+    func test_session_peakAmplitudeCanBeModified() {
+        var session = RecordingSession()
+        session.peakAmplitude = 1000
+
+        XCTAssertEqual(session.peakAmplitude, 1000)
+    }
+
+    func test_session_audioDataCanBeModified() {
+        var session = RecordingSession()
+        let samples: [Int16] = [100, 200, 300]
+        session.audioData = samples
+
+        XCTAssertEqual(session.audioData, samples)
+    }
+
+    func test_session_segmentsCanBeModified() {
+        var session = RecordingSession()
+        let segment = TranscriptionSegment(
+            text: "Test",
+            startTime: 0.0,
+            endTime: 1.0,
+            confidence: 0.9
+        )
+        session.segments = [segment]
+
+        XCTAssertEqual(session.segments.count, 1)
+        XCTAssertEqual(session.segments[0].text, "Test")
+    }
+
+    // MARK: - Identifiable Tests
+
+    func test_session_uniqueIds() {
+        let session1 = RecordingSession()
+        let session2 = RecordingSession()
+
+        XCTAssertNotEqual(session1.id, session2.id)
+    }
+
+    func test_segment_uniqueIds() {
+        let segment1 = TranscriptionSegment(text: "A", startTime: 0, endTime: 1, confidence: 0.9)
+        let segment2 = TranscriptionSegment(text: "B", startTime: 1, endTime: 2, confidence: 0.9)
+
+        XCTAssertNotEqual(segment1.id, segment2.id)
     }
 }

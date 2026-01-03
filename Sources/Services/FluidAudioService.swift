@@ -88,9 +88,17 @@ actor FluidAudioService {
 
             let durationMs = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
 
+            let confidence: Float
+            if let sdkConfidence = result.confidence {
+                confidence = sdkConfidence
+            } else {
+                AppLogger.service.debug("No confidence score from FluidAudio - using conservative default")
+                confidence = 0.5  // Unknown = 50% (more honest)
+            }
+
             return TranscriptionResult(
                 text: result.text,
-                confidence: result.confidence ?? 0.95,
+                confidence: confidence,
                 durationMs: durationMs
             )
         } catch {

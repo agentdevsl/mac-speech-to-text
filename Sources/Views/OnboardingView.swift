@@ -160,7 +160,14 @@ struct OnboardingView: View {
                 await viewModel.requestMicrophonePermission()
             }
 
-            if let warning = permissionWarning {
+            if let error = viewModel.permissionError {
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else if let warning = permissionWarning {
                 Text(warning)
                     .font(.callout)
                     .foregroundStyle(.orange)
@@ -182,7 +189,14 @@ struct OnboardingView: View {
                 await viewModel.requestAccessibilityPermission()
             }
 
-            if !viewModel.accessibilityGranted {
+            if let error = viewModel.permissionError {
+                Text(error)
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else if !viewModel.accessibilityGranted {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("How to grant accessibility access:")
                         .font(.headline)

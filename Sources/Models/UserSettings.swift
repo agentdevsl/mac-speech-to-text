@@ -1,7 +1,7 @@
 import Foundation
 
 /// User configuration stored locally
-struct UserSettings: Codable {
+struct UserSettings: Codable, Sendable {
     var version: Int
     var general: GeneralConfiguration
     var hotkey: HotkeyConfiguration
@@ -54,7 +54,8 @@ struct UserSettings: Codable {
         privacy: PrivacyConfiguration(
             collectAnonymousStats: true,
             storagePolicy: .sessionOnly,
-            dataRetentionDays: 7
+            dataRetentionDays: 7,
+            storeHistory: false
         ),
         onboarding: OnboardingState(
             completed: false,
@@ -70,13 +71,13 @@ struct UserSettings: Codable {
     )
 }
 
-struct GeneralConfiguration: Codable {
+struct GeneralConfiguration: Codable, Sendable {
     var launchAtLogin: Bool
     var autoInsertText: Bool
     var copyToClipboard: Bool
 }
 
-struct HotkeyConfiguration: Codable {
+struct HotkeyConfiguration: Codable, Sendable {
     var enabled: Bool
     var keyCode: Int
     var modifiers: [KeyModifier]
@@ -85,7 +86,7 @@ struct HotkeyConfiguration: Codable {
     // Consider using enum with indirect case if alternative hotkey needed
 }
 
-enum KeyModifier: String, Codable, CaseIterable {
+enum KeyModifier: String, Codable, CaseIterable, Sendable {
     case command
     case control
     case option
@@ -101,14 +102,14 @@ enum KeyModifier: String, Codable, CaseIterable {
     }
 }
 
-struct LanguageConfiguration: Codable {
+struct LanguageConfiguration: Codable, Sendable {
     var defaultLanguage: String
     var recentLanguages: [String]
     var autoDetectEnabled: Bool
     var downloadedModels: [String]
 }
 
-struct AudioConfiguration: Codable {
+struct AudioConfiguration: Codable, Sendable {
     var inputDeviceId: String?
     var sensitivity: Double // 0.0 - 1.0
     var silenceThreshold: TimeInterval // seconds (0.5 - 3.0)
@@ -116,7 +117,7 @@ struct AudioConfiguration: Codable {
     var autoGainControl: Bool
 }
 
-struct UIConfiguration: Codable {
+struct UIConfiguration: Codable, Sendable {
     var theme: Theme
     var modalPosition: ModalPosition
     var showWaveform: Bool
@@ -125,7 +126,7 @@ struct UIConfiguration: Codable {
     var menuBarIcon: MenuBarIcon
 }
 
-enum Theme: String, Codable {
+enum Theme: String, Codable, Sendable {
     case light
     case dark
     case system
@@ -139,7 +140,7 @@ enum Theme: String, Codable {
     }
 }
 
-enum ModalPosition: String, Codable {
+enum ModalPosition: String, Codable, Sendable {
     case center
     case cursor
 
@@ -151,7 +152,7 @@ enum ModalPosition: String, Codable {
     }
 }
 
-enum MenuBarIcon: String, Codable {
+enum MenuBarIcon: String, Codable, Sendable {
     case `default`
     case minimal
 
@@ -163,13 +164,14 @@ enum MenuBarIcon: String, Codable {
     }
 }
 
-struct PrivacyConfiguration: Codable {
+struct PrivacyConfiguration: Codable, Sendable {
     var collectAnonymousStats: Bool
     var storagePolicy: StoragePolicy
     var dataRetentionDays: Int
+    var storeHistory: Bool
 }
 
-enum StoragePolicy: String, Codable {
+enum StoragePolicy: String, Codable, Sendable {
     case none
     case sessionOnly
     case persistent
@@ -183,14 +185,14 @@ enum StoragePolicy: String, Codable {
     }
 }
 
-struct OnboardingState: Codable {
+struct OnboardingState: Codable, Sendable {
     var completed: Bool
     var currentStep: Int
     var permissionsGranted: PermissionsGranted
     var skippedSteps: [String]
 }
 
-struct PermissionsGranted: Codable {
+struct PermissionsGranted: Codable, Sendable {
     var microphone: Bool
     var accessibility: Bool
     var inputMonitoring: Bool

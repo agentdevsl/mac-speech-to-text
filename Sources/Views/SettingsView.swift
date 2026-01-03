@@ -176,7 +176,7 @@ struct SettingsView: View {
             )
 
             // Auto-detect language
-            Toggle("Automatically detect language", isOn: $viewModel.settings.language.autoDetect)
+            Toggle("Automatically detect language", isOn: $viewModel.settings.language.autoDetectEnabled)
                 .help("Let FluidAudio detect the spoken language")
 
             Divider()
@@ -230,11 +230,11 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Slider(
-                    value: $viewModel.settings.audio.sensitivityThreshold,
+                    value: $viewModel.settings.audio.sensitivity,
                     in: 0.1...1.0,
                     step: 0.05
                 )
-                .onChange(of: viewModel.settings.audio.sensitivityThreshold) { _, newValue in
+                .onChange(of: viewModel.settings.audio.sensitivity) { _, newValue in
                     Task {
                         await viewModel.updateAudioSensitivity(newValue)
                     }
@@ -245,7 +245,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("Current: \(viewModel.settings.audio.sensitivityThreshold, specifier: "%.2f")")
+            Text("Current: \(viewModel.settings.audio.sensitivity, specifier: "%.2f")")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -274,11 +274,11 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Slider(
-                    value: $viewModel.settings.audio.silenceDetectionThreshold,
+                    value: $viewModel.settings.audio.silenceThreshold,
                     in: 0.5...3.0,
                     step: 0.1
                 )
-                .onChange(of: viewModel.settings.audio.silenceDetectionThreshold) { _, newValue in
+                .onChange(of: viewModel.settings.audio.silenceThreshold) { _, newValue in
                     Task {
                         await viewModel.updateSilenceThreshold(newValue)
                     }
@@ -289,7 +289,7 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text("Current: \(viewModel.settings.audio.silenceDetectionThreshold, specifier: "%.1f") seconds")
+            Text("Current: \(viewModel.settings.audio.silenceThreshold, specifier: "%.1f") seconds")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -305,7 +305,7 @@ struct SettingsView: View {
             )
 
             // Collect statistics
-            Toggle("Collect anonymous usage statistics", isOn: $viewModel.settings.privacy.collectStatistics)
+            Toggle("Collect anonymous usage statistics", isOn: $viewModel.settings.privacy.collectAnonymousStats)
                 .help("Track word count and session statistics locally")
 
             // Store history

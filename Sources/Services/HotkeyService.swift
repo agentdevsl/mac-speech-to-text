@@ -47,9 +47,10 @@ class HotkeyService {
         // Install event handler
         var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let eventHandlerCallback: EventHandlerUPP = { (_, _, userData) -> OSStatus in
-            guard let service = userData?.load(as: HotkeyService.self) else {
+            guard let userData = userData else {
                 return OSStatus(eventNotHandledErr)
             }
+            let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
 
             service.callback?()
             return noErr
@@ -69,6 +70,9 @@ class HotkeyService {
         )
 
         guard status == noErr else {
+            // Release the retained reference on failure
+            Unmanaged<HotkeyService>.fromOpaque(userData).release()
+            userDataPointer = nil
             throw HotkeyError.installationFailed("Failed to install event handler: \(status)")
         }
 
@@ -83,6 +87,16 @@ class HotkeyService {
         )
 
         guard registerStatus == noErr else {
+            // Clean up the already-installed event handler
+            if let handler = eventHandler {
+                RemoveEventHandler(handler)
+                eventHandler = nil
+            }
+            // Release the retained reference
+            if let userData = userDataPointer {
+                Unmanaged<HotkeyService>.fromOpaque(userData).release()
+                userDataPointer = nil
+            }
             throw HotkeyError.registrationFailed("Failed to register hotkey: \(registerStatus)")
         }
     }

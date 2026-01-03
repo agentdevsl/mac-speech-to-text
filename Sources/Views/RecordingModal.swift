@@ -5,6 +5,7 @@
 // Task T027: RecordingModal - Main recording UI with frosted glass effect,
 // waveform visualization, and spring animations
 
+import OSLog
 import SwiftUI
 
 /// RecordingModal provides the main recording interface with frosted glass effect
@@ -66,7 +67,12 @@ struct RecordingModal: View {
             }
             // Auto-start recording
             Task {
-                try? await viewModel.startRecording()
+                do {
+                    try await viewModel.startRecording()
+                } catch {
+                    viewModel.errorMessage = "Failed to start recording: \(error.localizedDescription)"
+                    AppLogger.viewModel.error("startRecording failed: \(error.localizedDescription, privacy: .public)")
+                }
             }
         }
         .onDisappear {
@@ -198,7 +204,12 @@ struct RecordingModal: View {
                 // Stop button
                 Button("Stop Recording") {
                     Task {
-                        try? await viewModel.stopRecording()
+                        do {
+                            try await viewModel.stopRecording()
+                        } catch {
+                            viewModel.errorMessage = "Failed to process recording: \(error.localizedDescription)"
+                            AppLogger.viewModel.error("stopRecording failed: \(error.localizedDescription, privacy: .public)")
+                        }
                     }
                 }
                 .buttonStyle(.borderedProminent)

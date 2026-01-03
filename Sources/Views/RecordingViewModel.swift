@@ -211,7 +211,7 @@ final class RecordingViewModel {
         do {
             _ = try await audioService.stopCapture()
         } catch {
-            // Ignore errors during cancellation
+            AppLogger.audio.warning("Non-fatal error during recording cancellation: \(error.localizedDescription, privacy: .public)")
         }
 
         // Mark session as cancelled

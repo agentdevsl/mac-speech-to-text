@@ -32,6 +32,14 @@ protocol PermissionChecker {
 
 /// Real implementation of permission service
 class PermissionService: PermissionChecker {
+    /// Tracks the last known input monitoring permission status based on hotkey registration result
+    private var lastKnownInputMonitoringStatus: Bool = false
+
+    /// Update the input monitoring status based on hotkey registration result
+    /// This should be called by HotkeyService after attempting to register a hotkey
+    func setInputMonitoringStatus(_ granted: Bool) {
+        lastKnownInputMonitoringStatus = granted
+    }
 
     /// Check microphone permission status
     func checkMicrophonePermission() async -> Bool {
@@ -63,7 +71,12 @@ class PermissionService: PermissionChecker {
         if !trusted {
             // Open System Settings to Accessibility
             if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                NSWorkspace.shared.open(url)
+                let opened = NSWorkspace.shared.open(url)
+                if !opened {
+                    AppLogger.system.error("Failed to open System Settings for Accessibility permissions")
+                }
+            } else {
+                AppLogger.system.error("Invalid URL for Accessibility System Settings")
             }
             throw PermissionError.accessibilityDenied
         }
@@ -71,11 +84,12 @@ class PermissionService: PermissionChecker {
 
     /// Check input monitoring permission status
     /// This is required for global hotkeys on macOS 10.15+
+    /// Returns the last known status based on hotkey registration result
     func checkInputMonitoringPermission() -> Bool {
         // Input monitoring permission is implicitly checked when registering global hotkeys
         // If Carbon Event Manager APIs succeed, permission is granted
-        // We'll check this when actually registering the hotkey
-        return true
+        // Return the tracked status from the last hotkey registration attempt
+        return lastKnownInputMonitoringStatus
     }
 
     /// Get all permission statuses

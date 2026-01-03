@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import OSLog
 
 /// Service for capturing audio using AVAudioEngine
 @MainActor
@@ -46,7 +47,12 @@ class AudioCaptureService {
         }
 
         // Start audio engine
-        try audioEngine.start()
+        do {
+            try audioEngine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)  // Clean up the tap on failure
+            throw AudioCaptureError.engineStartFailed(error.localizedDescription)
+        }
     }
 
     /// Stop audio capture and return recorded samples
@@ -69,7 +75,12 @@ class AudioCaptureService {
 
     /// Process incoming audio buffer
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        guard let channelData = buffer.int16ChannelData else { return }
+        guard let channelData = buffer.int16ChannelData else {
+            AppLogger.audio.warning(
+                "Audio buffer missing int16ChannelData at time \(time.sampleTime). Audio samples lost."
+            )
+            return
+        }
 
         let frameLength = Int(buffer.frameLength)
         let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
@@ -80,7 +91,11 @@ class AudioCaptureService {
         // Add to streaming buffer (using Task for non-blocking async execution
         // since Core Audio callbacks run in a synchronous context)
         Task { [weak self] in
-            await self?.streamingBuffer?.append(audioBuffer)
+            do {
+                try await self?.appendToStreamingBuffer(audioBuffer)
+            } catch {
+                AppLogger.audio.error("Failed to append audio buffer: \(error.localizedDescription)")
+            }
         }
 
         // Calculate and report audio level
@@ -88,8 +103,28 @@ class AudioCaptureService {
 
         // Dispatch to MainActor for UI updates
         Task { @MainActor [weak self] in
-            self?.levelCallback?(level)
+            do {
+                try self?.invokeLeveCallback(level)
+            } catch {
+                AppLogger.audio.error("Failed to invoke level callback: \(error.localizedDescription)")
+            }
         }
+    }
+
+    /// Appends audio buffer to streaming buffer - throws if buffer is nil
+    private func appendToStreamingBuffer(_ audioBuffer: AudioBuffer) async throws {
+        guard let streamingBuffer = streamingBuffer else {
+            throw AudioCaptureError.noDataRecorded
+        }
+        await streamingBuffer.append(audioBuffer)
+    }
+
+    /// Invokes the level callback - throws if callback is nil
+    private func invokeLeveCallback(_ level: Double) throws {
+        guard let callback = levelCallback else {
+            return  // No callback set is not an error, just skip
+        }
+        callback(level)
     }
 }
 

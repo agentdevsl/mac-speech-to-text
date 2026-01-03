@@ -1,10 +1,16 @@
 import Foundation
 import OSLog
 
+/// Notification posted when settings are reset due to corruption
+extension Notification.Name {
+    static let settingsDidReset = Notification.Name("com.speechtotext.settingsDidReset")
+}
+
 /// Service for managing user settings persistence
 class SettingsService {
     private let userDefaults: UserDefaults
     private let settingsKey = "com.speechtotext.settings"
+    private let corruptedBackupKey = "com.speechtotext.settings.corrupted"
 
     init(userDefaults: UserDefaults = .standard) {
         self.userDefaults = userDefaults
@@ -19,7 +25,26 @@ class SettingsService {
         do {
             return try JSONDecoder().decode(UserSettings.self, from: data)
         } catch {
-            AppLogger.service.error("Failed to decode settings: \(error.localizedDescription, privacy: .public). Returning defaults. User may have lost customizations.")
+            // Log the decode error with details
+            AppLogger.service.error(
+                """
+                Failed to decode settings: \(error.localizedDescription, privacy: .public). \
+                Data size: \(data.count, privacy: .public) bytes. \
+                Backing up corrupted data and resetting to defaults.
+                """
+            )
+
+            // Backup corrupted data for potential recovery
+            userDefaults.set(data, forKey: corruptedBackupKey)
+            AppLogger.service.info("Corrupted settings backed up to '\(self.corruptedBackupKey, privacy: .public)'")
+
+            // Post notification about settings reset
+            NotificationCenter.default.post(
+                name: .settingsDidReset,
+                object: nil,
+                userInfo: ["reason": "decode_failure", "error": error.localizedDescription]
+            )
+
             return .default
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents in-memory audio data during recording
-struct AudioBuffer {
+struct AudioBuffer: Sendable {
     let samples: [Int16]
     let sampleRate: Int
     let channels: Int
@@ -20,8 +20,8 @@ struct AudioBuffer {
         self.duration = Double(samples.count) / Double(sampleRate * channels)
         self.timestamp = timestamp
 
-        // Calculate peak amplitude
-        self.peakAmplitude = samples.map { abs($0) }.max() ?? 0
+        // Calculate peak amplitude (handle Int16.min overflow: abs(-32768) would overflow)
+        self.peakAmplitude = samples.map { $0 == Int16.min ? Int16.max : abs($0) }.max() ?? 0
 
         // Calculate RMS level
         if samples.isEmpty {
@@ -36,7 +36,7 @@ struct AudioBuffer {
         sampleRate == 16000 &&
         channels == 1 &&
         !samples.isEmpty &&
-        peakAmplitude <= Int16.max
+        peakAmplitude > 0  // Meaningful check: buffer has actual audio content
     }
 }
 

@@ -17,6 +17,7 @@ class TextInsertionService {
         // Get the currently focused application
         guard NSWorkspace.shared.frontmostApplication != nil else {
             // Fallback to clipboard if no focused app
+            AppLogger.service.info("No frontmost application detected. Falling back to clipboard copy.")
             try await copyToClipboard(text)
             return
         }
@@ -33,17 +34,20 @@ class TextInsertionService {
 
         if result != .success {
             // Fallback to clipboard
+            AppLogger.service.info("Failed to get focused UI element (error: \(String(describing: result), privacy: .public)). Falling back to clipboard copy.")
             try await copyToClipboard(text)
             return
         }
 
         guard let element = focusedElement else {
+            AppLogger.service.info("Focused element is nil after successful query. Falling back to clipboard copy.")
             try await copyToClipboard(text)
             return
         }
 
         // element is AXUIElement (CFTypeRef) - conditional cast for safety
         guard let axElement = element as? AXUIElement else {
+            AppLogger.service.info("CFTypeRef could not be cast to AXUIElement. Falling back to clipboard copy.")
             try await copyToClipboard(text)
             return
         }

@@ -159,6 +159,7 @@ struct WaveformView: View {
 /// Preview helper for animated waveform
 private struct WaveformAnimatedPreview: View {
     @State private var level: Float = 0.5
+    @State private var previewTimer: Timer?
 
     var body: some View {
         VStack(spacing: 20) {
@@ -177,12 +178,16 @@ private struct WaveformAnimatedPreview: View {
         }
         .padding()
         .onAppear {
-            // Simulate audio levels (warning suppressed for preview code)
-            Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+            // Simulate audio levels
+            previewTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
                 Task { @MainActor in
                     level = Float.random(in: 0.0...1.0)
                 }
             }
+        }
+        .onDisappear {
+            previewTimer?.invalidate()
+            previewTimer = nil
         }
     }
 }

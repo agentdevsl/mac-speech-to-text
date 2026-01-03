@@ -8,6 +8,7 @@
 import AppKit
 import Foundation
 import Observation
+import OSLog
 
 /// MenuBarViewModel manages menu bar state and statistics
 @Observable
@@ -65,7 +66,7 @@ final class MenuBarViewModel {
     func refreshStatistics() async {
         isLoading = true
 
-        let stats = statisticsService.getTodayStats()
+        let stats = await statisticsService.getTodayStats()
 
         wordsToday = stats.totalWordsTranscribed
         sessionsToday = stats.totalSessions
@@ -128,7 +129,11 @@ final class MenuBarViewModel {
         var settings = settingsService.load()
         settings.language.defaultLanguage = language.code
         settings.language.recentLanguages = recentLanguages.map { $0.code }
-        try? settingsService.save(settings)
+        do {
+            try settingsService.save(settings)
+        } catch {
+            AppLogger.viewModel.error("Failed to save language settings: \(error.localizedDescription, privacy: .public)")
+        }
 
         // Notify FluidAudioService to switch language (T064)
         NotificationCenter.default.post(

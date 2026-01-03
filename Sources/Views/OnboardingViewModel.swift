@@ -37,6 +37,9 @@ final class OnboardingViewModel {
     /// Current skip warning message
     var skipWarningMessage: String = ""
 
+    /// Permission error message to display to user
+    var permissionError: String?
+
     // MARK: - Dependencies
 
     private let permissionService: PermissionService
@@ -110,6 +113,7 @@ final class OnboardingViewModel {
 
     /// Request microphone permission
     func requestMicrophonePermission() async {
+        permissionError = nil
         do {
             try await permissionService.requestMicrophonePermission()
             microphoneGranted = await permissionService.checkMicrophonePermission()
@@ -119,11 +123,13 @@ final class OnboardingViewModel {
             }
         } catch {
             AppLogger.viewModel.error("Microphone permission error: \(error.localizedDescription, privacy: .public)")
+            permissionError = "Microphone access was denied. Please grant access in System Settings > Privacy & Security > Microphone to enable voice recording."
         }
     }
 
     /// Request accessibility permission
     func requestAccessibilityPermission() async {
+        permissionError = nil
         do {
             try permissionService.requestAccessibilityPermission()
             accessibilityGranted = permissionService.checkAccessibilityPermission()
@@ -135,6 +141,7 @@ final class OnboardingViewModel {
             }
         } catch {
             AppLogger.viewModel.error("Accessibility permission error: \(error.localizedDescription, privacy: .public)")
+            permissionError = "Accessibility access is required to insert text into apps. Please enable it in System Settings > Privacy & Security > Accessibility, then return here."
         }
     }
 

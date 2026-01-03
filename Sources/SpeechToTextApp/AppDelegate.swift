@@ -2,11 +2,13 @@ import Cocoa
 import OSLog
 import SwiftUI
 
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
     private var hotkeyService: HotkeyService?
     private var onboardingWindow: NSWindow?
     private let settingsService = SettingsService()
+    private var recordingModalObserver: NSObjectProtocol?
+    private var settingsObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure only one instance of the app runs
@@ -22,10 +24,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Initialize menu bar
-        Task { @MainActor in
-            setupMenuBar()
-        }
+        // Setup notification observers for menu actions (works with MenuBarExtra from SpeechToTextApp)
+        setupMenuActionObservers()
 
         // Initialize global hotkey
         Task {
@@ -34,7 +34,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Cleanup
+        // Cleanup NotificationCenter observers
+        if let observer = recordingModalObserver {
+            NotificationCenter.default.removeObserver(observer)
+            recordingModalObserver = nil
+        }
+        if let observer = settingsObserver {
+            NotificationCenter.default.removeObserver(observer)
+            settingsObserver = nil
+        }
+        // Cleanup hotkey service
         hotkeyService = nil
     }
 
@@ -43,40 +52,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
-    // MARK: - Menu Bar Setup
-
-    @MainActor
-    private func setupMenuBar() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-
-        if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Speech to Text")
-            button.imagePosition = .imageLeading
-        }
-
-        // Create SwiftUI menu content (T045)
-        let menuBarView = MenuBarView()
-        let hostingView = NSHostingView(rootView: menuBarView)
-        hostingView.frame.size = CGSize(width: 250, height: 400)
-
-        // Create menu and attach to status item
-        let menu = NSMenu()
-        let menuItem = NSMenuItem()
-        menuItem.view = hostingView
-        menu.addItem(menuItem)
-
-        statusItem?.menu = menu
-
-        // Setup notification observers for menu actions (T046, T047)
-        setupMenuActionObservers()
-    }
-
     // MARK: - Menu Action Observers
+    // Note: Menu bar is handled by MenuBarExtra in SpeechToTextApp.swift
+    // AppDelegate only handles notification observers for modal/settings windows
 
     @MainActor
     private func setupMenuActionObservers() {
         // Observer for "Start Recording" action (T046)
-        NotificationCenter.default.addObserver(
+        recordingModalObserver = NotificationCenter.default.addObserver(
             forName: .showRecordingModal,
             object: nil,
             queue: .main
@@ -85,7 +68,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Observer for "Open Settings" action (T047)
-        NotificationCenter.default.addObserver(
+        settingsObserver = NotificationCenter.default.addObserver(
             forName: .showSettings,
             object: nil,
             queue: .main
@@ -124,8 +107,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.onboardingWindow?.close()
                 self.onboardingWindow = nil
 
-                // After onboarding completes, setup the app
-                self.setupMenuBar()
+                // After onboarding completes, setup notification observers and hotkey
+                // Menu bar is handled by MenuBarExtra in SpeechToTextApp.swift
+                self.setupMenuActionObservers()
                 Task {
                     await self.setupGlobalHotkey()
                 }

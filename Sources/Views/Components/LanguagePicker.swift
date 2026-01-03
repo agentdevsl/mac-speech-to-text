@@ -162,7 +162,7 @@ private struct LanguageRow: View {
                 .foregroundStyle(.secondary)
                 .font(.caption)
 
-        case .failed:
+        case .error:
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(.orange)
                 .font(.caption)
