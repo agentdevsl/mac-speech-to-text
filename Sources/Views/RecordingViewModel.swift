@@ -75,6 +75,9 @@ final class RecordingViewModel {
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
     @ObservationIgnored private nonisolated(unsafe) var deinitSilenceTimer: Timer?
 
+    /// Unique ID for logging
+    @ObservationIgnored private let viewModelId: String
+
     // MARK: - Initialization
 
     init(
@@ -84,6 +87,7 @@ final class RecordingViewModel {
         settingsService: SettingsService = SettingsService(),
         statisticsService: StatisticsService = StatisticsService()
     ) {
+        self.viewModelId = UUID().uuidString.prefix(8).description
         self.audioService = audioService
         self.fluidAudioService = fluidAudioService
         self.textInsertionService = textInsertionService
@@ -97,11 +101,18 @@ final class RecordingViewModel {
         // Get current language from settings (T068)
         self.currentLanguage = settings.language.defaultLanguage
 
+        AppLogger.lifecycle(AppLogger.viewModel, self, event: "init[\(viewModelId)]")
+        AppLogger.debug(
+            AppLogger.viewModel,
+            "[\(viewModelId)] Initialized with silenceThreshold=\(silenceThreshold), language=\(currentLanguage)"
+        )
+
         // Setup language switch observer (T064)
         setupLanguageSwitchObserver()
     }
 
     deinit {
+        AppLogger.trace(AppLogger.viewModel, "RecordingViewModel[\(viewModelId)] deallocating")
         // For closure-based observers, we must remove via the returned token
         // Store observer in nonisolated(unsafe) property for deinit access
         if let observer = deinitLanguageSwitchObserver {
@@ -141,13 +152,16 @@ final class RecordingViewModel {
 
     /// Handle language switch - extracted to avoid @Observable mutations during notification delivery
     private func handleLanguageSwitch(to languageCode: String) async {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] handleLanguageSwitch to \(languageCode)")
         isLanguageSwitching = true
         currentLanguage = languageCode
 
         // Switch language in FluidAudioService
         do {
             try await fluidAudioService.switchLanguage(to: languageCode)
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Language switch successful")
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Language switch failed: \(error.localizedDescription)")
             errorMessage = "Failed to switch language: \(error.localizedDescription)"
         }
 
@@ -158,38 +172,43 @@ final class RecordingViewModel {
 
     /// Start recording audio
     func startRecording() async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] startRecording() called, isRecording=\(isRecording)")
+
         guard !isRecording else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: already recording")
             throw RecordingError.alreadyRecording
         }
 
         // Clear previous state
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Clearing previous state")
         errorMessage = nil
         transcribedText = ""
         confidence = 0.0
 
         // Create new recording session with state set to recording
         let settings = settingsService.load()
+        let sessionId = UUID()
         currentSession = RecordingSession(
-            id: UUID(),
+            id: sessionId,
             startTime: Date(),
             language: settings.language.defaultLanguage,
             state: .recording
         )
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Created session \(sessionId.uuidString.prefix(8))")
 
+        AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isRecording")
         isRecording = true
 
         do {
-            // Start audio capture with level callback
-            // Note: The callback is already invoked on MainActor by AudioCaptureService
-            // and throttled to prevent rapid-fire updates during view body evaluation.
-            // No need to spawn another Task here - just update state directly.
-            try await audioService.startCapture { [weak self] level in
-                // This closure runs on MainActor (dispatched by AudioCaptureService)
-                self?.audioLevel = level
-                self?.resetSilenceTimer()
+            // Start audio capture - callback is @Sendable and handles MainActor dispatch
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting audio capture...")
+            try await audioService.startCapture { @Sendable [weak self] level in
+                Task { @MainActor in self?.audioLevel = level; self?.resetSilenceTimer() }
             }
             isAudioCaptureActive = true
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture started successfully")
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed: \(error.localizedDescription)")
             isRecording = false
             currentSession = nil
             throw RecordingError.audioCaptureFailed(error.localizedDescription)
@@ -198,10 +217,14 @@ final class RecordingViewModel {
 
     /// Stop recording and trigger transcription
     func stopRecording() async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] stopRecording() called, isRecording=\(isRecording)")
+
         guard isRecording else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] stopRecording: not recording")
             throw RecordingError.notRecording
         }
 
+        AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isRecording")
         isRecording = false
         silenceTimer?.invalidate()
         silenceTimer = nil
@@ -210,23 +233,34 @@ final class RecordingViewModel {
         do {
             // Stop audio capture and get samples (only if active)
             guard isAudioCaptureActive else {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] stopRecording: audio capture not active")
                 throw RecordingError.notRecording
             }
             isAudioCaptureActive = false
+
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Stopping audio capture...")
             let samples = try await audioService.stopCapture()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples")
 
             guard !samples.isEmpty else {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] No audio captured")
                 throw RecordingError.noAudioCaptured
             }
 
             // Update session
             currentSession?.endTime = Date()
             currentSession?.audioData = samples
+            if let session = currentSession {
+                let duration = session.endTime?.timeIntervalSince(session.startTime) ?? 0
+                AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Session duration: \(String(format: "%.2f", duration))s")
+            }
 
             // Transcribe audio
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription...")
             try await transcribe(samples: samples)
 
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] stopRecording error: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             throw error
         }
@@ -234,6 +268,11 @@ final class RecordingViewModel {
 
     /// Cancel recording without transcription
     func cancelRecording() async {
+        AppLogger.info(
+            AppLogger.viewModel,
+            "[\(viewModelId)] cancelRecording() called, isRecording=\(isRecording), isAudioCaptureActive=\(isAudioCaptureActive)"
+        )
+
         isRecording = false
         isTranscribing = false
         isInserting = false
@@ -245,10 +284,15 @@ final class RecordingViewModel {
         // Stop audio capture only if active (prevents double-stop)
         if isAudioCaptureActive {
             isAudioCaptureActive = false
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Stopping audio capture for cancellation...")
             do {
                 _ = try await audioService.stopCapture()
+                AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped for cancellation")
             } catch {
-                AppLogger.audio.warning("Non-fatal error during recording cancellation: \(error.localizedDescription, privacy: .public)")
+                AppLogger.warning(
+                    AppLogger.viewModel,
+                    "[\(viewModelId)] Non-fatal error during cancellation: \(error.localizedDescription)"
+                )
             }
         }
 
@@ -262,16 +306,21 @@ final class RecordingViewModel {
         transcribedText = ""
         confidence = 0.0
         errorMessage = nil
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Recording cancelled and state reset")
     }
 
     // MARK: - Private Methods
 
     /// Transcribe audio samples using FluidAudio
     private func transcribe(samples: [Int16]) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribe() called with \(samples.count) samples")
+
         guard var session = currentSession else {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] transcribe: no active session")
             throw RecordingError.noActiveSession
         }
 
+        AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isTranscribing")
         isTranscribing = true
         session.state = .transcribing
         currentSession = session
@@ -279,27 +328,35 @@ final class RecordingViewModel {
         do {
             // Initialize FluidAudio if needed
             let settings = settingsService.load()
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Initializing FluidAudio with language=\(settings.language.defaultLanguage)")
             try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
 
             // Transcribe
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
             let result = try await fluidAudioService.transcribe(samples: samples)
+            AppLogger.info(
+                AppLogger.viewModel,
+                "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
+            )
 
             // Update session
             session.transcribedText = result.text
             session.confidenceScore = Double(result.confidence)
-            // Note: wordCount is a computed property, no need to set it
             currentSession = session
 
             // Update local state
             transcribedText = result.text
             confidence = Double(result.confidence)
 
+            AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isTranscribing")
             isTranscribing = false
 
             // Insert text
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Proceeding to text insertion...")
             try await insertText(result.text)
 
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription
@@ -311,28 +368,37 @@ final class RecordingViewModel {
 
     /// Insert transcribed text into active application
     private func insertText(_ text: String) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] insertText() called, textLength=\(text.count)")
+
         guard var session = currentSession else {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] insertText: no active session")
             throw RecordingError.noActiveSession
         }
 
+        AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isInserting")
         isInserting = true
         session.state = .inserting
         currentSession = session
 
         do {
             // Try text insertion via Accessibility API
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling TextInsertionService...")
             try await textInsertionService.insertText(text)
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text insertion successful")
 
             session.insertionSuccess = true
             session.state = .completed
             currentSession = session
 
+            AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
             isInserting = false
 
             // Save statistics
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
             await saveStatistics(session: session)
 
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Text insertion failed: \(error.localizedDescription)")
             isInserting = false
             errorMessage = "Text insertion failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription
@@ -371,11 +437,14 @@ final class RecordingViewModel {
 
     /// Called when silence is detected after threshold
     private func onSilenceDetected() async {
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Silence detected, isRecording=\(isRecording)")
         guard isRecording else { return }
 
         do {
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Auto-stopping recording due to silence")
             try await stopRecording()
         } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to stop recording on silence: \(error.localizedDescription)")
             errorMessage = "Failed to stop recording: \(error.localizedDescription)"
         }
     }
@@ -384,9 +453,9 @@ final class RecordingViewModel {
     private func saveStatistics(session: RecordingSession) async {
         do {
             try await statisticsService.recordSession(session)
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Statistics saved successfully")
         } catch {
-            // Log error but don't fail the workflow
-            AppLogger.viewModel.warning("Failed to save statistics: \(error.localizedDescription, privacy: .public)")
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Failed to save statistics: \(error.localizedDescription)")
         }
     }
 }
