@@ -178,7 +178,7 @@ final class LanguagePickerTests: XCTestCase {
 
     func test_downloadStatusText_downloaded() {
         // Given
-        let status: LanguageModel.DownloadStatus = .downloaded
+        let status: DownloadStatus = .downloaded
 
         // When
         let text = downloadStatusText(for: status)
@@ -189,7 +189,7 @@ final class LanguagePickerTests: XCTestCase {
 
     func test_downloadStatusText_downloading() {
         // Given
-        let status: LanguageModel.DownloadStatus = .downloading
+        let status: DownloadStatus = .downloading(progress: 0.5, bytesDownloaded: 100)
 
         // When
         let text = downloadStatusText(for: status)
@@ -200,7 +200,7 @@ final class LanguagePickerTests: XCTestCase {
 
     func test_downloadStatusText_notDownloaded() {
         // Given
-        let status: LanguageModel.DownloadStatus = .notDownloaded
+        let status: DownloadStatus = .notDownloaded
 
         // When
         let text = downloadStatusText(for: status)
@@ -211,7 +211,7 @@ final class LanguagePickerTests: XCTestCase {
 
     func test_downloadStatusText_error() {
         // Given
-        let status: LanguageModel.DownloadStatus = .error
+        let status: DownloadStatus = .error(message: "Test error")
 
         // When
         let text = downloadStatusText(for: status)
@@ -282,7 +282,7 @@ final class LanguagePickerTests: XCTestCase {
 
     // MARK: - Helper Methods
 
-    private func downloadStatusText(for status: LanguageModel.DownloadStatus) -> String {
+    private func downloadStatusText(for status: DownloadStatus) -> String {
         switch status {
         case .downloaded:
             return "downloaded"
@@ -298,7 +298,7 @@ final class LanguagePickerTests: XCTestCase {
     private func accessibilityLabel(
         for language: LanguageModel,
         isSelected: Bool,
-        downloadStatus: LanguageModel.DownloadStatus
+        downloadStatus: DownloadStatus
     ) -> String {
         let selectionText = isSelected ? "selected" : "not selected"
         let statusText = downloadStatusText(for: downloadStatus)
