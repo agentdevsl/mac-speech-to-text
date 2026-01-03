@@ -182,15 +182,15 @@
 
 ### Implementation for User Story 4
 
-- [ ] T051 [P] [US4] Create SettingsViewModel at `/workspace/Sources/Views/SettingsViewModel.swift` as @Observable class managing settings state and validation
-- [ ] T052 [US4] Create SettingsView at `/workspace/Sources/Views/SettingsView.swift` with tabs for General, Language, Audio, and Privacy settings
-- [ ] T053 [US4] Create LanguagePicker component at `/workspace/Sources/Views/Components/LanguagePicker.swift` with searchable list of 25 languages and native names
-- [ ] T054 [US4] Implement hotkey configuration UI in SettingsView with key capture field and conflict detection
-- [ ] T055 [US4] Add hotkey conflict detection in HotkeyService by checking against known system shortcuts
-- [ ] T056 [US4] Implement language selection in SettingsView with model download progress indicator using FluidAudio SDK
-- [ ] T057 [US4] Create audio sensitivity slider in SettingsView with live microphone level visualization
-- [ ] T058 [US4] Add silence detection threshold slider in SettingsView (0.5-3.0 seconds range)
-- [ ] T059 [US4] Implement settings persistence in SettingsViewModel using SettingsService.save()
+- [X] T051 [P] [US4] Create SettingsViewModel at `/workspace/Sources/Views/SettingsViewModel.swift` as @Observable class managing settings state and validation
+- [X] T052 [US4] Create SettingsView at `/workspace/Sources/Views/SettingsView.swift` with tabs for General, Language, Audio, and Privacy settings
+- [X] T053 [US4] Create LanguagePicker component at `/workspace/Sources/Views/Components/LanguagePicker.swift` with searchable list of 25 languages and native names
+- [X] T054 [US4] Implement hotkey configuration UI in SettingsView with key capture field and conflict detection
+- [X] T055 [US4] Add hotkey conflict detection in HotkeyService by checking against known system shortcuts
+- [X] T056 [US4] Implement language selection in SettingsView with model download progress indicator using FluidAudio SDK
+- [X] T057 [US4] Create audio sensitivity slider in SettingsView with live microphone level visualization
+- [X] T058 [US4] Add silence detection threshold slider in SettingsView (0.5-3.0 seconds range)
+- [X] T059 [US4] Implement settings persistence in SettingsViewModel using SettingsService.save()
 - [ ] T060 [US4] Add reset to defaults button in SettingsView restoring UserSettings.default values
 - [ ] T061 [US4] Show model download progress in LanguagePicker using ProgressView with percentage and bytes downloaded
 - [ ] T062 [US4] Add validation in SettingsViewModel for hotkey conflicts, invalid audio thresholds, and unsupported languages
