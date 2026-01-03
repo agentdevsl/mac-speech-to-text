@@ -5,10 +5,11 @@
 // Task T034: OnboardingViewModel - @Observable class managing onboarding state
 // and permission flow
 
-import Foundation
-import Observation
 import AppKit
 import AVFoundation
+import Foundation
+import Observation
+import OSLog
 
 /// OnboardingViewModel manages the onboarding flow and permission state
 @Observable
@@ -117,7 +118,7 @@ final class OnboardingViewModel {
                 nextStep()
             }
         } catch {
-            print("Microphone permission error: \(error)")
+            AppLogger.viewModel.error("Microphone permission error: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -133,7 +134,7 @@ final class OnboardingViewModel {
                 openSystemSettings(for: "accessibility")
             }
         } catch {
-            print("Accessibility permission error: \(error)")
+            AppLogger.viewModel.error("Accessibility permission error: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -171,7 +172,7 @@ final class OnboardingViewModel {
         do {
             try settingsService.save(settings)
         } catch {
-            print("Failed to save onboarding settings: \(error)")
+            AppLogger.viewModel.error("Failed to save onboarding settings: \(error.localizedDescription, privacy: .public)")
         }
     }
 

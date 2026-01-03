@@ -1,6 +1,7 @@
-import Foundation
-import ApplicationServices
 import AppKit
+import ApplicationServices
+import Foundation
+import OSLog
 
 /// Service for inserting text using Accessibility APIs
 class TextInsertionService {
@@ -41,8 +42,11 @@ class TextInsertionService {
             return
         }
 
-        // element is AXUIElement (CFTypeRef) - cast for API
-        let axElement = element as! AXUIElement
+        // element is AXUIElement (CFTypeRef) - conditional cast for safety
+        guard let axElement = element as? AXUIElement else {
+            try await copyToClipboard(text)
+            return
+        }
 
         // Try to insert text directly
         let insertionResult = AXUIElementSetAttributeValue(
@@ -56,7 +60,7 @@ class TextInsertionService {
         }
 
         // Log why direct insertion failed before falling back
-        print("[TextInsertionService] Direct insertion failed with error: \(insertionResult). Falling back to paste.")
+        AppLogger.service.warning("Direct insertion failed with error: \(String(describing: insertionResult), privacy: .public). Falling back to paste.")
 
         // Try alternative: simulate paste
         try await simulatePaste(text)

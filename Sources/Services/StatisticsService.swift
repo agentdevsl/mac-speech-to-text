@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Service for managing usage statistics with privacy preservation
 class StatisticsService: @unchecked Sendable {
@@ -130,7 +131,7 @@ class StatisticsService: @unchecked Sendable {
         do {
             return try JSONDecoder().decode([UsageStatistics].self, from: data)
         } catch {
-            print("[StatisticsService] ERROR: Failed to decode statistics: \(error). Returning empty array. Historical statistics may be lost.")
+            AppLogger.analytics.error("Failed to decode statistics: \(error.localizedDescription, privacy: .public). Returning empty array. Historical statistics may be lost.")
             return []
         }
     }

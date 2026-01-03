@@ -1,5 +1,5 @@
-import Foundation
 import FluidAudio
+import Foundation
 
 /// Result of transcription
 struct TranscriptionResult {

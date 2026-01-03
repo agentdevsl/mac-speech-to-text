@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 /// Observable app-wide state management
-@Observable
+@Observable @MainActor
 class AppState {
     var settings: UserSettings
     var statistics: AggregatedStats

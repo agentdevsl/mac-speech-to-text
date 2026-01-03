@@ -4,9 +4,9 @@
 // User Story 4: Customizable Settings
 // Task T051: SettingsViewModel - @Observable class managing settings state and validation
 
+import AppKit
 import Foundation
 import Observation
-import AppKit
 
 /// SettingsViewModel manages all app settings and their validation
 @Observable
@@ -150,17 +150,16 @@ final class SettingsViewModel {
         modifiers: [UserSettings.HotkeyModifier]
     ) -> String? {
         // Common macOS system shortcuts to check
-        let systemShortcuts: [(String, UInt16, [UserSettings.HotkeyModifier])] = [
-            ("Spotlight", 49, [.command]),  // Cmd+Space
-            ("Siri", 49, [.command, .option]),  // Cmd+Option+Space
-            ("Screenshot", 52, [.command, .shift]),  // Cmd+Shift+4
-            ("Force Quit", 46, [.command, .option]),  // Cmd+Option+Esc
+        let systemShortcuts: [SystemShortcut] = [
+            SystemShortcut(name: "Spotlight", keyCode: 49, modifiers: [.command]),
+            SystemShortcut(name: "Siri", keyCode: 49, modifiers: [.command, .option]),
+            SystemShortcut(name: "Screenshot", keyCode: 52, modifiers: [.command, .shift]),
+            SystemShortcut(name: "Force Quit", keyCode: 46, modifiers: [.command, .option])
         ]
 
-        for (name, sysKeyCode, sysModifiers) in systemShortcuts {
-            if keyCode == sysKeyCode && Set(modifiers) == Set(sysModifiers) {
-                return name
-            }
+        for shortcut in systemShortcuts where keyCode == shortcut.keyCode
+            && Set(modifiers) == Set(shortcut.modifiers) {
+            return shortcut.name
         }
 
         return nil
@@ -181,4 +180,13 @@ final class SettingsViewModel {
         isDownloadingModel = false
         downloadProgress = 1.0
     }
+}
+
+// MARK: - System Shortcut
+
+/// Represents a macOS system keyboard shortcut for conflict detection
+private struct SystemShortcut {
+    let name: String
+    let keyCode: UInt16
+    let modifiers: [UserSettings.HotkeyModifier]
 }

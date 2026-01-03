@@ -1,7 +1,7 @@
-import Foundation
-import AVFoundation
-import ApplicationServices
 import AppKit
+import ApplicationServices
+import AVFoundation
+import Foundation
 
 /// Permission-related errors
 enum PermissionError: Error, LocalizedError {

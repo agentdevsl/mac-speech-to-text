@@ -1,4 +1,5 @@
 import Cocoa
+import OSLog
 import SwiftUI
 
 class AppDelegate: NSObject, NSApplicationDelegate {
@@ -110,7 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         } catch {
-            print("Failed to register global hotkey: \(error.localizedDescription)")
+            AppLogger.app.error("Failed to register global hotkey: \(error.localizedDescription, privacy: .public)")
         }
     }
 

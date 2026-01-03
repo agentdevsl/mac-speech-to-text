@@ -5,9 +5,9 @@
 // Task T043: MenuBarViewModel - @Observable class fetching daily statistics
 // and handling menu actions
 
+import AppKit
 import Foundation
 import Observation
-import AppKit
 
 /// MenuBarViewModel manages menu bar state and statistics
 @Observable

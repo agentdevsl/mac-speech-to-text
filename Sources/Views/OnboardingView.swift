@@ -39,7 +39,7 @@ struct OnboardingView: View {
             "Skip This Step?",
             isPresented: $viewModel.showSkipWarning,
             presenting: viewModel.skipWarningMessage
-        ) { message in
+        ) { _ in
             Button("Cancel", role: .cancel, action: viewModel.cancelSkip)
             Button("Skip Anyway", role: .destructive, action: viewModel.confirmSkip)
         } message: { message in

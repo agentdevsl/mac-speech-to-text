@@ -3,6 +3,7 @@ import Foundation
 /// User configuration stored locally
 struct UserSettings: Codable {
     var version: Int
+    var general: GeneralConfiguration
     var hotkey: HotkeyConfiguration
     var language: LanguageConfiguration
     var audio: AudioConfiguration
@@ -11,9 +12,18 @@ struct UserSettings: Codable {
     var onboarding: OnboardingState
     var lastModified: Date
 
+    // Typealiases for view compatibility
+    typealias HotkeyConfig = HotkeyConfiguration
+    typealias HotkeyModifier = KeyModifier
+
     /// Default user settings
     static let `default` = UserSettings(
         version: 1,
+        general: GeneralConfiguration(
+            launchAtLogin: false,
+            autoInsertText: true,
+            copyToClipboard: true
+        ),
         hotkey: HotkeyConfiguration(
             enabled: true,
             keyCode: 49, // Space key
@@ -58,6 +68,12 @@ struct UserSettings: Codable {
         ),
         lastModified: Date()
     )
+}
+
+struct GeneralConfiguration: Codable {
+    var launchAtLogin: Bool
+    var autoInsertText: Bool
+    var copyToClipboard: Bool
 }
 
 struct HotkeyConfiguration: Codable {

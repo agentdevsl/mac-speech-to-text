@@ -93,7 +93,7 @@ final class ConstantsTests: XCTestCase {
 
     func test_ui_modalCornerRadius_isReasonable() {
         // Given/When
-        let cornerRadius = Constants.UI.modalCornerRadius
+        let cornerRadius = Constants.UserInterface.modalCornerRadius
 
         // Then
         XCTAssertEqual(cornerRadius, 16)
@@ -102,7 +102,7 @@ final class ConstantsTests: XCTestCase {
 
     func test_ui_modalPadding_isReasonable() {
         // Given/When
-        let padding = Constants.UI.modalPadding
+        let padding = Constants.UserInterface.modalPadding
 
         // Then
         XCTAssertEqual(padding, 32)
@@ -111,7 +111,7 @@ final class ConstantsTests: XCTestCase {
 
     func test_ui_animationDuration_is300ms() {
         // Given/When
-        let duration = Constants.UI.animationDuration
+        let duration = Constants.UserInterface.animationDuration
 
         // Then
         XCTAssertEqual(duration, 0.3)
@@ -119,8 +119,8 @@ final class ConstantsTests: XCTestCase {
 
     func test_ui_springParameters_areValid() {
         // Given/When
-        let response = Constants.UI.springResponse
-        let damping = Constants.UI.springDampingFraction
+        let response = Constants.UserInterface.springResponse
+        let damping = Constants.UserInterface.springDampingFraction
 
         // Then
         XCTAssertEqual(response, 0.5)
@@ -354,7 +354,7 @@ final class ConstantsTests: XCTestCase {
         // Given/When/Then
         XCTAssertTrue(type(of: Constants.Audio.sampleRate) == Int.self)
         XCTAssertTrue(type(of: Constants.Audio.defaultSilenceThreshold) == TimeInterval.self)
-        XCTAssertTrue(type(of: Constants.UI.modalCornerRadius) == CGFloat.self)
+        XCTAssertTrue(type(of: Constants.UserInterface.modalCornerRadius) == CGFloat.self)
         XCTAssertTrue(type(of: Constants.Defaults.defaultAudioSensitivity) == Double.self)
         XCTAssertTrue(type(of: Constants.Storage.settingsKey) == String.self)
     }

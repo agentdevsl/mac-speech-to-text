@@ -53,13 +53,13 @@ struct PermissionCard: View {
 
             // Action button
             if !isGranted {
-                Button(action: {
+                Button {
                     Task {
                         isProcessing = true
                         await action()
                         isProcessing = false
                     }
-                }) {
+                } label: {
                     HStack {
                         if isProcessing {
                             ProgressView()

@@ -5,9 +5,10 @@
 // Task T025: RecordingViewModel - @Observable class coordinating audio capture,
 // FluidAudio transcription, and text insertion
 
+import AVFoundation
 import Foundation
 import Observation
-import AVFoundation
+import OSLog
 
 /// RecordingViewModel coordinates the recording, transcription, and text insertion workflow
 @Observable
@@ -62,6 +63,7 @@ final class RecordingViewModel {
 
     private var silenceTimer: Timer?
     private let silenceThreshold: TimeInterval
+    private var languageSwitchObserver: NSObjectProtocol?
 
     // MARK: - Initialization
 
@@ -89,11 +91,19 @@ final class RecordingViewModel {
         setupLanguageSwitchObserver()
     }
 
+    deinit {
+        // Remove NotificationCenter observer to prevent retain cycle
+        if let observer = languageSwitchObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        silenceTimer?.invalidate()
+    }
+
     // MARK: - Language Switch Observer
 
     private func setupLanguageSwitchObserver() {
         // Listen for language switch notifications (T064, T067)
-        NotificationCenter.default.addObserver(
+        languageSwitchObserver = NotificationCenter.default.addObserver(
             forName: .switchLanguage,
             object: nil,
             queue: .main
@@ -321,7 +331,7 @@ final class RecordingViewModel {
             try statisticsService.recordSession(session)
         } catch {
             // Log error but don't fail the workflow
-            print("Warning: Failed to save statistics: \(error)")
+            AppLogger.viewModel.warning("Failed to save statistics: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

@@ -13,6 +13,25 @@ struct LanguageModel: Codable, Identifiable {
     let version: String
     let checksumSHA256: String
 
+    // Computed properties for view compatibility
+    var code: String { languageCode }
+    var name: String { displayName }
+    var flag: String {
+        SupportedLanguage.from(code: languageCode)?.flag ?? "🌐"
+    }
+
+    /// Static property for all supported languages
+    static var supportedLanguages: [LanguageModel] {
+        SupportedLanguage.allCases.map { lang in
+            LanguageModel(
+                languageCode: lang.rawValue,
+                displayName: lang.displayName,
+                modelPath: URL(fileURLWithPath: "/tmp/\(lang.rawValue).model"),
+                fileSize: 500_000_000 // 500MB default
+            )
+        }
+    }
+
     init(id: UUID = UUID(),
          languageCode: String,
          displayName: String,
@@ -109,6 +128,36 @@ enum SupportedLanguage: String, CaseIterable, Codable {
 
     var nativeName: String {
         displayName
+    }
+
+    var flag: String {
+        switch self {
+        case .en: return "🇬🇧"
+        case .es: return "🇪🇸"
+        case .fr: return "🇫🇷"
+        case .de: return "🇩🇪"
+        case .it: return "🇮🇹"
+        case .pt: return "🇵🇹"
+        case .ru: return "🇷🇺"
+        case .pl: return "🇵🇱"
+        case .nl: return "🇳🇱"
+        case .sv: return "🇸🇪"
+        case .da: return "🇩🇰"
+        case .no: return "🇳🇴"
+        case .fi: return "🇫🇮"
+        case .cs: return "🇨🇿"
+        case .ro: return "🇷🇴"
+        case .uk: return "🇺🇦"
+        case .el: return "🇬🇷"
+        case .bg: return "🇧🇬"
+        case .hr: return "🇭🇷"
+        case .sk: return "🇸🇰"
+        case .sl: return "🇸🇮"
+        case .et: return "🇪🇪"
+        case .lv: return "🇱🇻"
+        case .lt: return "🇱🇹"
+        case .mt: return "🇲🇹"
+        }
     }
 
     static func isSupported(_ code: String) -> Bool {

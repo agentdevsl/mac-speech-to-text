@@ -151,11 +151,11 @@ struct MenuBarView: View {
     private var languageQuickSwitchMenu: some View {
         Menu {
             ForEach(viewModel.recentLanguages, id: \.code) { language in
-                Button(action: {
+                Button {
                     Task {
                         await viewModel.switchLanguage(to: language)
                     }
-                }) {
+                } label: {
                     HStack {
                         Text(language.flag)
                         Text(language.name)

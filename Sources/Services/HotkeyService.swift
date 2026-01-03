@@ -1,11 +1,13 @@
-import Foundation
 import Carbon
+import Foundation
+import OSLog
 
 /// Service for managing global hotkey registration using Carbon Event Manager
 class HotkeyService {
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
     private var callback: (() -> Void)?
+    private var userDataPointer: UnsafeMutableRawPointer?
 
     deinit {
         unregisterHotkey()
@@ -44,7 +46,7 @@ class HotkeyService {
 
         // Install event handler
         var eventSpec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
-        let eventHandlerCallback: EventHandlerUPP = { (nextHandler, event, userData) -> OSStatus in
+        let eventHandlerCallback: EventHandlerUPP = { (_, _, userData) -> OSStatus in
             guard let service = userData?.load(as: HotkeyService.self) else {
                 return OSStatus(eventNotHandledErr)
             }
@@ -53,12 +55,16 @@ class HotkeyService {
             return noErr
         }
 
+        // Create and store retained reference to self
+        let userData = Unmanaged.passRetained(self).toOpaque()
+        userDataPointer = userData
+
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
             eventHandlerCallback,
             1,
             &eventSpec,
-            Unmanaged.passRetained(self).toOpaque(),
+            userData,
             &eventHandler
         )
 
@@ -86,7 +92,7 @@ class HotkeyService {
         if let hotKeyRef = hotKeyRef {
             let status = UnregisterEventHotKey(hotKeyRef)
             if status != noErr {
-                print("[HotkeyService] Warning: Failed to unregister hotkey: \(status)")
+                AppLogger.service.warning("Failed to unregister hotkey: \(status, privacy: .public)")
             }
             self.hotKeyRef = nil
         }
@@ -94,11 +100,15 @@ class HotkeyService {
         if let eventHandler = eventHandler {
             let status = RemoveEventHandler(eventHandler)
             if status != noErr {
-                print("[HotkeyService] Warning: Failed to remove event handler: \(status)")
+                AppLogger.service.warning("Failed to remove event handler: \(status, privacy: .public)")
             }
 
             // Release the retained self reference that was created in registerHotkey
-            Unmanaged.passUnretained(self).release()
+            if let userData = userDataPointer {
+                Unmanaged<HotkeyService>.fromOpaque(userData).release()
+                userDataPointer = nil
+            }
+
             self.eventHandler = nil
         }
 
@@ -113,7 +123,7 @@ class HotkeyService {
             (48, [.command]), // Cmd+Tab
             (49, [.command]), // Cmd+Space (Spotlight)
             (12, [.command]), // Cmd+Q (Quit)
-            (13, [.command]), // Cmd+W (Close window)
+            (13, [.command]) // Cmd+W (Close window)
         ]
 
         let modifierSet = Set(modifiers)

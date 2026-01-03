@@ -80,7 +80,7 @@ struct RecordingModal: View {
             handleDismiss()
             return .handled
         }
-        .onChange(of: viewModel.errorMessage) { oldValue, newValue in
+        .onChange(of: viewModel.errorMessage) { _, newValue in
             showError = newValue != nil
         }
     }

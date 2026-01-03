@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 /// Service for managing user settings persistence
 class SettingsService {
@@ -18,7 +19,7 @@ class SettingsService {
         do {
             return try JSONDecoder().decode(UserSettings.self, from: data)
         } catch {
-            print("[SettingsService] ERROR: Failed to decode settings: \(error). Returning defaults. User may have lost customizations.")
+            AppLogger.service.error("Failed to decode settings: \(error.localizedDescription, privacy: .public). Returning defaults. User may have lost customizations.")
             return .default
         }
     }

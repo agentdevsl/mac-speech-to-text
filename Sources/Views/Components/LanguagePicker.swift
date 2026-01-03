@@ -50,7 +50,9 @@ struct LanguagePicker: View {
                     .textFieldStyle(.plain)
 
                 if !searchText.isEmpty {
-                    Button(action: { searchText = "" }) {
+                    Button {
+                        searchText = ""
+                    } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
                     }

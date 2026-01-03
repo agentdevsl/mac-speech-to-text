@@ -23,7 +23,7 @@ enum Constants {
     }
 
     // MARK: - UI
-    enum UI {
+    enum UserInterface {
         static let modalCornerRadius: CGFloat = 16
         static let modalPadding: CGFloat = 32
         static let animationDuration: TimeInterval = 0.3

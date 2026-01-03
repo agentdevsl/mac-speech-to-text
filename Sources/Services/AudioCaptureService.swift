@@ -1,7 +1,8 @@
-import Foundation
 import AVFoundation
+import Foundation
 
 /// Service for capturing audio using AVAudioEngine
+@MainActor
 class AudioCaptureService {
     private let audioEngine = AVAudioEngine()
     private let inputNode: AVAudioInputNode
@@ -84,7 +85,11 @@ class AudioCaptureService {
 
         // Calculate and report audio level
         let level = audioBuffer.rmsLevel / 32768.0 // Normalize to 0-1 range
-        levelCallback?(level)
+
+        // Dispatch to MainActor for UI updates
+        Task { @MainActor [weak self] in
+            self?.levelCallback?(level)
+        }
     }
 }
 

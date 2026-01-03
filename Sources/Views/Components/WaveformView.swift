@@ -23,6 +23,9 @@ struct WaveformView: View {
     /// Previous audio levels for smooth transitions
     @State private var levelHistory: [Float] = Array(repeating: 0.0, count: 60)
 
+    /// Timer for animation updates (needs to be invalidated on disappear)
+    @State private var animationTimer: Timer?
+
     // MARK: - Body
 
     var body: some View {
@@ -72,11 +75,14 @@ struct WaveformView: View {
             }
         }
         .frame(height: 80)
-        .onChange(of: audioLevel) { oldValue, newValue in
+        .onChange(of: audioLevel) { _, newValue in
             updateLevelHistory(newLevel: newValue)
         }
         .onAppear {
             startAnimation()
+        }
+        .onDisappear {
+            stopAnimation()
         }
     }
 
@@ -91,11 +97,17 @@ struct WaveformView: View {
 
     /// Start continuous animation for smooth transitions
     private func startAnimation() {
-        Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
+        animationTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { _ in
             Task { @MainActor in
                 animationPhase += 0.1
             }
         }
+    }
+
+    /// Stop animation timer
+    private func stopAnimation() {
+        animationTimer?.invalidate()
+        animationTimer = nil
     }
 
     /// Determine color based on audio level
