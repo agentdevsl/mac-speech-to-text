@@ -144,8 +144,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Create SwiftUI view
-        let contentView = RecordingModal()
+        // Create ViewModel OUTSIDE of SwiftUI view creation to avoid
+        // actor existential crashes during body evaluation.
+        // The ViewModel contains `any FluidAudioServiceProtocol` which triggers
+        // executor checks that can crash on ARM64 if created during rendering.
+        let viewModel = RecordingViewModel()
+
+        // Create SwiftUI view with pre-created ViewModel
+        let contentView = RecordingModal(viewModel: viewModel)
             .onDisappear { [weak self] in
                 self?.recordingWindow?.close()
                 self?.recordingWindow = nil

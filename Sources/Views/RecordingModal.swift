@@ -16,7 +16,10 @@ struct RecordingModal: View {
 
     // MARK: - State
 
-    @State private var viewModel = RecordingViewModel()
+    /// ViewModel must be passed in from outside to avoid actor existential crashes
+    /// during SwiftUI body evaluation. Creating RecordingViewModel inline with @State
+    /// triggers executor checks that can cause EXC_BAD_ACCESS on ARM64.
+    @State var viewModel: RecordingViewModel
     @State private var showError: Bool = false
     @State private var isVisible: Bool = false
     @State private var isDismissing: Bool = false
@@ -24,6 +27,13 @@ struct RecordingModal: View {
     @State private var recordingTaskId: UUID?
     /// Controls the dismiss task lifecycle
     @State private var dismissTaskId: UUID?
+
+    // MARK: - Initialization
+
+    /// Initialize with an externally-created ViewModel to avoid actor existential crashes
+    init(viewModel: RecordingViewModel = RecordingViewModel()) {
+        self._viewModel = State(initialValue: viewModel)
+    }
 
     // MARK: - Body
 
