@@ -51,7 +51,8 @@ SwiftLint rule `observable_actor_existential_warning` detects this.
 ### When to Use (nonisolated)
 
 1. Accessing properties from `deinit` (which is nonisolated)
-2. When you have a clear synchronization strategy
+2. Audio/system callbacks that run on background threads
+3. When you have a clear synchronization strategy (e.g., thread-safe types)
 
 ### Example (nonisolated)
 
@@ -76,6 +77,99 @@ class MyViewModel {
 ### Detection (nonisolated)
 
 SwiftLint rule `nonisolated_unsafe_warning` flags these usages.
+
+---
+
+## Audio Callbacks and @MainActor
+
+### Issue (Audio)
+
+Core Audio callbacks run on a real-time audio thread. Calling `@MainActor`
+methods directly from these callbacks causes actor isolation crashes.
+
+### Cause (Audio)
+
+```swift
+// WRONG - Crashes with actor isolation violation
+@MainActor class AudioCaptureService {
+    func processBuffer(_ buffer: AVAudioPCMBuffer) { ... }
+
+    func start() {
+        inputNode.installTap(...) { buffer, time in
+            self.processBuffer(buffer)  // Called from audio thread!
+        }
+    }
+}
+```
+
+### Solution (Audio)
+
+1. Make the callback handler `nonisolated`
+2. Use `nonisolated(unsafe)` for thread-safe properties accessed from callback
+3. Hop to MainActor via `Task` for state updates
+
+```swift
+@MainActor class AudioCaptureService {
+    // Thread-safe types can be nonisolated(unsafe)
+    private nonisolated(unsafe) let pendingWrites = PendingWritesCounter()
+    private nonisolated(unsafe) let throttler = AudioLevelThrottler()
+
+    func start() {
+        inputNode.installTap(...) { [weak self] buffer, time in
+            self?.processBuffer(buffer)
+        }
+    }
+
+    // nonisolated - safe to call from audio thread
+    private nonisolated func processBuffer(_ buffer: AVAudioPCMBuffer) {
+        let samples = convertToInt16(buffer)
+
+        pendingWrites.increment()
+        Task { @MainActor [weak self] in
+            defer { self?.pendingWrites.decrement() }
+            // Update MainActor-isolated state here
+            await self?.streamingBuffer?.append(samples)
+        }
+    }
+}
+```
+
+### Key Points (Audio)
+
+- Audio callbacks are synchronous; cannot use `await`
+- Use `Task { @MainActor ... }` to hop to MainActor
+- Thread-safe utility classes (`@unchecked Sendable`) can be `nonisolated(unsafe)`
+- Never access `@MainActor` `var` properties from `nonisolated` context
+
+---
+
+## AVAudioEngine Format Compatibility
+
+### Issue (Format)
+
+Requesting a specific audio format (e.g., 16kHz Int16) that hardware doesn't
+support can cause `audioEngine.start()` to fail.
+
+### Solution (Format)
+
+Use the native format and convert in the callback:
+
+```swift
+// WRONG - May fail on some hardware
+let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, ...)
+inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { ... }
+
+// CORRECT - Use native format, convert manually
+let nativeFormat = inputNode.outputFormat(forBus: 0)
+inputNode.installTap(
+    onBus: 0, bufferSize: 1024, format: nativeFormat
+) { buffer, _ in
+    // Convert float32 to Int16 in callback
+    if let floatData = buffer.floatChannelData {
+        let samples = floatData[0].map { Int16($0 * Float(Int16.max)) }
+    }
+}
+```
 
 ---
 

@@ -3,8 +3,8 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 **Project Type**: macOS native application for local speech-to-text capture
-**Language**: Swift 5.9+
-**Platform**: macOS 14+
+**Language**: Swift 6.x (compiler) with Swift 5.9 language mode (Package.swift)
+**Platform**: macOS 14+ (minimum), macOS 26+ (development)
 
 ## Primary Reference
 
@@ -52,7 +52,7 @@ Tests/
 ```bash
 swift package resolve      # Resolve dependencies
 swift build               # Build from command line
-# OR open in Xcode 15.0+
+# OR open in Xcode 26.x
 ```
 
 ### Testing
@@ -72,13 +72,18 @@ pre-commit run --all-files # Run all pre-commit hooks
 
 ## Swift Version & Features in Use
 
-- **Swift 5.9+** with Swift 6 concurrency flags
+- **Compiler**: Swift 6.2.3 (Xcode 26.2)
+- **Language Mode**: Swift 5.9 (`swift-tools-version: 5.9` in Package.swift)
+- **Note**: Swift 6 strict concurrency warnings appear but are not errors due to 5.9 language mode
+
+### Concurrency Features
 - **async/await** for all asynchronous operations
 - **Swift actors** for thread-safe concurrency (FluidAudioService, StreamingAudioBuffer)
 - **@Observable macro** for reactive state management
 - **@MainActor** for UI-bound classes
 - **Sendable** conformance for thread-safe data types
 - **Structured concurrency** with Task and async let
+- **Task.detached** for breaking actor context inheritance
 
 ## Common Commands
 
@@ -158,24 +163,50 @@ func test_recordingModal_instantiatesWithoutCrash() {
 
 ### Concurrency Safety Patterns
 
-**Critical**: When using `@Observable` with actor existential types, use `@ObservationIgnored`:
+**CRITICAL**: Review `docs/CONCURRENCY_PATTERNS.md` before writing concurrency code.
 
+#### 1. @Observable + Actor Existential (EXC_BAD_ACCESS)
 ```swift
-// WRONG - Can crash with EXC_BAD_ACCESS
+// WRONG - Crashes
 @Observable class ViewModel {
     private let service: any MyActorProtocol
 }
 
-// CORRECT - Safe
+// CORRECT - Use @ObservationIgnored
 @Observable class ViewModel {
     @ObservationIgnored private let service: any MyActorProtocol
 }
 ```
 
-See `docs/CONCURRENCY_PATTERNS.md` for full documentation.
+#### 2. Audio Callbacks + @MainActor (Actor Isolation Crash)
+```swift
+// WRONG - Crashes when audio callback hits MainActor method
+@MainActor class AudioService {
+    func processBuffer(_ buffer: AVAudioPCMBuffer) { ... }
+}
 
-**SwiftLint Custom Rule**: The `.swiftlint.yml` includes a custom rule to detect this pattern:
-- `observable_actor_existential_warning`: Warns when actor existentials are used in @Observable classes without @ObservationIgnored
+// CORRECT - Use nonisolated + Task hop
+@MainActor class AudioService {
+    private nonisolated(unsafe) let counter = ThreadSafeCounter()
+
+    private nonisolated func processBuffer(_ buffer: AVAudioPCMBuffer) {
+        Task { @MainActor [weak self] in ... }
+    }
+}
+```
+
+#### 3. AVAudioEngine Format (Engine Start Failure)
+```swift
+// WRONG - May fail on some hardware
+let format = AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 16000, ...)
+
+// CORRECT - Use native format, convert manually
+let nativeFormat = inputNode.outputFormat(forBus: 0)
+```
+
+**SwiftLint Custom Rules**:
+- `observable_actor_existential_warning`: Detects actor existentials in @Observable without @ObservationIgnored
+- `nonisolated_unsafe_warning`: Flags nonisolated(unsafe) usage for review
 
 ## Asking Questions
 

@@ -11,11 +11,16 @@ class AudioCaptureService {
     private var levelCallback: ((Double) -> Void)?
 
     /// Counter for pending buffer append operations to ensure all audio is flushed before stop
-    private let pendingWrites = PendingWritesCounter()
+    /// nonisolated(unsafe) allows access from audio callback thread
+    private nonisolated(unsafe) let pendingWrites = PendingWritesCounter()
 
     /// Throttler for audio level updates to prevent MainActor congestion
     /// Audio callbacks fire every ~64ms; we throttle to ~50ms to reduce Task spawning
-    private let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
+    /// nonisolated(unsafe) allows access from audio callback thread
+    private nonisolated(unsafe) let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
+
+    /// Native sample rate from hardware (for resampling)
+    private var nativeSampleRate: Double = 44100.0
 
     init() {
         inputNode = audioEngine.inputNode
@@ -32,23 +37,24 @@ class AudioCaptureService {
             throw PermissionError.microphoneDenied
         }
 
-        // Configure audio format: 16kHz mono
-        let recordingFormat = AVAudioFormat(
-            commonFormat: .pcmFormatInt16,
-            sampleRate: Double(Constants.Audio.sampleRate),
-            channels: AVAudioChannelCount(Constants.Audio.channels),
-            interleaved: false
-        )
+        // Use the input node's native format to avoid hardware incompatibility issues
+        // macOS audio hardware typically provides float32 at 44.1kHz or 48kHz
+        // We'll convert to Int16 in processAudioBuffer
+        let nativeFormat = inputNode.outputFormat(forBus: 0)
 
-        guard let recordingFormat = recordingFormat else {
+        // Validate we have a usable format
+        guard nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0 else {
             throw AudioCaptureError.invalidFormat
         }
 
-        // Install tap on input node
+        // Store native sample rate for resampling calculations
+        nativeSampleRate = nativeFormat.sampleRate
+
+        // Install tap on input node using native format
         inputNode.installTap(
             onBus: 0,
             bufferSize: AVAudioFrameCount(Constants.Audio.chunkSize),
-            format: recordingFormat
+            format: nativeFormat
         ) { [weak self] buffer, time in
             self?.processAudioBuffer(buffer, time: time)
         }
@@ -86,32 +92,48 @@ class AudioCaptureService {
     }
 
     /// Process incoming audio buffer
-    private func processAudioBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        guard let channelData = buffer.int16ChannelData else {
+    /// Must be nonisolated because it's called from Core Audio's real-time thread
+    private nonisolated func processAudioBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
+        // Native format is typically float32 - convert to Int16 for our pipeline
+        let samples: [Int16]
+
+        if let floatData = buffer.floatChannelData {
+            // Convert float32 to Int16 (most common case for native macOS audio)
+            let frameLength = Int(buffer.frameLength)
+            let floatSamples = UnsafeBufferPointer(start: floatData[0], count: frameLength)
+            samples = floatSamples.map { sample in
+                // Clamp and convert float [-1.0, 1.0] to Int16 range
+                let clamped = max(-1.0, min(1.0, sample))
+                return Int16(clamped * Float(Int16.max))
+            }
+        } else if let int16Data = buffer.int16ChannelData {
+            // Already Int16 format
+            let frameLength = Int(buffer.frameLength)
+            samples = Array(UnsafeBufferPointer(start: int16Data[0], count: frameLength))
+        } else {
             AppLogger.audio.warning(
-                "Audio buffer missing int16ChannelData at time \(time.sampleTime). Audio samples lost."
+                "Audio buffer has unsupported format at time \(time.sampleTime). Audio samples lost."
             )
             return
         }
 
-        let frameLength = Int(buffer.frameLength)
-        let samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameLength))
-
         // Create audio buffer
         let audioBuffer = AudioBuffer(samples: samples)
+
+        // Capture Sendable references for the Task closure
+        // pendingWrites and levelThrottler are @unchecked Sendable so safe to capture
+        let pendingWrites = self.pendingWrites
+        let levelThrottler = self.levelThrottler
 
         // Add to streaming buffer (using Task for non-blocking async execution
         // since Core Audio callbacks run in a synchronous context)
         // Track pending writes to prevent race condition in stopCapture
-        let pendingWrites = self.pendingWrites
         pendingWrites.increment()
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             defer { pendingWrites.decrement() }
-            do {
-                try await self?.appendToStreamingBuffer(audioBuffer)
-            } catch {
-                AppLogger.audio.error("Failed to append audio buffer: \(error.localizedDescription)")
-            }
+            guard let self else { return }
+            guard let streamingBuffer = self.streamingBuffer else { return }
+            await streamingBuffer.append(audioBuffer)
         }
 
         // Calculate and report audio level (throttled to prevent MainActor congestion)
@@ -127,13 +149,6 @@ class AudioCaptureService {
         }
     }
 
-    /// Appends audio buffer to streaming buffer - throws if buffer is nil
-    private func appendToStreamingBuffer(_ audioBuffer: AudioBuffer) async throws {
-        guard let streamingBuffer = streamingBuffer else {
-            throw AudioCaptureError.noDataRecorded
-        }
-        await streamingBuffer.append(audioBuffer)
-    }
 }
 
 /// Audio capture errors
