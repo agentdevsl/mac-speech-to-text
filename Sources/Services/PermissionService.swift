@@ -22,6 +22,7 @@ enum PermissionError: Error, LocalizedError {
 }
 
 /// Protocol for permission checking (enables testing with mocks)
+@MainActor
 protocol PermissionChecker {
     func checkMicrophonePermission() async -> Bool
     func requestMicrophonePermission() async throws
@@ -29,6 +30,10 @@ protocol PermissionChecker {
     func requestAccessibilityPermission() throws
     func checkInputMonitoringPermission() -> Bool
 }
+
+// Cache the accessibility option key at module load time to avoid Swift 6 concurrency warnings
+// about accessing global mutable state
+private nonisolated(unsafe) let axTrustedCheckOptionPromptKey: String = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
 
 /// Real implementation of permission service
 @MainActor
@@ -59,14 +64,14 @@ class PermissionService: PermissionChecker {
     /// Check accessibility permission status
     /// This is required for text insertion via Accessibility APIs
     func checkAccessibilityPermission() -> Bool {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false]
+        let options: NSDictionary = [axTrustedCheckOptionPromptKey: false]
         return AXIsProcessTrustedWithOptions(options)
     }
 
     /// Request accessibility permission
     /// Note: macOS doesn't allow programmatic granting - must guide user to System Settings
     func requestAccessibilityPermission() throws {
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let options: NSDictionary = [axTrustedCheckOptionPromptKey: true]
         let trusted = AXIsProcessTrustedWithOptions(options)
 
         if !trusted {

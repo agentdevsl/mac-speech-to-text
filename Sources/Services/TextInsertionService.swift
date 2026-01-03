@@ -46,12 +46,9 @@ class TextInsertionService {
             return
         }
 
-        // element is AXUIElement (CFTypeRef) - conditional cast for safety
-        guard let axElement = element as? AXUIElement else {
-            AppLogger.service.info("CFTypeRef could not be cast to AXUIElement. Falling back to clipboard copy.")
-            try await copyToClipboard(text)
-            return
-        }
+        // element is CFTypeRef from AXUIElementCopyAttributeValue - cast to AXUIElement
+        // Note: In Swift 6, CFTypeRef to AXUIElement cast always succeeds, so we use unsafeBitCast
+        let axElement = unsafeBitCast(element, to: AXUIElement.self)
 
         // Try to insert text directly
         let insertionResult = AXUIElementSetAttributeValue(

@@ -64,7 +64,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.showRecordingModal()
+            Task { @MainActor in
+                self?.showRecordingModal()
+            }
         }
 
         // Observer for "Open Settings" action (T047)
@@ -73,7 +75,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.showSettingsWindow()
+            Task { @MainActor in
+                self?.showSettingsWindow()
+            }
         }
     }
 
