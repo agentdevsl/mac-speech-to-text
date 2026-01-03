@@ -3,10 +3,11 @@ import Foundation
 import OSLog
 
 /// Service for managing global hotkey registration using Carbon Event Manager
+@MainActor
 class HotkeyService {
     private var hotKeyRef: EventHotKeyRef?
     private var eventHandler: EventHandlerRef?
-    private var callback: (() -> Void)?
+    private var callback: (@Sendable () -> Void)?
     private var userDataPointer: UnsafeMutableRawPointer?
 
     deinit {
@@ -17,7 +18,7 @@ class HotkeyService {
     func registerHotkey(
         keyCode: Int,
         modifiers: [KeyModifier],
-        callback: @escaping () -> Void
+        callback: @escaping @Sendable () -> Void
     ) async throws {
         unregisterHotkey()
         self.callback = callback

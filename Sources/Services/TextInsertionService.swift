@@ -4,6 +4,7 @@ import Foundation
 import OSLog
 
 /// Service for inserting text using Accessibility APIs
+@MainActor
 class TextInsertionService {
     private let permissionService = PermissionService()
 

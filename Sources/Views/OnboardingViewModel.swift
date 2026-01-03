@@ -59,8 +59,8 @@ final class OnboardingViewModel {
         self.settingsService = settingsService
 
         // Check initial permission status
-        Task {
-            await checkAllPermissions()
+        Task { [weak self] in
+            await self?.checkAllPermissions()
         }
     }
 

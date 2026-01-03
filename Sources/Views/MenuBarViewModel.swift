@@ -54,9 +54,9 @@ final class MenuBarViewModel {
         self.settingsService = settingsService
 
         // Load initial stats and language settings
-        Task {
-            await refreshStatistics()
-            await loadLanguageSettings()
+        Task { [weak self] in
+            await self?.refreshStatistics()
+            await self?.loadLanguageSettings()
         }
     }
 

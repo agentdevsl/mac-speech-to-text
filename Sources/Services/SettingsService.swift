@@ -7,6 +7,7 @@ extension Notification.Name {
 }
 
 /// Service for managing user settings persistence
+@MainActor
 class SettingsService {
     private let userDefaults: UserDefaults
     private let settingsKey = "com.speechtotext.settings"
@@ -23,7 +24,9 @@ class SettingsService {
         }
 
         do {
-            return try JSONDecoder().decode(UserSettings.self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(UserSettings.self, from: data)
         } catch {
             // Log the decode error with details
             AppLogger.service.error(

@@ -130,7 +130,9 @@ actor StatisticsService {
         }
 
         do {
-            return try JSONDecoder().decode([UsageStatistics].self, from: data)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode([UsageStatistics].self, from: data)
         } catch {
             AppLogger.analytics.error("Failed to decode statistics: \(error.localizedDescription, privacy: .public). Returning empty array. Historical statistics may be lost.")
             return []

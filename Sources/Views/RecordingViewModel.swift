@@ -92,11 +92,9 @@ final class RecordingViewModel {
     }
 
     deinit {
-        // Remove NotificationCenter observer to prevent retain cycle
-        if let observer = languageSwitchObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        silenceTimer?.invalidate()
+        // NotificationCenter.removeObserver(self) is thread-safe and removes all observers
+        // associated with this object, avoiding MainActor-isolated property access issues
+        NotificationCenter.default.removeObserver(self)
     }
 
     // MARK: - Language Switch Observer
@@ -328,7 +326,7 @@ final class RecordingViewModel {
     /// Save statistics to database
     private func saveStatistics(session: RecordingSession) async {
         do {
-            try statisticsService.recordSession(session)
+            try await statisticsService.recordSession(session)
         } catch {
             // Log error but don't fail the workflow
             AppLogger.viewModel.warning("Failed to save statistics: \(error.localizedDescription, privacy: .public)")

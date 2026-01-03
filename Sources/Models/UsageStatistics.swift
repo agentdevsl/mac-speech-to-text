@@ -1,7 +1,7 @@
 import Foundation
 
 /// Aggregated usage metrics without storing sensitive content
-struct UsageStatistics: Codable, Identifiable {
+struct UsageStatistics: Codable, Identifiable, Sendable {
     let id: UUID
     let date: Date
     var totalSessions: Int
@@ -46,7 +46,7 @@ struct UsageStatistics: Codable, Identifiable {
     }
 }
 
-struct LanguageStats: Codable, Identifiable {
+struct LanguageStats: Codable, Identifiable, Sendable {
     let id: UUID
     let languageCode: String
     var sessionCount: Int
@@ -60,7 +60,7 @@ struct LanguageStats: Codable, Identifiable {
     }
 }
 
-struct ErrorStats: Codable, Identifiable {
+struct ErrorStats: Codable, Identifiable, Sendable {
     let id: UUID
     let errorType: String
     var count: Int
@@ -73,7 +73,7 @@ struct ErrorStats: Codable, Identifiable {
 }
 
 /// Aggregated statistics across different time periods
-struct AggregatedStats {
+struct AggregatedStats: Sendable {
     let today: UsageStatistics
     let thisWeek: UsageStatistics
     let thisMonth: UsageStatistics

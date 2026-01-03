@@ -31,6 +31,7 @@ protocol PermissionChecker {
 }
 
 /// Real implementation of permission service
+@MainActor
 class PermissionService: PermissionChecker {
     /// Tracks the last known input monitoring permission status based on hotkey registration result
     private var lastKnownInputMonitoringStatus: Bool = false
@@ -120,6 +121,7 @@ class PermissionService: PermissionChecker {
 }
 
 /// Mock implementation for testing
+@MainActor
 class MockPermissionService: PermissionChecker {
     var microphoneGranted = true
     var accessibilityGranted = true

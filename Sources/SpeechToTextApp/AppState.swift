@@ -28,8 +28,11 @@ class AppState {
         // Load settings
         self.settings = settingsService.load()
 
-        // Load statistics
-        self.statistics = statisticsService.getAggregatedStats()
+        // Load statistics asynchronously (actor isolation)
+        self.statistics = .empty
+        Task {
+            self.statistics = await statisticsService.getAggregatedStats()
+        }
 
         // Check if onboarding needed
         self.showOnboarding = !settings.onboarding.completed
@@ -63,15 +66,15 @@ class AppState {
     }
 
     /// Complete session successfully
-    func completeSession() {
+    func completeSession() async {
         guard var session = currentSession else { return }
         session.state = .completed
         session.insertionSuccess = true
 
         // Record statistics
         do {
-            try statisticsService.recordSession(session)
-            statistics = statisticsService.getAggregatedStats()
+            try await statisticsService.recordSession(session)
+            statistics = await statisticsService.getAggregatedStats()
         } catch {
             errorMessage = "Failed to record statistics: \(error.localizedDescription)"
         }
@@ -109,7 +112,7 @@ class AppState {
     }
 
     /// Refresh statistics
-    func refreshStatistics() {
-        statistics = statisticsService.getAggregatedStats()
+    func refreshStatistics() async {
+        statistics = await statisticsService.getAggregatedStats()
     }
 }
