@@ -2,112 +2,33 @@ import AVFoundation
 import Foundation
 import OSLog
 
-/// Service for capturing audio using AVAudioEngine
-@MainActor
-class AudioCaptureService {
-    private let audioEngine = AVAudioEngine()
-    private let inputNode: AVAudioInputNode
-    private var streamingBuffer: StreamingAudioBuffer?
-    private var levelCallback: ((Double) -> Void)?
+/// Handles audio buffer processing on the audio thread without actor isolation
+/// This class is intentionally NOT @MainActor to avoid actor isolation crashes
+/// when called from Core Audio's real-time thread
+final class AudioBufferProcessor: @unchecked Sendable {
+    private let pendingWrites = PendingWritesCounter()
+    private let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
+    private let streamingBuffer: StreamingAudioBuffer
+    private let levelCallback: @Sendable (Double) -> Void
 
-    /// Counter for pending buffer append operations to ensure all audio is flushed before stop
-    /// nonisolated(unsafe) allows access from audio callback thread
-    private nonisolated(unsafe) let pendingWrites = PendingWritesCounter()
-
-    /// Throttler for audio level updates to prevent MainActor congestion
-    /// Audio callbacks fire every ~64ms; we throttle to ~50ms to reduce Task spawning
-    /// nonisolated(unsafe) allows access from audio callback thread
-    private nonisolated(unsafe) let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
-
-    /// Native sample rate from hardware (for resampling)
-    private var nativeSampleRate: Double = 44100.0
-
-    init() {
-        inputNode = audioEngine.inputNode
-    }
-
-    /// Start audio capture
-    func startCapture(levelCallback: @escaping (Double) -> Void) async throws {
+    init(streamingBuffer: StreamingAudioBuffer, levelCallback: @escaping @Sendable (Double) -> Void) {
+        self.streamingBuffer = streamingBuffer
         self.levelCallback = levelCallback
-        streamingBuffer = StreamingAudioBuffer()
-
-        // Check microphone permission
-        let microphonePermission = await PermissionService().checkMicrophonePermission()
-        guard microphonePermission else {
-            throw PermissionError.microphoneDenied
-        }
-
-        // Use the input node's native format to avoid hardware incompatibility issues
-        // macOS audio hardware typically provides float32 at 44.1kHz or 48kHz
-        // We'll convert to Int16 in processAudioBuffer
-        let nativeFormat = inputNode.outputFormat(forBus: 0)
-
-        // Validate we have a usable format
-        guard nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0 else {
-            throw AudioCaptureError.invalidFormat
-        }
-
-        // Store native sample rate for resampling calculations
-        nativeSampleRate = nativeFormat.sampleRate
-
-        // Install tap on input node using native format
-        inputNode.installTap(
-            onBus: 0,
-            bufferSize: AVAudioFrameCount(Constants.Audio.chunkSize),
-            format: nativeFormat
-        ) { [weak self] buffer, time in
-            self?.processAudioBuffer(buffer, time: time)
-        }
-
-        // Start audio engine
-        do {
-            try audioEngine.start()
-        } catch {
-            inputNode.removeTap(onBus: 0)  // Clean up the tap on failure
-            throw AudioCaptureError.engineStartFailed(error.localizedDescription)
-        }
     }
 
-    /// Stop audio capture and return recorded samples
-    func stopCapture() async throws -> [Int16] {
-        audioEngine.stop()
-        inputNode.removeTap(onBus: 0)
-
-        // Wait for all pending buffer writes to complete before retrieving samples
-        // This prevents race condition where in-flight Tasks from processAudioBuffer
-        // haven't finished appending audio data yet
-        await pendingWrites.waitForCompletion()
-
-        guard let streamingBuffer = streamingBuffer else {
-            throw AudioCaptureError.noDataRecorded
-        }
-
-        await streamingBuffer.markComplete()
-        let samples = await streamingBuffer.allSamples
-
-        // Clear buffer
-        self.streamingBuffer = nil
-
-        return samples
-    }
-
-    /// Process incoming audio buffer
-    /// Must be nonisolated because it's called from Core Audio's real-time thread
-    private nonisolated func processAudioBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
-        // Native format is typically float32 - convert to Int16 for our pipeline
+    /// Process audio buffer - safe to call from any thread
+    func process(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
+        // Convert to Int16 samples
         let samples: [Int16]
 
         if let floatData = buffer.floatChannelData {
-            // Convert float32 to Int16 (most common case for native macOS audio)
             let frameLength = Int(buffer.frameLength)
             let floatSamples = UnsafeBufferPointer(start: floatData[0], count: frameLength)
             samples = floatSamples.map { sample in
-                // Clamp and convert float [-1.0, 1.0] to Int16 range
                 let clamped = max(-1.0, min(1.0, sample))
                 return Int16(clamped * Float(Int16.max))
             }
         } else if let int16Data = buffer.int16ChannelData {
-            // Already Int16 format
             let frameLength = Int(buffer.frameLength)
             samples = Array(UnsafeBufferPointer(start: int16Data[0], count: frameLength))
         } else {
@@ -117,38 +38,110 @@ class AudioCaptureService {
             return
         }
 
-        // Create audio buffer
         let audioBuffer = AudioBuffer(samples: samples)
 
-        // Capture Sendable references for the Task closure
-        // pendingWrites and levelThrottler are @unchecked Sendable so safe to capture
-        let pendingWrites = self.pendingWrites
-        let levelThrottler = self.levelThrottler
-
-        // Add to streaming buffer (using Task for non-blocking async execution
-        // since Core Audio callbacks run in a synchronous context)
-        // Track pending writes to prevent race condition in stopCapture
+        // Append to streaming buffer via Task (no actor isolation issues)
         pendingWrites.increment()
-        Task { @MainActor [weak self] in
-            defer { pendingWrites.decrement() }
-            guard let self else { return }
-            guard let streamingBuffer = self.streamingBuffer else { return }
-            await streamingBuffer.append(audioBuffer)
+        let buffer = self.streamingBuffer
+        let writes = self.pendingWrites
+        Task {
+            defer { writes.decrement() }
+            await buffer.append(audioBuffer)
         }
 
-        // Calculate and report audio level (throttled to prevent MainActor congestion)
-        let level = audioBuffer.rmsLevel / 32768.0 // Normalize to 0-1 range
-
-        // Only dispatch level update if throttle interval has passed
-        // This prevents spawning a Task for every audio buffer (~64ms intervals)
-        // which can cause @Observable mutations during SwiftUI body evaluation
+        // Report level (throttled)
+        let level = audioBuffer.rmsLevel / 32768.0
         if levelThrottler.shouldUpdate() {
-            Task { @MainActor [weak self] in
-                self?.levelCallback?(level)
+            let callback = self.levelCallback
+            Task { @MainActor in
+                callback(level)
             }
         }
     }
 
+    /// Wait for all pending writes to complete
+    func waitForCompletion() async {
+        await pendingWrites.waitForCompletion()
+    }
+}
+
+/// Service for capturing audio using AVAudioEngine
+@MainActor
+class AudioCaptureService {
+    private let audioEngine = AVAudioEngine()
+    private let inputNode: AVAudioInputNode
+    private var streamingBuffer: StreamingAudioBuffer?
+    private var bufferProcessor: AudioBufferProcessor?
+
+    init() {
+        inputNode = audioEngine.inputNode
+    }
+
+    /// Start audio capture
+    func startCapture(levelCallback: @escaping (Double) -> Void) async throws {
+        let buffer = StreamingAudioBuffer()
+        streamingBuffer = buffer
+
+        // Check microphone permission
+        let microphonePermission = await PermissionService().checkMicrophonePermission()
+        guard microphonePermission else {
+            throw PermissionError.microphoneDenied
+        }
+
+        // Use the input node's native format to avoid hardware incompatibility issues
+        let nativeFormat = inputNode.outputFormat(forBus: 0)
+
+        guard nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0 else {
+            throw AudioCaptureError.invalidFormat
+        }
+
+        // Create processor with captured references (no self needed in tap closure)
+        let processor = AudioBufferProcessor(
+            streamingBuffer: buffer,
+            levelCallback: { @Sendable level in levelCallback(level) }
+        )
+        bufferProcessor = processor
+
+        // Install tap - processor handles everything, no self reference needed
+        inputNode.installTap(
+            onBus: 0,
+            bufferSize: AVAudioFrameCount(Constants.Audio.chunkSize),
+            format: nativeFormat
+        ) { buffer, time in
+            // processor is captured directly - no actor isolation issues
+            processor.process(buffer, time: time)
+        }
+
+        // Start audio engine
+        do {
+            try audioEngine.start()
+        } catch {
+            inputNode.removeTap(onBus: 0)
+            throw AudioCaptureError.engineStartFailed(error.localizedDescription)
+        }
+    }
+
+    /// Stop audio capture and return recorded samples
+    func stopCapture() async throws -> [Int16] {
+        audioEngine.stop()
+        inputNode.removeTap(onBus: 0)
+
+        // Wait for all pending buffer writes to complete
+        await bufferProcessor?.waitForCompletion()
+
+        guard let streamingBuffer = streamingBuffer else {
+            throw AudioCaptureError.noDataRecorded
+        }
+
+        await streamingBuffer.markComplete()
+        let samples = await streamingBuffer.allSamples
+
+        // Clear state
+        self.streamingBuffer = nil
+        self.bufferProcessor = nil
+
+        return samples
+    }
 }
 
 /// Audio capture errors
