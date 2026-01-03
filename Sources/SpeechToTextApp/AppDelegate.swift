@@ -136,6 +136,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Recording Modal
 
     private var recordingWindow: NSWindow?
+    private var recordingViewModel: RecordingViewModel?
+    private let permissionService = PermissionService()
 
     @MainActor
     private func showRecordingModal() {
@@ -144,11 +146,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Create SwiftUI view
-        let contentView = RecordingModal()
+        // Check permissions before showing modal
+        Task {
+            await checkPermissionsAndShowModal()
+        }
+    }
+
+    @MainActor
+    private func checkPermissionsAndShowModal() async {
+        // Check microphone permission first (required)
+        let hasMicrophone = await permissionService.checkMicrophonePermission()
+        if !hasMicrophone {
+            showPermissionAlert(
+                title: "Microphone Access Required",
+                message: "Speech-to-Text needs microphone access to record your voice. Please grant permission in System Settings > Privacy & Security > Microphone.",
+                settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+            )
+            return
+        }
+
+        // Check accessibility permission (required for text insertion)
+        let hasAccessibility = permissionService.checkAccessibilityPermission()
+        if !hasAccessibility {
+            showPermissionAlert(
+                title: "Accessibility Access Required",
+                message: "Speech-to-Text needs accessibility access to insert transcribed text into other applications. Please grant permission in System Settings > Privacy & Security > Accessibility.",
+                settingsURL: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+            )
+            return
+        }
+
+        // All permissions granted - show the modal
+        showRecordingModalWindow()
+    }
+
+    @MainActor
+    private func showPermissionAlert(title: String, message: String, settingsURL: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            if let url = URL(string: settingsURL) {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    @MainActor
+    private func showRecordingModalWindow() {
+        // Create viewModel on MainActor (fixes @State + @Observable + @MainActor race condition)
+        let viewModel = RecordingViewModel()
+        recordingViewModel = viewModel
+
+        // Create SwiftUI view with the viewModel
+        let contentView = RecordingModal(viewModel: viewModel)
             .onDisappear { [weak self] in
                 self?.recordingWindow?.close()
                 self?.recordingWindow = nil
+                self?.recordingViewModel = nil
             }
 
         // Create window for modal

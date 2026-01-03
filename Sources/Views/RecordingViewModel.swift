@@ -145,7 +145,10 @@ final class RecordingViewModel {
 
     /// Start recording audio
     func startRecording() async throws {
+        AppLogger.viewModel.info("📍 startRecording() called")
+
         guard !isRecording else {
+            AppLogger.viewModel.warning("⚠️ Already recording, ignoring startRecording call")
             throw RecordingError.alreadyRecording
         }
 
@@ -156,17 +159,21 @@ final class RecordingViewModel {
 
         // Create new recording session with state set to recording
         let settings = settingsService.load()
+        let sessionId = UUID()
         currentSession = RecordingSession(
-            id: UUID(),
+            id: sessionId,
             startTime: Date(),
             language: settings.language.defaultLanguage,
             state: .recording
         )
 
+        AppLogger.viewModel.info("🎙️ Created session \(sessionId.uuidString.prefix(8)) with language: \(settings.language.defaultLanguage)")
+
         isRecording = true
 
         do {
             // Start audio capture with level callback
+            AppLogger.audio.info("🎤 Starting audio capture...")
             try await audioService.startCapture { [weak self] level in
                 Task { @MainActor in
                     self?.audioLevel = level
@@ -174,7 +181,9 @@ final class RecordingViewModel {
                 }
             }
             isAudioCaptureActive = true
+            AppLogger.audio.info("✅ Audio capture started successfully")
         } catch {
+            AppLogger.audio.error("❌ Audio capture failed: \(error.localizedDescription)")
             isRecording = false
             currentSession = nil
             throw RecordingError.audioCaptureFailed(error.localizedDescription)
@@ -183,7 +192,10 @@ final class RecordingViewModel {
 
     /// Stop recording and trigger transcription
     func stopRecording() async throws {
+        AppLogger.viewModel.info("📍 stopRecording() called")
+
         guard isRecording else {
+            AppLogger.viewModel.warning("⚠️ Not recording, ignoring stopRecording call")
             throw RecordingError.notRecording
         }
 
@@ -195,12 +207,17 @@ final class RecordingViewModel {
         do {
             // Stop audio capture and get samples (only if active)
             guard isAudioCaptureActive else {
+                AppLogger.audio.warning("⚠️ Audio capture not active")
                 throw RecordingError.notRecording
             }
             isAudioCaptureActive = false
+
+            AppLogger.audio.info("⏹️ Stopping audio capture...")
             let samples = try await audioService.stopCapture()
+            AppLogger.audio.info("✅ Captured \(samples.count) samples (\(String(format: "%.1f", Double(samples.count) / 16000.0))s of audio)")
 
             guard !samples.isEmpty else {
+                AppLogger.audio.error("❌ No audio samples captured")
                 throw RecordingError.noAudioCaptured
             }
 
@@ -212,6 +229,7 @@ final class RecordingViewModel {
             try await transcribe(samples: samples)
 
         } catch {
+            AppLogger.viewModel.error("❌ stopRecording failed: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
             throw error
         }
@@ -253,7 +271,10 @@ final class RecordingViewModel {
 
     /// Transcribe audio samples using FluidAudio
     private func transcribe(samples: [Int16]) async throws {
+        AppLogger.service.info("🔄 Starting transcription of \(samples.count) samples...")
+
         guard var session = currentSession else {
+            AppLogger.service.error("❌ No active session for transcription")
             throw RecordingError.noActiveSession
         }
 
@@ -264,10 +285,17 @@ final class RecordingViewModel {
         do {
             // Initialize FluidAudio if needed
             let settings = settingsService.load()
+            AppLogger.service.info("🚀 Initializing FluidAudio with language: \(settings.language.defaultLanguage)")
             try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
 
             // Transcribe
+            AppLogger.service.info("🎯 Calling FluidAudio transcribe...")
+            let startTime = CFAbsoluteTimeGetCurrent()
             let result = try await fluidAudioService.transcribe(samples: samples)
+            let duration = CFAbsoluteTimeGetCurrent() - startTime
+
+            AppLogger.service.info("✅ Transcription complete in \(String(format: "%.0f", duration * 1000))ms")
+            AppLogger.service.info("📝 Result: \"\(result.text)\" (confidence: \(String(format: "%.1f", result.confidence * 100))%)")
 
             // Update session
             session.transcribedText = result.text
@@ -285,6 +313,7 @@ final class RecordingViewModel {
             try await insertText(result.text)
 
         } catch {
+            AppLogger.service.error("❌ Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription
@@ -296,7 +325,10 @@ final class RecordingViewModel {
 
     /// Insert transcribed text into active application
     private func insertText(_ text: String) async throws {
+        AppLogger.service.info("⌨️ Inserting text: \"\(text.prefix(50))...\"")
+
         guard var session = currentSession else {
+            AppLogger.service.error("❌ No active session for text insertion")
             throw RecordingError.noActiveSession
         }
 
@@ -306,6 +338,7 @@ final class RecordingViewModel {
 
         do {
             // Try text insertion via Accessibility API
+            AppLogger.service.info("🔗 Calling TextInsertionService...")
             try await textInsertionService.insertText(text)
 
             session.insertionSuccess = true
@@ -313,11 +346,13 @@ final class RecordingViewModel {
             currentSession = session
 
             isInserting = false
+            AppLogger.service.info("✅ Text inserted successfully")
 
             // Save statistics
             await saveStatistics(session: session)
 
         } catch {
+            AppLogger.service.error("❌ Text insertion failed: \(error.localizedDescription)")
             isInserting = false
             errorMessage = "Text insertion failed: \(error.localizedDescription)"
             session.errorMessage = error.localizedDescription

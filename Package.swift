@@ -43,6 +43,13 @@ let package = Package(
                 .product(name: "ViewInspector", package: "ViewInspector")
             ],
             path: "Tests/SpeechToTextTests"
+        ),
+        .testTarget(
+            name: "SpeechToTextIntegrationTests",
+            dependencies: [
+                "SpeechToText"
+            ],
+            path: "Tests/SpeechToTextIntegrationTests"
         )
     ]
 )

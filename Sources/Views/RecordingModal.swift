@@ -16,7 +16,10 @@ struct RecordingModal: View {
 
     // MARK: - State
 
-    @State private var viewModel = RecordingViewModel()
+    /// ViewModel passed from parent to avoid @State + @Observable + @MainActor race condition
+    /// The viewModel must be created on MainActor before passing to this view
+    var viewModel: RecordingViewModel
+
     @State private var showError: Bool = false
     @State private var isVisible: Bool = false
     @State private var isDismissing: Bool = false
@@ -267,21 +270,23 @@ struct RecordingModal: View {
 // MARK: - Previews
 
 #Preview("Recording") {
-    RecordingModal()
+    RecordingModalPreviewWrapper()
 }
 
 #Preview("With Error") {
-    RecordingModalPreview(showError: true)
+    RecordingModalPreviewWrapper(showError: true)
 }
 
 #Preview("Transcribing") {
-    RecordingModalPreview(transcribing: true)
+    RecordingModalPreviewWrapper(transcribing: true)
 }
 
-/// Preview helper with customizable state
-private struct RecordingModalPreview: View {
+/// Preview wrapper that creates viewModel on MainActor
+@MainActor
+private struct RecordingModalPreviewWrapper: View {
     let showError: Bool
     let transcribing: Bool
+    @State private var viewModel = RecordingViewModel()
 
     init(showError: Bool = false, transcribing: Bool = false) {
         self.showError = showError
@@ -289,6 +294,6 @@ private struct RecordingModalPreview: View {
     }
 
     var body: some View {
-        RecordingModal()
+        RecordingModal(viewModel: viewModel)
     }
 }
