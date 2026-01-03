@@ -5,13 +5,14 @@ import XCTest
 final class AppStateTests: XCTestCase {
 
     var appState: AppState!
-    var userDefaults: UserDefaults!
+    private let settingsKey = "com.speechtotext.settings"
 
     override func setUp() async throws {
         try await super.setUp()
-        // Use test suite to avoid interfering with actual app data
-        userDefaults = UserDefaults(suiteName: "com.speechtotext.appstate.tests")!
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
+        // Clear settings from UserDefaults.standard to ensure test isolation
+        // AppState internally uses SettingsService with .standard UserDefaults
+        UserDefaults.standard.removeObject(forKey: settingsKey)
+        UserDefaults.standard.synchronize()
 
         // Note: AppState creates its own services internally
         // For full testing, we'd need dependency injection
@@ -19,7 +20,9 @@ final class AppStateTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        userDefaults.removePersistentDomain(forName: "com.speechtotext.appstate.tests")
+        // Clean up to avoid affecting other tests
+        UserDefaults.standard.removeObject(forKey: settingsKey)
+        UserDefaults.standard.synchronize()
         try await super.tearDown()
     }
 
