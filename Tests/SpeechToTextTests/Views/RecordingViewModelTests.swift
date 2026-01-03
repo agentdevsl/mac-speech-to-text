@@ -192,20 +192,21 @@ final class RecordingViewModelTests: XCTestCase {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Hello", confidence: 0.95, durationMs: 1000)
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Hello", confidence: 0.95, durationMs: 1000))
 
         // When
         try await sut.stopRecording()
 
         // Then
-        XCTAssertTrue(mockFluidAudioService.transcribeCalled)
+        let transcribeCalled = await mockFluidAudioService.transcribeCalled
+        XCTAssertTrue(transcribeCalled)
     }
 
     func test_stopRecording_updatesTranscribedText() async throws {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Test transcription", confidence: 0.85, durationMs: 1500)
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test transcription", confidence: 0.85, durationMs: 1500))
 
         // When
         try await sut.stopRecording()
@@ -219,7 +220,7 @@ final class RecordingViewModelTests: XCTestCase {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Insert me", confidence: 0.9, durationMs: 2000)
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Insert me", confidence: 0.9, durationMs: 2000))
 
         // When
         try await sut.stopRecording()
@@ -389,23 +390,44 @@ class MockAudioCaptureServiceForRecording: AudioCaptureService {
     }
 }
 
-class MockFluidAudioServiceForRecording: FluidAudioService {
+actor MockFluidAudioServiceForRecording: FluidAudioServiceProtocol {
     var initializeCalled = false
     var transcribeCalled = false
     var switchLanguageCalled = false
     var mockResult = TranscriptionResult(text: "Mock transcription", confidence: 0.9, durationMs: 1000)
+    private var currentLanguage = "en"
+    private var isInitialized = false
 
-    override func initialize(language: String) async throws {
-        initializeCalled = true
+    func setMockResult(_ result: TranscriptionResult) {
+        mockResult = result
     }
 
-    override func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+    func initialize(language: String) async throws {
+        initializeCalled = true
+        currentLanguage = language
+        isInitialized = true
+    }
+
+    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
         transcribeCalled = true
         return mockResult
     }
 
-    override func switchLanguage(to languageCode: String) async throws {
+    func switchLanguage(to language: String) async throws {
         switchLanguageCalled = true
+        currentLanguage = language
+    }
+
+    func getCurrentLanguage() -> String {
+        currentLanguage
+    }
+
+    func checkInitialized() -> Bool {
+        isInitialized
+    }
+
+    func shutdown() {
+        isInitialized = false
     }
 }
 
