@@ -61,13 +61,13 @@ final class RecordingViewModel {
 
     // MARK: - Private State
 
-    private var silenceTimer: Timer?
+    @ObservationIgnored private var silenceTimer: Timer?
     private let silenceThreshold: TimeInterval
-    private var languageSwitchObserver: NSObjectProtocol?
+    @ObservationIgnored private var languageSwitchObserver: NSObjectProtocol?
 
     // nonisolated(unsafe) copies for deinit access (deinit cannot access MainActor-isolated state)
-    private nonisolated(unsafe) var _languageSwitchObserver: NSObjectProtocol?
-    private nonisolated(unsafe) var _silenceTimer: Timer?
+    private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
+    private nonisolated(unsafe) var deinitSilenceTimer: Timer?
 
     // MARK: - Initialization
 
@@ -98,11 +98,11 @@ final class RecordingViewModel {
     deinit {
         // For closure-based observers, we must remove via the returned token
         // Store observer in nonisolated(unsafe) property for deinit access
-        if let observer = _languageSwitchObserver {
+        if let observer = deinitLanguageSwitchObserver {
             NotificationCenter.default.removeObserver(observer)
         }
         // Invalidate any pending timer
-        _silenceTimer?.invalidate()
+        deinitSilenceTimer?.invalidate()
     }
 
     // MARK: - Language Switch Observer
@@ -134,7 +134,7 @@ final class RecordingViewModel {
             }
         }
         languageSwitchObserver = observer
-        _languageSwitchObserver = observer
+        deinitLanguageSwitchObserver = observer
     }
 
     // MARK: - Public Methods
@@ -308,7 +308,7 @@ final class RecordingViewModel {
     /// Reset silence detection timer (T029)
     private func resetSilenceTimer() {
         silenceTimer?.invalidate()
-        _silenceTimer?.invalidate()
+        deinitSilenceTimer?.invalidate()
 
         // Check if audio level is below threshold (silence)
         if audioLevel < 0.01 { // Very low threshold for silence
@@ -321,10 +321,10 @@ final class RecordingViewModel {
                 }
             }
             silenceTimer = timer
-            _silenceTimer = timer
+            deinitSilenceTimer = timer
         } else {
             silenceTimer = nil
-            _silenceTimer = nil
+            deinitSilenceTimer = nil
         }
     }
 

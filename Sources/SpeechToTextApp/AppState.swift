@@ -19,7 +19,9 @@ class AppState {
     let statisticsService: StatisticsService
 
     /// Task for loading statistics - tracked for proper lifecycle management
-    private var loadingTask: Task<Void, Never>?
+    @ObservationIgnored private var loadingTask: Task<Void, Never>?
+    /// nonisolated(unsafe) copy for deinit access (deinit cannot access MainActor-isolated state)
+    private nonisolated(unsafe) var deinitLoadingTask: Task<Void, Never>?
 
     init() {
         // Initialize services
@@ -34,17 +36,19 @@ class AppState {
         // Load statistics asynchronously (actor isolation)
         // Track the task for proper lifecycle management
         self.statistics = .empty
-        loadingTask = Task { [weak self] in
+        let task = Task { [weak self] in
             guard let self else { return }
             self.statistics = await statisticsService.getAggregatedStats()
         }
+        loadingTask = task
+        deinitLoadingTask = task
 
         // Check if onboarding needed
         self.showOnboarding = !settings.onboarding.completed
     }
 
     deinit {
-        loadingTask?.cancel()
+        deinitLoadingTask?.cancel()
     }
 
     /// Initialize FluidAudio on app startup
