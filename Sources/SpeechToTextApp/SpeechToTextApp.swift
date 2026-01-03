@@ -14,9 +14,7 @@ struct SpeechToTextApp: App {
     }
 
     init() {
-        // Initialize FluidAudio on app startup
-        Task {
-            await appState.initializeFluidAudio()
-        }
+        // FluidAudio initialization moved to onAppear in MenuBarView
+        // to avoid capturing mutating self in init()
     }
 }

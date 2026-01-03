@@ -54,7 +54,7 @@ actor FluidAudioService {
             self.models = models
 
             // Initialize ASR manager with default config
-            let config = AsrConfig.default
+            let config = ASRConfig.default
             let manager = AsrManager(config: config)
             try await manager.initialize(models: models)
 

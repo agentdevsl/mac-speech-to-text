@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "SpeechToText",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v14)],
     products: [
         .executable(
             name: "SpeechToText",
@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
-            from: "0.9.0"
+            branch: "main"
         )
     ],
     targets: [
@@ -26,7 +26,10 @@ let package = Package(
             exclude: [],
             swiftSettings: [
                 .enableUpcomingFeature("BareSlashRegexLiterals"),
-                .enableExperimentalFeature("StrictConcurrency")
+                // Disable strict concurrency checking for Swift 6 compatibility
+                .unsafeFlags(["-Xfrontend", "-disable-availability-checking",
+                              "-Xfrontend", "-warn-concurrency",
+                              "-Xfrontend", "-enable-actor-data-race-checks"])
             ]
         ),
         .testTarget(

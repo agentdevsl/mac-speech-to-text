@@ -14,7 +14,7 @@ class TextInsertionService {
         }
 
         // Get the currently focused application
-        guard let focusedApp = NSWorkspace.shared.frontmostApplication else {
+        guard NSWorkspace.shared.frontmostApplication != nil else {
             // Fallback to clipboard if no focused app
             try await copyToClipboard(text)
             return
@@ -41,11 +41,8 @@ class TextInsertionService {
             return
         }
 
-        guard let axElement = element as? AXUIElement else {
-            // Type mismatch - fallback to clipboard
-            try await copyToClipboard(text)
-            return
-        }
+        // element is AXUIElement (CFTypeRef) - cast for API
+        let axElement = element as! AXUIElement
 
         // Try to insert text directly
         let insertionResult = AXUIElementSetAttributeValue(

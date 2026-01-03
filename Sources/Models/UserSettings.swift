@@ -18,8 +18,7 @@ struct UserSettings: Codable {
             enabled: true,
             keyCode: 49, // Space key
             modifiers: [.command, .control],
-            conflictDetected: false,
-            alternativeHotkey: nil
+            conflictDetected: false
         ),
         language: LanguageConfiguration(
             defaultLanguage: "en",
@@ -66,7 +65,8 @@ struct HotkeyConfiguration: Codable {
     var keyCode: Int
     var modifiers: [KeyModifier]
     var conflictDetected: Bool
-    var alternativeHotkey: HotkeyConfiguration?
+    // Note: alternativeHotkey removed to avoid recursive type definition
+    // Consider using enum with indirect case if alternative hotkey needed
 }
 
 enum KeyModifier: String, Codable, CaseIterable {

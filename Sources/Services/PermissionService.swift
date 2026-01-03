@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import ApplicationServices
+import AppKit
 
 /// Permission-related errors
 enum PermissionError: Error, LocalizedError {
@@ -93,7 +94,7 @@ class PermissionService: PermissionChecker {
     /// Request all required permissions
     func requestAllPermissions() async throws {
         // Request microphone
-        if !await checkMicrophonePermission() {
+        if !(await checkMicrophonePermission()) {
             try await requestMicrophonePermission()
         }
 
