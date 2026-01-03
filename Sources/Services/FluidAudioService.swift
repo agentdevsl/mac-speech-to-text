@@ -8,6 +8,16 @@ struct TranscriptionResult: Sendable {
     let durationMs: Int
 }
 
+/// Protocol for FluidAudio service (enables mocking for tests)
+protocol FluidAudioServiceProtocol: Actor {
+    func initialize(language: String) async throws
+    func transcribe(samples: [Int16]) async throws -> TranscriptionResult
+    func switchLanguage(to language: String) async throws
+    func getCurrentLanguage() -> String
+    func checkInitialized() -> Bool
+    func shutdown()
+}
+
 /// Errors specific to FluidAudio integration
 enum FluidAudioError: Error, LocalizedError, Sendable, Equatable {
     case notInitialized
@@ -36,7 +46,7 @@ enum FluidAudioError: Error, LocalizedError, Sendable, Equatable {
 }
 
 /// Swift actor wrapping FluidAudio SDK for thread-safe ASR
-actor FluidAudioService {
+actor FluidAudioService: FluidAudioServiceProtocol {
     private var asrManager: AsrManager?
     private var currentLanguage: String = "en"
     private var isLanguageSwitching: Bool = false

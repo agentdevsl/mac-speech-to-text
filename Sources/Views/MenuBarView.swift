@@ -12,6 +12,8 @@ struct MenuBarView: View {
     // MARK: - State
 
     @State private var viewModel = MenuBarViewModel()
+    /// Task for refreshing statistics - stored for cancellation
+    @State private var refreshTask: Task<Void, Never>?
 
     // MARK: - Body
 
@@ -37,9 +39,15 @@ struct MenuBarView: View {
         }
         .frame(width: 250)
         .onAppear {
-            Task {
+            // Store task for potential cancellation
+            refreshTask = Task {
                 await viewModel.refreshStatistics()
             }
+        }
+        .onDisappear {
+            // Cancel any pending refresh task
+            refreshTask?.cancel()
+            refreshTask = nil
         }
     }
 

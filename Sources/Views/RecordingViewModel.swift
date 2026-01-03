@@ -54,7 +54,7 @@ final class RecordingViewModel {
     // MARK: - Dependencies
 
     private let audioService: AudioCaptureService
-    private let fluidAudioService: FluidAudioService
+    private let fluidAudioService: any FluidAudioServiceProtocol
     private let textInsertionService: TextInsertionService
     private let settingsService: SettingsService
     private let statisticsService: StatisticsService
@@ -76,7 +76,7 @@ final class RecordingViewModel {
 
     init(
         audioService: AudioCaptureService = AudioCaptureService(),
-        fluidAudioService: FluidAudioService = FluidAudioService(),
+        fluidAudioService: any FluidAudioServiceProtocol = FluidAudioService(),
         textInsertionService: TextInsertionService = TextInsertionService(),
         settingsService: SettingsService = SettingsService(),
         statisticsService: StatisticsService = StatisticsService()
