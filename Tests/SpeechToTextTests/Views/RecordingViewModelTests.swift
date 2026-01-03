@@ -11,29 +11,23 @@ final class RecordingViewModelTests: XCTestCase {
     // MARK: - Properties
 
     var sut: RecordingViewModel!
-    var mockAudioService: MockAudioCaptureService!
-    var mockFluidAudioService: MockFluidAudioService!
-    var mockTextInsertionService: MockTextInsertionService!
-    var mockSettingsService: MockSettingsService!
-    var mockStatisticsService: MockStatisticsService!
+    var mockAudioService: MockAudioCaptureServiceForRecording!
+    var mockFluidAudioService: MockFluidAudioServiceForRecording!
+    var mockTextInsertionService: MockTextInsertionServiceForRecording!
 
     // MARK: - Setup & Teardown
 
     override func setUp() async throws {
         try await super.setUp()
 
-        mockAudioService = MockAudioCaptureService()
-        mockFluidAudioService = MockFluidAudioService()
-        mockTextInsertionService = MockTextInsertionService()
-        mockSettingsService = MockSettingsService()
-        mockStatisticsService = MockStatisticsService()
+        mockAudioService = MockAudioCaptureServiceForRecording()
+        mockFluidAudioService = MockFluidAudioServiceForRecording()
+        mockTextInsertionService = MockTextInsertionServiceForRecording()
 
         sut = RecordingViewModel(
             audioService: mockAudioService,
             fluidAudioService: mockFluidAudioService,
-            textInsertionService: mockTextInsertionService,
-            settingsService: mockSettingsService,
-            statisticsService: mockStatisticsService
+            textInsertionService: mockTextInsertionService
         )
     }
 
@@ -42,8 +36,6 @@ final class RecordingViewModelTests: XCTestCase {
         mockAudioService = nil
         mockFluidAudioService = nil
         mockTextInsertionService = nil
-        mockSettingsService = nil
-        mockStatisticsService = nil
         try await super.tearDown()
     }
 
@@ -59,24 +51,6 @@ final class RecordingViewModelTests: XCTestCase {
         XCTAssertNil(sut.errorMessage)
         XCTAssertEqual(sut.transcribedText, "")
         XCTAssertEqual(sut.confidence, 0.0)
-    }
-
-    func test_initialization_loadsLanguageFromSettings() {
-        // Given
-        let customSettings = UserSettings.default
-        mockSettingsService.mockSettings = customSettings
-
-        // When
-        let viewModel = RecordingViewModel(
-            audioService: mockAudioService,
-            fluidAudioService: mockFluidAudioService,
-            textInsertionService: mockTextInsertionService,
-            settingsService: mockSettingsService,
-            statisticsService: mockStatisticsService
-        )
-
-        // Then
-        XCTAssertEqual(viewModel.currentLanguage, customSettings.language.defaultLanguage)
     }
 
     // MARK: - startRecording Tests
@@ -218,7 +192,7 @@ final class RecordingViewModelTests: XCTestCase {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Hello", confidence: 0.95)
+        mockFluidAudioService.mockResult = TranscriptionResult(text: "Hello", confidence: 0.95, durationMs: 1000)
 
         // When
         try await sut.stopRecording()
@@ -231,7 +205,7 @@ final class RecordingViewModelTests: XCTestCase {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Test transcription", confidence: 0.85)
+        mockFluidAudioService.mockResult = TranscriptionResult(text: "Test transcription", confidence: 0.85, durationMs: 1500)
 
         // When
         try await sut.stopRecording()
@@ -245,7 +219,7 @@ final class RecordingViewModelTests: XCTestCase {
         // Given
         try await sut.startRecording()
         mockAudioService.mockSamples = [100, 200, 300]
-        mockFluidAudioService.mockResult = TranscriptionResult(text: "Insert me", confidence: 0.9)
+        mockFluidAudioService.mockResult = TranscriptionResult(text: "Insert me", confidence: 0.9, durationMs: 2000)
 
         // When
         try await sut.stopRecording()
@@ -396,7 +370,7 @@ final class RecordingViewModelTests: XCTestCase {
 
 // MARK: - Mock Services
 
-class MockAudioCaptureService: AudioCaptureService {
+class MockAudioCaptureServiceForRecording: AudioCaptureService {
     var startCaptureCalled = false
     var stopCaptureCalled = false
     var shouldFailStartCapture = false
@@ -405,7 +379,7 @@ class MockAudioCaptureService: AudioCaptureService {
     override func startCapture(levelCallback: @escaping (Double) -> Void) async throws {
         startCaptureCalled = true
         if shouldFailStartCapture {
-            throw AudioCaptureError.engineStartFailed
+            throw AudioCaptureError.engineStartFailed("Mock engine start failed")
         }
     }
 
@@ -415,11 +389,11 @@ class MockAudioCaptureService: AudioCaptureService {
     }
 }
 
-class MockFluidAudioService: FluidAudioService {
+class MockFluidAudioServiceForRecording: FluidAudioService {
     var initializeCalled = false
     var transcribeCalled = false
     var switchLanguageCalled = false
-    var mockResult = TranscriptionResult(text: "Mock transcription", confidence: 0.9)
+    var mockResult = TranscriptionResult(text: "Mock transcription", confidence: 0.9, durationMs: 1000)
 
     override func initialize(language: String) async throws {
         initializeCalled = true
@@ -435,20 +409,12 @@ class MockFluidAudioService: FluidAudioService {
     }
 }
 
-class MockTextInsertionService: TextInsertionService {
+class MockTextInsertionServiceForRecording: TextInsertionService {
     var insertTextCalled = false
     var lastInsertedText: String?
 
     override func insertText(_ text: String) async throws {
         insertTextCalled = true
         lastInsertedText = text
-    }
-}
-
-class MockStatisticsService: StatisticsService {
-    var recordSessionCalled = false
-
-    override func recordSession(_ session: RecordingSession) async throws {
-        recordSessionCalled = true
     }
 }

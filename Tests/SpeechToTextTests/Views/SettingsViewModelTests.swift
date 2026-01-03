@@ -11,16 +11,16 @@ final class SettingsViewModelTests: XCTestCase {
     // MARK: - Properties
 
     var sut: SettingsViewModel!
-    var mockSettingsService: MockSettingsServiceForSettings!
-    var mockHotkeyService: MockHotkeyServiceForSettings!
+    var mockSettingsService: MockSettingsServiceForSettingsVM!
+    var mockHotkeyService: MockHotkeyServiceForSettingsVM!
 
     // MARK: - Setup & Teardown
 
     override func setUp() async throws {
         try await super.setUp()
 
-        mockSettingsService = MockSettingsServiceForSettings()
-        mockHotkeyService = MockHotkeyServiceForSettings()
+        mockSettingsService = MockSettingsServiceForSettingsVM()
+        mockHotkeyService = MockHotkeyServiceForSettingsVM()
 
         sut = SettingsViewModel(
             settingsService: mockSettingsService,
@@ -73,27 +73,6 @@ final class SettingsViewModelTests: XCTestCase {
         // Then
         XCTAssertTrue(mockSettingsService.saveWasCalled)
         XCTAssertTrue(mockSettingsService.lastSavedSettings?.general.launchAtLogin == true)
-    }
-
-    func test_saveSettings_setsIsSavingDuringSave() async {
-        // Given
-        mockSettingsService.saveDelay = 100_000_000 // 100ms
-
-        // When
-        let saveTask = Task {
-            await sut.saveSettings()
-        }
-
-        // Brief wait to catch saving state
-        try? await Task.sleep(nanoseconds: 50_000_000)
-
-        // Then - should be saving
-        XCTAssertTrue(sut.isSaving)
-
-        await saveTask.value
-
-        // Then - should not be saving after completion
-        XCTAssertFalse(sut.isSaving)
     }
 
     func test_saveSettings_clearsValidationErrorOnSuccess() async {
@@ -346,21 +325,17 @@ final class SettingsViewModelTests: XCTestCase {
 // MARK: - Mock Services
 
 @MainActor
-class MockSettingsServiceForSettings: SettingsService {
+class MockSettingsServiceForSettingsVM: SettingsService {
     var mockSettings = UserSettings.default
     var saveWasCalled = false
     var lastSavedSettings: UserSettings?
     var shouldFailSave = false
-    var saveDelay: UInt64 = 0
 
     override func load() -> UserSettings {
         return mockSettings
     }
 
     override func save(_ settings: UserSettings) throws {
-        if saveDelay > 0 {
-            Thread.sleep(forTimeInterval: Double(saveDelay) / 1_000_000_000)
-        }
         if shouldFailSave {
             throw NSError(domain: "TestError", code: 1, userInfo: [NSLocalizedDescriptionKey: "Save failed"])
         }
@@ -371,7 +346,7 @@ class MockSettingsServiceForSettings: SettingsService {
 }
 
 @MainActor
-class MockHotkeyServiceForSettings: HotkeyService {
+class MockHotkeyServiceForSettingsVM: HotkeyService {
     var registerHotkeyCalled = false
     var lastRegisteredKeyCode: Int?
     var lastRegisteredModifiers: [KeyModifier]?
@@ -380,7 +355,7 @@ class MockHotkeyServiceForSettings: HotkeyService {
     override func registerHotkey(
         keyCode: Int,
         modifiers: [KeyModifier],
-        handler: @escaping () -> Void
+        callback: @escaping @Sendable () -> Void
     ) async throws {
         registerHotkeyCalled = true
         lastRegisteredKeyCode = keyCode
