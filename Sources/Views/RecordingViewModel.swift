@@ -115,33 +115,43 @@ final class RecordingViewModel {
 
     private func setupLanguageSwitchObserver() {
         // Listen for language switch notifications (T064, T067)
+        // Note: We use queue: nil to receive on posting queue, then explicitly
+        // defer to MainActor. This prevents the notification from firing synchronously
+        // during SwiftUI view body evaluation which could cause @Observable re-entrancy.
         let observer = NotificationCenter.default.addObserver(
             forName: .switchLanguage,
             object: nil,
-            queue: .main
+            queue: nil  // Receive on posting thread, not main queue
         ) { [weak self] notification in
             guard let languageCode = notification.userInfo?["languageCode"] as? String else {
                 return
             }
 
-            // Use [weak self] inside Task to avoid strong capture after guard
-            Task { @MainActor [weak self] in
+            // Use Task.detached to ensure we don't inherit any context that might
+            // be in the middle of SwiftUI view evaluation. This creates a completely
+            // new async context that will run after current synchronous work completes.
+            Task.detached { @MainActor [weak self] in
                 guard let self else { return }
-                self.isLanguageSwitching = true
-                self.currentLanguage = languageCode
-
-                // Switch language in FluidAudioService
-                do {
-                    try await self.fluidAudioService.switchLanguage(to: languageCode)
-                } catch {
-                    self.errorMessage = "Failed to switch language: \(error.localizedDescription)"
-                }
-
-                self.isLanguageSwitching = false
+                await self.handleLanguageSwitch(to: languageCode)
             }
         }
         languageSwitchObserver = observer
         deinitLanguageSwitchObserver = observer
+    }
+
+    /// Handle language switch - extracted to avoid @Observable mutations during notification delivery
+    private func handleLanguageSwitch(to languageCode: String) async {
+        isLanguageSwitching = true
+        currentLanguage = languageCode
+
+        // Switch language in FluidAudioService
+        do {
+            try await fluidAudioService.switchLanguage(to: languageCode)
+        } catch {
+            errorMessage = "Failed to switch language: \(error.localizedDescription)"
+        }
+
+        isLanguageSwitching = false
     }
 
     // MARK: - Public Methods
@@ -170,11 +180,13 @@ final class RecordingViewModel {
 
         do {
             // Start audio capture with level callback
+            // Note: The callback is already invoked on MainActor by AudioCaptureService
+            // and throttled to prevent rapid-fire updates during view body evaluation.
+            // No need to spawn another Task here - just update state directly.
             try await audioService.startCapture { [weak self] level in
-                Task { @MainActor in
-                    self?.audioLevel = level
-                    self?.resetSilenceTimer()
-                }
+                // This closure runs on MainActor (dispatched by AudioCaptureService)
+                self?.audioLevel = level
+                self?.resetSilenceTimer()
             }
             isAudioCaptureActive = true
         } catch {
@@ -342,7 +354,10 @@ final class RecordingViewModel {
                 withTimeInterval: silenceThreshold,
                 repeats: false
             ) { [weak self] _ in
-                Task { @MainActor in
+                // Timer fires on the run loop that scheduled it (main run loop since
+                // this is a @MainActor class). Use Task.detached to avoid inheriting
+                // any context that might be in the middle of SwiftUI view evaluation.
+                Task.detached { @MainActor [weak self] in
                     await self?.onSilenceDetected()
                 }
             }

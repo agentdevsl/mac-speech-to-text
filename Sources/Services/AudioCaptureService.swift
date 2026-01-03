@@ -13,6 +13,10 @@ class AudioCaptureService {
     /// Counter for pending buffer append operations to ensure all audio is flushed before stop
     private let pendingWrites = PendingWritesCounter()
 
+    /// Throttler for audio level updates to prevent MainActor congestion
+    /// Audio callbacks fire every ~64ms; we throttle to ~50ms to reduce Task spawning
+    private let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
+
     init() {
         inputNode = audioEngine.inputNode
     }
@@ -110,15 +114,15 @@ class AudioCaptureService {
             }
         }
 
-        // Calculate and report audio level
+        // Calculate and report audio level (throttled to prevent MainActor congestion)
         let level = audioBuffer.rmsLevel / 32768.0 // Normalize to 0-1 range
 
-        // Dispatch to MainActor for UI updates
-        Task { @MainActor [weak self] in
-            do {
-                try self?.invokeLeveCallback(level)
-            } catch {
-                AppLogger.audio.error("Failed to invoke level callback: \(error.localizedDescription)")
+        // Only dispatch level update if throttle interval has passed
+        // This prevents spawning a Task for every audio buffer (~64ms intervals)
+        // which can cause @Observable mutations during SwiftUI body evaluation
+        if levelThrottler.shouldUpdate() {
+            Task { @MainActor [weak self] in
+                self?.levelCallback?(level)
             }
         }
     }
@@ -129,14 +133,6 @@ class AudioCaptureService {
             throw AudioCaptureError.noDataRecorded
         }
         await streamingBuffer.append(audioBuffer)
-    }
-
-    /// Invokes the level callback - throws if callback is nil
-    private func invokeLeveCallback(_ level: Double) throws {
-        guard let callback = levelCallback else {
-            return  // No callback set is not an error, just skip
-        }
-        callback(level)
     }
 }
 
@@ -207,5 +203,39 @@ final class PendingWritesCounter: @unchecked Sendable {
                 lock.unlock()
             }
         }
+    }
+}
+
+/// Thread-safe throttler for audio level updates
+/// Prevents rapid-fire Task spawning from audio callbacks that can cause
+/// @Observable mutations during SwiftUI body evaluation (executor crashes)
+final class AudioLevelThrottler: @unchecked Sendable {
+    private let minInterval: CFAbsoluteTime
+    private var lastUpdateTime: CFAbsoluteTime = 0
+    private let lock = NSLock()
+
+    init(minInterval: CFAbsoluteTime) {
+        self.minInterval = minInterval
+    }
+
+    /// Returns true if enough time has passed since the last update
+    /// Thread-safe for use from audio callbacks
+    func shouldUpdate() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let now = CFAbsoluteTimeGetCurrent()
+        if now - lastUpdateTime >= minInterval {
+            lastUpdateTime = now
+            return true
+        }
+        return false
+    }
+
+    /// Reset the throttler (e.g., when starting a new recording)
+    func reset() {
+        lock.lock()
+        lastUpdateTime = 0
+        lock.unlock()
     }
 }

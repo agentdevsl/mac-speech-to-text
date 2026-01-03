@@ -90,3 +90,6 @@ jobs:
           name: release-build
           path: .build/release/
           retention-days: 7
+
+      # Note: Smoke tests require real macOS hardware with audio/accessibility
+      # Use scripts/smoke-test.sh locally before merging

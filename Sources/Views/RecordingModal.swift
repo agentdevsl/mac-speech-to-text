@@ -20,10 +20,10 @@ struct RecordingModal: View {
     @State private var showError: Bool = false
     @State private var isVisible: Bool = false
     @State private var isDismissing: Bool = false
-    /// Task for starting recording - stored for cancellation
-    @State private var startRecordingTask: Task<Void, Never>?
-    /// Task for dismissal - stored for cancellation
-    @State private var dismissTask: Task<Void, Never>?
+    /// Controls the recording task lifecycle - changing this cancels and restarts the task
+    @State private var recordingTaskId: UUID?
+    /// Controls the dismiss task lifecycle
+    @State private var dismissTaskId: UUID?
 
     // MARK: - Body
 
@@ -70,27 +70,40 @@ struct RecordingModal: View {
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                 isVisible = true
             }
-            // Auto-start recording - store task for cancellation
-            startRecordingTask = Task {
-                do {
-                    try await viewModel.startRecording()
-                } catch {
-                    guard !Task.isCancelled else { return }
-                    viewModel.errorMessage = "Failed to start recording: \(error.localizedDescription)"
-                    AppLogger.viewModel.error("startRecording failed: \(error.localizedDescription, privacy: .public)")
-                }
+            // Trigger recording task
+            recordingTaskId = UUID()
+        }
+        // Recording task - automatically cancelled when recordingTaskId changes or view disappears
+        .task(id: recordingTaskId) {
+            guard recordingTaskId != nil else { return }
+            do {
+                try await viewModel.startRecording()
+            } catch {
+                guard !Task.isCancelled else { return }
+                viewModel.errorMessage = "Failed to start recording: \(error.localizedDescription)"
+                AppLogger.viewModel.error("startRecording failed: \(error.localizedDescription, privacy: .public)")
             }
         }
+        // Dismiss task - runs when dismissTaskId is set, auto-cancelled on view disappear
+        .task(id: dismissTaskId) {
+            guard let dismissTaskId else { return }
+            // Capture dismiss action eagerly before any async work to avoid dangling @Environment
+            let dismissAction = dismiss
+            await viewModel.cancelRecording()
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+            dismissAction()
+        }
         .onDisappear {
-            // Cancel any pending tasks
-            startRecordingTask?.cancel()
-            startRecordingTask = nil
-            dismissTask?.cancel()
-            dismissTask = nil
+            // Cancel tasks by clearing their IDs (triggers task cancellation)
+            recordingTaskId = nil
+            dismissTaskId = nil
 
-            // Cleanup - only cancel if not already dismissing (prevents double-cancellation)
+            // Cleanup only if not already dismissing (dismissTask handles cleanup in that case)
             guard !isDismissing else { return }
-            Task {
+            // Use detached task for cleanup since view is disappearing
+            // This is safe because cancelRecording is idempotent
+            Task.detached { @MainActor in
                 await viewModel.cancelRecording()
             }
         }
@@ -257,25 +270,19 @@ struct RecordingModal: View {
 
     /// Handle modal dismissal with animation
     private func handleDismiss() {
-        // Prevent double-cancellation if already dismissing
+        // Prevent double-dismissal
         guard !isDismissing else { return }
         isDismissing = true
 
-        // Cancel any pending start recording task
-        startRecordingTask?.cancel()
-        startRecordingTask = nil
+        // Cancel recording task by clearing its ID
+        recordingTaskId = nil
 
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             isVisible = false
         }
 
-        // Cancel recording and dismiss after animation delay - store task for cleanup
-        dismissTask = Task { @MainActor in
-            await viewModel.cancelRecording()
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled else { return }
-            dismiss()
-        }
+        // Trigger dismiss task - it will handle cleanup and dismissal
+        dismissTaskId = UUID()
     }
 }
 

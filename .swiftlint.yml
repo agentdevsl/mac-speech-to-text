@@ -61,3 +61,27 @@ nesting:
     error: 3
 
 reporter: "xcode"
+
+# Custom rules to catch common Swift concurrency issues
+custom_rules:
+  # Detect @Observable classes with actor existential properties that aren't @ObservationIgnored
+  # This pattern can cause crashes due to executor check failures
+  observable_actor_existential_warning:
+    name: "Observable Actor Existential"
+    regex: '@Observable[\s\S]*?private\s+let\s+\w+:\s*any\s+\w*(?:Protocol|Service)'
+    message: "Actor existential types in @Observable classes should use @ObservationIgnored to prevent executor check crashes"
+    severity: warning
+    match_kinds:
+      - comment
+      - comment.mark
+      - comment.url
+      - doccomment
+      - doccomment.field
+    excluded: true  # Only match in source code, not comments
+
+  # Warn about nonisolated(unsafe) usage which can cause memory issues
+  nonisolated_unsafe_warning:
+    name: "Nonisolated Unsafe Usage"
+    regex: 'nonisolated\(unsafe\)'
+    message: "nonisolated(unsafe) bypasses actor isolation safety. Ensure proper synchronization."
+    severity: warning
