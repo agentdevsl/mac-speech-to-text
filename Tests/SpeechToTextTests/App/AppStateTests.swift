@@ -7,8 +7,20 @@ final class AppStateTests: XCTestCase {
     var appState: AppState!
     private let settingsKey = "com.speechtotext.settings"
 
+    /// Detect if running in CI environment (GitHub Actions, etc.)
+    /// AppState tests require real macOS hardware for audio/accessibility services
+    private static var isCI: Bool {
+        ProcessInfo.processInfo.environment["CI"] != nil ||
+        ProcessInfo.processInfo.environment["GITHUB_ACTIONS"] != nil
+    }
+
     override func setUp() async throws {
         try await super.setUp()
+
+        // Skip in CI - AppState creates real services that require macOS hardware
+        // These tests pass locally but crash in headless CI environments
+        try XCTSkipIf(Self.isCI, "AppStateTests require real macOS hardware, skipping in CI")
+
         // Clear settings from UserDefaults.standard to ensure test isolation
         // AppState internally uses SettingsService with .standard UserDefaults
         UserDefaults.standard.removeObject(forKey: settingsKey)
