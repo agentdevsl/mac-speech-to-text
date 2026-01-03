@@ -28,14 +28,26 @@ Use parallel tool calls and tasks where possible.
 ```
 Sources/
 ├── SpeechToTextApp/     # App entry point (@main, AppDelegate, AppState)
-├── Services/            # Business logic layer (9 services)
+├── Services/            # Business logic layer (7 services)
 ├── Models/              # Data structures (5 models)
-├── Views/               # SwiftUI components + ViewModels
-│   └── Components/      # Reusable UI components
-└── Utilities/           # Extensions and constants
+├── Views/               # SwiftUI views + ViewModels (12 files)
+│   └── Components/      # Reusable UI components (4 files)
+└── Utilities/           # Extensions, constants, and logging
+    └── Extensions/      # Color+Theme, etc.
 
 Tests/
-└── SpeechToTextTests/   # XCTest suite (14 test files)
+└── SpeechToTextTests/   # XCTest suite (24 test files)
+
+UITests/                 # XCUITest E2E tests
+
+scripts/                 # Build and test automation
+├── build-app.sh         # Build signed .app bundle (--sync for remote Mac)
+├── smoke-test.sh        # Quick crash detection test
+├── run-ui-tests.sh      # Run XCUITest suite
+├── remote-test.sh       # Run tests on remote Mac via SSH
+├── setup-signing.sh     # Configure code signing
+├── export-dmg.sh        # Create distributable DMG
+└── setup-ssh-for-mac.sh # Configure SSH for remote testing
 ```
 
 ## Key Architectural Patterns
@@ -89,7 +101,8 @@ pre-commit run --all-files # Run all pre-commit hooks
 
 ```bash
 # Development
-open SpeechToText.xcodeproj  # Open in Xcode
+open Package.swift           # Open in Xcode (generates Xcode project)
+swift build                  # Build from command line
 
 # Testing
 swift test --parallel        # Run tests in parallel
@@ -123,7 +136,8 @@ pre-commit run --all-files   # Run all hooks manually
 
 ## Key Dependencies
 
-- **FluidAudio** (v0.9.0+): Local speech-to-text SDK leveraging Apple Neural Engine
+- **FluidAudio** (main branch): Local speech-to-text SDK leveraging Apple Neural Engine
+- **ViewInspector** (v0.10.0+): SwiftUI testing library for crash detection tests
 - **AVFoundation**: Audio capture and processing
 - **ApplicationServices**: Accessibility APIs for text insertion
 - **Carbon**: Global hotkey registration
@@ -160,6 +174,33 @@ func test_recordingModal_instantiatesWithoutCrash() {
 - Brief app runs checking for crashes
 - Must run on actual macOS hardware
 - Run via `./scripts/smoke-test.sh --build --duration 5`
+
+## Scripts Reference
+
+Located in `scripts/` directory. All require macOS to run.
+
+| Script | Purpose | Key Flags |
+|--------|---------|-----------|
+| `build-app.sh` | Build signed .app bundle | `--sync` (rsync to remote Mac), `--skip-tests` |
+| `smoke-test.sh` | Quick crash detection | `--build`, `--duration <sec>` |
+| `run-ui-tests.sh` | Run XCUITest E2E suite | Requires built app |
+| `remote-test.sh` | Run tests on remote Mac | Requires SSH config |
+| `setup-signing.sh` | Configure code signing | Interactive prompts |
+| `export-dmg.sh` | Create distributable DMG | Requires signed app |
+| `create-issues.sh` | Create GitHub issues from specs | Reads from `specs/` |
+
+### Remote Testing Workflow
+For CI or when developing on non-macOS:
+```bash
+# 1. Setup SSH to your Mac (one-time)
+./scripts/setup-ssh-for-mac.sh
+
+# 2. Build and sync to remote Mac
+./scripts/build-app.sh --sync
+
+# 3. Run tests remotely
+./scripts/remote-test.sh
+```
 
 ### Concurrency Safety Patterns
 
