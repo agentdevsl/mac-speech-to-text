@@ -92,18 +92,21 @@ final class SettingsViewModel {
 
         await saveSettings()
 
-        // Register the new hotkey with the system (critical fix - was unused before)
-        // Note: UserSettings.HotkeyModifier is a typealias for KeyModifier, so direct cast works
-        do {
-            try await hotkeyService.registerHotkey(
-                keyCode: keyCode,
-                modifiers: modifiers // KeyModifier array is compatible directly
-            ) {
-                // Hotkey triggered - post notification to show recording modal
-                NotificationCenter.default.post(name: .showRecordingModal, object: nil)
+        // Only register hotkey if settings were saved successfully
+        if validationError == nil {
+            // Register the new hotkey with the system
+            // Note: UserSettings.HotkeyModifier is a typealias for KeyModifier, so direct cast works
+            do {
+                try await hotkeyService.registerHotkey(
+                    keyCode: keyCode,
+                    modifiers: modifiers // KeyModifier array is compatible directly
+                ) {
+                    // Hotkey triggered - post notification to show recording modal
+                    NotificationCenter.default.post(name: .showRecordingModal, object: nil)
+                }
+            } catch {
+                validationError = "Failed to register hotkey: \(error.localizedDescription)"
             }
-        } catch {
-            validationError = "Failed to register hotkey: \(error.localizedDescription)"
         }
     }
 

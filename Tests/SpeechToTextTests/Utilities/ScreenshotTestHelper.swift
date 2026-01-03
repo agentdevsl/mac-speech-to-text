@@ -11,8 +11,10 @@ final class ScreenshotTestHelper {
 
     /// Initialize with a custom screenshot directory
     init(testName: String) {
+        // Sanitize test name to create a valid directory name
+        let sanitizedTestName = testName.components(separatedBy: CharacterSet.alphanumerics.inverted).joined()
         let tempDir = FileManager.default.temporaryDirectory
-        screenshotDirectory = tempDir.appendingPathComponent("SpeechToTextScreenshots/\(testName)")
+        screenshotDirectory = tempDir.appendingPathComponent("SpeechToTextScreenshots/\(sanitizedTestName)")
 
         // Create directory if it doesn't exist
         try? FileManager.default.createDirectory(

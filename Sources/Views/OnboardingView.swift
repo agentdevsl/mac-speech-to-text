@@ -49,12 +49,13 @@ struct OnboardingView: View {
             // Start permission checking loop for permission steps
             permissionCheckTask = Task { @MainActor in
                 while !Task.isCancelled {
-                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-                    guard !Task.isCancelled else { break }
-                    // Only check permissions when on permission steps (1-3)
+                    // Check permissions first for immediate responsiveness
                     if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
                         await viewModel.checkAllPermissions()
                     }
+                    // Sleep for 1 second before the next check
+                    try? await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard !Task.isCancelled else { break }
                 }
             }
         }
