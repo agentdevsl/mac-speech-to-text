@@ -250,21 +250,27 @@ final class AppStateTests: XCTestCase {
     }
 
     func test_completeOnboarding_updatesSettings() {
-        // Given - ensure fresh state
-        UserDefaults.standard.removeObject(forKey: settingsKey)
-        UserDefaults.standard.synchronize()
-        let freshAppState = AppState()
-        XCTAssertFalse(freshAppState.settings.onboarding.completed)
-        XCTAssertNil(freshAppState.errorMessage, "Should have no error before onboarding")
+        // Given - use the class-level appState which is initialized with clean UserDefaults
+        // in setUp() to avoid race conditions with UserDefaults syncing
+        XCTAssertFalse(appState.settings.onboarding.completed, "Onboarding should not be completed initially")
+        XCTAssertNil(appState.errorMessage, "Should have no error before onboarding")
 
         // When
-        freshAppState.completeOnboarding()
+        appState.completeOnboarding()
 
-        // Then
-        XCTAssertNil(freshAppState.errorMessage, "Should have no error after completeOnboarding")
+        // Then - verify both the in-memory state and that no error occurred
+        XCTAssertNil(appState.errorMessage, "Should have no error after completeOnboarding")
         XCTAssertTrue(
-            freshAppState.settings.onboarding.completed,
+            appState.settings.onboarding.completed,
             "Settings should be updated after completeOnboarding"
+        )
+
+        // Also verify persistence by reloading settings
+        let settingsService = SettingsService()
+        let reloadedSettings = settingsService.load()
+        XCTAssertTrue(
+            reloadedSettings.onboarding.completed,
+            "Settings should persist to UserDefaults"
         )
     }
 
