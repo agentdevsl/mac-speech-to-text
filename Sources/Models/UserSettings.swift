@@ -22,12 +22,14 @@ struct UserSettings: Codable, Sendable {
         general: GeneralConfiguration(
             launchAtLogin: false,
             autoInsertText: true,
-            copyToClipboard: true
+            copyToClipboard: true,
+            accessibilityPromptDismissed: false,
+            clipboardOnlyMode: false
         ),
         hotkey: HotkeyConfiguration(
             enabled: true,
             keyCode: 49, // Space key
-            modifiers: [.command, .control],
+            modifiers: [.control, .shift], // ⌃⇧Space - avoids conflict with macOS emoji picker (⌘⌃Space)
             conflictDetected: false
         ),
         language: LanguageConfiguration(
@@ -49,7 +51,8 @@ struct UserSettings: Codable, Sendable {
             showWaveform: true,
             showConfidenceIndicator: true,
             animationsEnabled: true,
-            menuBarIcon: .default
+            menuBarIcon: .default,
+            recordingMode: .holdToRecord
         ),
         privacy: PrivacyConfiguration(
             collectAnonymousStats: true,
@@ -62,8 +65,7 @@ struct UserSettings: Codable, Sendable {
             currentStep: 0,
             permissionsGranted: PermissionsGranted(
                 microphone: false,
-                accessibility: false,
-                inputMonitoring: false
+                accessibility: false
             ),
             skippedSteps: []
         ),
@@ -75,6 +77,8 @@ struct GeneralConfiguration: Codable, Sendable {
     var launchAtLogin: Bool
     var autoInsertText: Bool
     var copyToClipboard: Bool
+    var accessibilityPromptDismissed: Bool
+    var clipboardOnlyMode: Bool
 }
 
 struct HotkeyConfiguration: Codable, Sendable {
@@ -124,6 +128,7 @@ struct UIConfiguration: Codable, Sendable {
     var showConfidenceIndicator: Bool
     var animationsEnabled: Bool
     var menuBarIcon: MenuBarIcon
+    var recordingMode: RecordingMode
 }
 
 enum Theme: String, Codable, Sendable {
@@ -164,6 +169,18 @@ enum MenuBarIcon: String, Codable, Sendable {
     }
 }
 
+enum RecordingMode: String, Codable, CaseIterable, Sendable {
+    case holdToRecord
+    case toggle
+
+    var displayName: String {
+        switch self {
+        case .holdToRecord: return "Hold to Record"
+        case .toggle: return "Toggle"
+        }
+    }
+}
+
 struct PrivacyConfiguration: Codable, Sendable {
     var collectAnonymousStats: Bool
     var storagePolicy: StoragePolicy
@@ -190,18 +207,25 @@ struct OnboardingState: Codable, Sendable {
     var currentStep: Int
     var permissionsGranted: PermissionsGranted
     var skippedSteps: [String]
+
+    /// Last known app bundle ID when permissions were granted
+    /// Used to detect signing/rebuild changes that invalidate permissions
+    var lastKnownBundleId: String?
+
+    /// Last known team ID when permissions were granted
+    /// Used to detect signing identity changes
+    var lastKnownTeamId: String?
 }
 
 struct PermissionsGranted: Codable, Sendable {
     var microphone: Bool
     var accessibility: Bool
-    var inputMonitoring: Bool
 
     var allGranted: Bool {
-        microphone && accessibility && inputMonitoring
+        microphone && accessibility
     }
 
     var hasAnyPermission: Bool {
-        microphone || accessibility || inputMonitoring
+        microphone || accessibility
     }
 }

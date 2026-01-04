@@ -78,7 +78,8 @@
       "Write(.mcp.json)",
       "Update(.mcp.json)",
       "Edit(.mcp.json)",
-      "mcp__terraform__create_workspace_variable"
+      "mcp__terraform__create_workspace_variable",
+      "Bash(rm -rf:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

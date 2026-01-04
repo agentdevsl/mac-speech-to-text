@@ -69,6 +69,7 @@ struct WaveformView: View {
             }
         }
         .frame(height: 80)
+        .accessibilityIdentifier("waveformView")
         .accessibilityLabel("Audio waveform visualization")
         .accessibilityValue("Audio level at \(Int(audioLevel * 100)) percent")
         .onChange(of: audioLevel) { _, newValue in

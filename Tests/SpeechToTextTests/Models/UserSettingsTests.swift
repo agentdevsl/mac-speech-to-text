@@ -14,7 +14,8 @@ final class UserSettingsTests: XCTestCase {
     }
 
     func test_defaultSettings_hotkey_hasCorrectModifiers() {
-        XCTAssertEqual(UserSettings.default.hotkey.modifiers, [.command, .control])
+        // Default uses Control+Shift+Space to avoid conflict with macOS emoji picker (Cmd+Ctrl+Space)
+        XCTAssertEqual(UserSettings.default.hotkey.modifiers, [.control, .shift])
     }
 
     func test_defaultSettings_hotkey_isEnabled() {
@@ -30,6 +31,8 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertFalse(general.launchAtLogin)
         XCTAssertTrue(general.autoInsertText)
         XCTAssertTrue(general.copyToClipboard)
+        XCTAssertFalse(general.accessibilityPromptDismissed)
+        XCTAssertFalse(general.clipboardOnlyMode)
     }
 
     func test_defaultSettings_language_hasCorrectDefaults() {
@@ -57,6 +60,7 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertTrue(ui.showConfidenceIndicator)
         XCTAssertTrue(ui.animationsEnabled)
         XCTAssertEqual(ui.menuBarIcon, .default)
+        XCTAssertEqual(ui.recordingMode, .holdToRecord)
     }
 
     func test_defaultSettings_privacy_hasCorrectDefaults() {
@@ -73,7 +77,6 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertTrue(onboarding.skippedSteps.isEmpty)
         XCTAssertFalse(onboarding.permissionsGranted.microphone)
         XCTAssertFalse(onboarding.permissionsGranted.accessibility)
-        XCTAssertFalse(onboarding.permissionsGranted.inputMonitoring)
     }
 
     // MARK: - KeyModifier Tests
@@ -122,27 +125,27 @@ final class UserSettingsTests: XCTestCase {
     // MARK: - PermissionsGranted Tests
 
     func test_permissionsGranted_allGranted_returnsTrueWhenAllTrue() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: true, inputMonitoring: true)
+        let permissions = PermissionsGranted(microphone: true, accessibility: true)
         XCTAssertTrue(permissions.allGranted)
     }
 
     func test_permissionsGranted_allGranted_returnsFalseWhenAnyFalse() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: false, inputMonitoring: true)
+        let permissions = PermissionsGranted(microphone: true, accessibility: false)
         XCTAssertFalse(permissions.allGranted)
     }
 
     func test_permissionsGranted_allGranted_returnsFalseWhenAllFalse() {
-        let permissions = PermissionsGranted(microphone: false, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: false, accessibility: false)
         XCTAssertFalse(permissions.allGranted)
     }
 
     func test_permissionsGranted_hasAnyPermission_returnsTrueWhenOneTrue() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: true, accessibility: false)
         XCTAssertTrue(permissions.hasAnyPermission)
     }
 
     func test_permissionsGranted_hasAnyPermission_returnsFalseWhenAllFalse() {
-        let permissions = PermissionsGranted(microphone: false, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: false, accessibility: false)
         XCTAssertFalse(permissions.hasAnyPermission)
     }
 
@@ -218,5 +221,47 @@ final class UserSettingsTests: XCTestCase {
 
         XCTAssertEqual(settings.audio.sensitivity, 0.8)
         XCTAssertEqual(settings.audio.silenceThreshold, 2.0)
+    }
+
+    func test_userSettings_generalCanBeModified() {
+        var settings = UserSettings.default
+        settings.general.accessibilityPromptDismissed = true
+        settings.general.clipboardOnlyMode = true
+
+        XCTAssertTrue(settings.general.accessibilityPromptDismissed)
+        XCTAssertTrue(settings.general.clipboardOnlyMode)
+    }
+
+    // MARK: - RecordingMode Tests
+
+    func test_recordingMode_displayName_returnsCorrectNames() {
+        XCTAssertEqual(RecordingMode.holdToRecord.displayName, "Hold to Record")
+        XCTAssertEqual(RecordingMode.toggle.displayName, "Toggle")
+    }
+
+    func test_recordingMode_allCases_hasTwoCases() {
+        XCTAssertEqual(RecordingMode.allCases.count, 2)
+    }
+
+    func test_recordingMode_codableRoundtrip() throws {
+        for mode in RecordingMode.allCases {
+            let data = try JSONEncoder().encode(mode)
+            let decoded = try JSONDecoder().decode(RecordingMode.self, from: data)
+            XCTAssertEqual(decoded, mode)
+        }
+    }
+
+    // MARK: - GeneralConfiguration New Fields Codable Tests
+
+    func test_generalConfiguration_newFieldsCodableRoundtrip() throws {
+        var general = UserSettings.default.general
+        general.accessibilityPromptDismissed = true
+        general.clipboardOnlyMode = true
+
+        let data = try JSONEncoder().encode(general)
+        let decoded = try JSONDecoder().decode(GeneralConfiguration.self, from: data)
+
+        XCTAssertEqual(decoded.accessibilityPromptDismissed, true)
+        XCTAssertEqual(decoded.clipboardOnlyMode, true)
     }
 }

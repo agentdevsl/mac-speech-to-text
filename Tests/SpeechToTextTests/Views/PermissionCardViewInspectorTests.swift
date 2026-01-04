@@ -77,41 +77,6 @@ final class PermissionCardViewInspectorTests: XCTestCase {
         XCTAssertEqual(card.buttonTitle, "Open System Settings")
     }
 
-    // MARK: - Input Monitoring Card Tests
-
-    func test_inputMonitoringCard_hasCorrectIcon() throws {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.icon, "keyboard.fill")
-    }
-
-    func test_inputMonitoringCard_hasCorrectTitle() throws {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.title, "Input Monitoring")
-    }
-
-    func test_inputMonitoringCard_hasCorrectDescription() throws {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertTrue(card.description.contains("global hotkey"))
-        XCTAssertTrue(card.description.contains("⌘⌃Space"))
-    }
-
-    func test_inputMonitoringCard_hasSystemSettingsButton() throws {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.buttonTitle, "Open System Settings")
-    }
-
     // MARK: - Granted State Tests
 
     func test_card_showsGrantedWhenTrue() throws {
@@ -165,15 +130,6 @@ final class PermissionCardViewInspectorTests: XCTestCase {
         XCTAssertNotNil(view)
     }
 
-    func test_inputMonitoringCard_rendersWithoutCrashing() throws {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // When/Then
-        let view = try card.inspect()
-        XCTAssertNotNil(view)
-    }
-
     func test_grantedCard_rendersWithoutCrashing() throws {
         // Given
         let card = PermissionCard.microphone(isGranted: true) {}
@@ -207,10 +163,9 @@ final class PermissionCardViewInspectorTests: XCTestCase {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
-        let icons = [micCard.icon, accessCard.icon, inputCard.icon]
+        let icons = [micCard.icon, accessCard.icon]
         let uniqueIcons = Set(icons)
         XCTAssertEqual(icons.count, uniqueIcons.count, "All permission types should have unique icons")
     }
@@ -219,10 +174,9 @@ final class PermissionCardViewInspectorTests: XCTestCase {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
-        let titles = [micCard.title, accessCard.title, inputCard.title]
+        let titles = [micCard.title, accessCard.title]
         let uniqueTitles = Set(titles)
         XCTAssertEqual(titles.count, uniqueTitles.count, "All permission types should have unique titles")
     }
@@ -231,12 +185,10 @@ final class PermissionCardViewInspectorTests: XCTestCase {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
         XCTAssertFalse(micCard.description.isEmpty)
         XCTAssertFalse(accessCard.description.isEmpty)
-        XCTAssertFalse(inputCard.description.isEmpty)
     }
 
     // MARK: - Edge Case Tests

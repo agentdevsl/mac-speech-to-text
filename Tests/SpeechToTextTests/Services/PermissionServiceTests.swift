@@ -66,97 +66,6 @@ final class PermissionServiceTests: XCTestCase {
         }
     }
 
-    // MARK: - Input Monitoring Permission Tests
-
-    func test_checkInputMonitoringPermission_returnsBooleanValue() {
-        // Given
-        let service = PermissionService()
-
-        // When
-        let hasPermission = service.checkInputMonitoringPermission()
-
-        // Then
-        XCTAssertNotNil(hasPermission)
-    }
-
-    func test_checkInputMonitoringPermission_usesIOHIDCheckAccess() {
-        // Given
-        // This test verifies that the IOHIDCheckAccess API is being used correctly
-        // The real PermissionService calls IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
-        // and compares the result to kIOHIDAccessTypeGranted
-        let service = PermissionService()
-
-        // When
-        // The method should return a boolean without crashing
-        // IOHIDCheckAccess returns IOHIDAccessType which is compared to kIOHIDAccessTypeGranted
-        let result = service.checkInputMonitoringPermission()
-
-        // Then
-        // Verify the method completes successfully and returns a valid boolean
-        // The result will be true if permission is granted, false otherwise
-        XCTAssertTrue(result == true || result == false, "Method should return a valid boolean")
-    }
-
-    func test_checkInputMonitoringPermission_returnsTrueWhenGranted() async {
-        // Given
-        let mockService = MockPermissionService()
-        mockService.inputMonitoringGranted = true
-
-        // When
-        let hasPermission = mockService.checkInputMonitoringPermission()
-
-        // Then
-        XCTAssertTrue(hasPermission, "Should return true when input monitoring is granted")
-    }
-
-    func test_checkInputMonitoringPermission_returnsFalseWhenDenied() async {
-        // Given
-        let mockService = MockPermissionService()
-        mockService.inputMonitoringGranted = false
-
-        // When
-        let hasPermission = mockService.checkInputMonitoringPermission()
-
-        // Then
-        XCTAssertFalse(hasPermission, "Should return false when input monitoring is denied")
-    }
-
-    func test_checkInputMonitoringPermission_canBeToggledInMock() async {
-        // Given
-        let mockService = MockPermissionService()
-
-        // When - Initially granted
-        mockService.inputMonitoringGranted = true
-        let initialResult = mockService.checkInputMonitoringPermission()
-
-        // Then - Switch to denied
-        mockService.inputMonitoringGranted = false
-        let deniedResult = mockService.checkInputMonitoringPermission()
-
-        // And back to granted
-        mockService.inputMonitoringGranted = true
-        let grantedAgainResult = mockService.checkInputMonitoringPermission()
-
-        // Verify all transitions work correctly
-        XCTAssertTrue(initialResult, "Initial state should be granted")
-        XCTAssertFalse(deniedResult, "Should return false after setting to denied")
-        XCTAssertTrue(grantedAgainResult, "Should return true after re-granting")
-    }
-
-    func test_realPermissionService_inputMonitoringReturnsConsistentValue() {
-        // Given
-        let service = PermissionService()
-
-        // When - Call multiple times
-        let result1 = service.checkInputMonitoringPermission()
-        let result2 = service.checkInputMonitoringPermission()
-        let result3 = service.checkInputMonitoringPermission()
-
-        // Then - Results should be consistent
-        XCTAssertEqual(result1, result2, "Multiple calls should return consistent results")
-        XCTAssertEqual(result2, result3, "Multiple calls should return consistent results")
-    }
-
     // MARK: - Get All Permissions Tests
 
     func test_getAllPermissionStatuses_returnsPermissionsGrantedStruct() async {
@@ -169,7 +78,6 @@ final class PermissionServiceTests: XCTestCase {
         // Then
         XCTAssertNotNil(permissions.microphone)
         XCTAssertNotNil(permissions.accessibility)
-        XCTAssertNotNil(permissions.inputMonitoring)
     }
 
     // MARK: - Request All Permissions Tests
@@ -197,17 +105,14 @@ final class PermissionServiceTests: XCTestCase {
         let mockService = MockPermissionService()
         mockService.microphoneGranted = true
         mockService.accessibilityGranted = true
-        mockService.inputMonitoringGranted = true
 
         // When
         let hasMicrophone = await mockService.checkMicrophonePermission()
         let hasAccessibility = mockService.checkAccessibilityPermission()
-        let hasInputMonitoring = mockService.checkInputMonitoringPermission()
 
         // Then
         XCTAssertTrue(hasMicrophone)
         XCTAssertTrue(hasAccessibility)
-        XCTAssertTrue(hasInputMonitoring)
     }
 
     func test_mockPermissionService_allowsTestingWithDeniedPermissions() async {
@@ -215,17 +120,14 @@ final class PermissionServiceTests: XCTestCase {
         let mockService = MockPermissionService()
         mockService.microphoneGranted = false
         mockService.accessibilityGranted = false
-        mockService.inputMonitoringGranted = false
 
         // When
         let hasMicrophone = await mockService.checkMicrophonePermission()
         let hasAccessibility = mockService.checkAccessibilityPermission()
-        let hasInputMonitoring = mockService.checkInputMonitoringPermission()
 
         // Then
         XCTAssertFalse(hasMicrophone)
         XCTAssertFalse(hasAccessibility)
-        XCTAssertFalse(hasInputMonitoring)
     }
 
     func test_mockPermissionService_requestMicrophone_throwsWhenDenied() async {
@@ -286,26 +188,13 @@ final class PermissionServiceTests: XCTestCase {
         XCTAssertTrue(description?.contains("System Settings") ?? false)
     }
 
-    func test_permissionError_inputMonitoringDenied_hasCorrectDescription() {
-        // Given
-        let error = PermissionError.inputMonitoringDenied
-
-        // When
-        let description = error.errorDescription
-
-        // Then
-        XCTAssertTrue(description?.contains("Input Monitoring permission denied") ?? false)
-        XCTAssertTrue(description?.contains("System Settings") ?? false)
-    }
-
     // MARK: - PermissionsGranted Tests
 
     func test_permissionsGranted_allGranted_returnsTrueWhenAllTrue() {
         // Given
         let permissions = PermissionsGranted(
             microphone: true,
-            accessibility: true,
-            inputMonitoring: true
+            accessibility: true
         )
 
         // When/Then
@@ -316,8 +205,7 @@ final class PermissionServiceTests: XCTestCase {
         // Given
         let permissions = PermissionsGranted(
             microphone: true,
-            accessibility: false,
-            inputMonitoring: true
+            accessibility: false
         )
 
         // When/Then
@@ -328,8 +216,7 @@ final class PermissionServiceTests: XCTestCase {
         // Given
         let permissions = PermissionsGranted(
             microphone: false,
-            accessibility: true,
-            inputMonitoring: false
+            accessibility: true
         )
 
         // When/Then
@@ -340,11 +227,137 @@ final class PermissionServiceTests: XCTestCase {
         // Given
         let permissions = PermissionsGranted(
             microphone: false,
-            accessibility: false,
-            inputMonitoring: false
+            accessibility: false
         )
 
         // When/Then
         XCTAssertFalse(permissions.hasAnyPermission)
+    }
+
+    // MARK: - PermissionStateVerification Tests
+
+    func test_permissionStateVerification_hasMismatch_trueWhenStoredGrantedButActualDenied() {
+        // Given: Stored says microphone granted, but actual is denied
+        let verification = PermissionStateVerification(
+            storedMicrophoneGranted: true,
+            actualMicrophoneGranted: false,
+            storedAccessibilityGranted: false,
+            actualAccessibilityGranted: false
+        )
+
+        // When/Then
+        XCTAssertTrue(verification.hasMismatch)
+        XCTAssertNotNil(verification.mismatchDescription)
+        XCTAssertTrue(verification.mismatchDescription?.contains("microphone") ?? false)
+    }
+
+    func test_permissionStateVerification_hasMismatch_falseWhenStoredDeniedButActualGranted() {
+        // Given: Stored says denied, but actual is granted (user granted via System Settings)
+        // This is NOT a mismatch - it's an upgrade
+        let verification = PermissionStateVerification(
+            storedMicrophoneGranted: false,
+            actualMicrophoneGranted: true,
+            storedAccessibilityGranted: false,
+            actualAccessibilityGranted: true
+        )
+
+        // When/Then
+        XCTAssertFalse(verification.hasMismatch)
+        XCTAssertNil(verification.mismatchDescription)
+    }
+
+    func test_permissionStateVerification_hasMismatch_falseWhenBothMatch() {
+        // Given: Stored and actual match
+        let verification = PermissionStateVerification(
+            storedMicrophoneGranted: true,
+            actualMicrophoneGranted: true,
+            storedAccessibilityGranted: true,
+            actualAccessibilityGranted: true
+        )
+
+        // When/Then
+        XCTAssertFalse(verification.hasMismatch)
+        XCTAssertNil(verification.mismatchDescription)
+    }
+
+    func test_permissionStateVerification_hasMismatch_detectsBothPermissionMismatches() {
+        // Given: Both permissions have stale grants
+        let verification = PermissionStateVerification(
+            storedMicrophoneGranted: true,
+            actualMicrophoneGranted: false,
+            storedAccessibilityGranted: true,
+            actualAccessibilityGranted: false
+        )
+
+        // When/Then
+        XCTAssertTrue(verification.hasMismatch)
+        XCTAssertTrue(verification.mismatchDescription?.contains("microphone") ?? false)
+        XCTAssertTrue(verification.mismatchDescription?.contains("accessibility") ?? false)
+    }
+
+    // MARK: - verifyPermissionStateConsistency Tests
+
+    func test_mockPermissionService_verifyPermissionStateConsistency_detectsMismatch() async {
+        // Given: Mock service with actual permissions denied
+        let mockService = MockPermissionService()
+        mockService.microphoneGranted = false
+        mockService.accessibilityGranted = false
+
+        // Settings with stored permissions as granted (stale)
+        var settings = UserSettings.default
+        settings.onboarding.permissionsGranted = PermissionsGranted(
+            microphone: true,
+            accessibility: true
+        )
+
+        // When
+        let verification = await mockService.verifyPermissionStateConsistency(settings: settings)
+
+        // Then
+        XCTAssertTrue(verification.hasMismatch)
+        XCTAssertTrue(verification.storedMicrophoneGranted)
+        XCTAssertFalse(verification.actualMicrophoneGranted)
+        XCTAssertTrue(verification.storedAccessibilityGranted)
+        XCTAssertFalse(verification.actualAccessibilityGranted)
+    }
+
+    func test_mockPermissionService_verifyPermissionStateConsistency_noMismatchWhenConsistent() async {
+        // Given: Mock service with actual permissions granted
+        let mockService = MockPermissionService()
+        mockService.microphoneGranted = true
+        mockService.accessibilityGranted = true
+
+        // Settings with stored permissions as granted (consistent)
+        var settings = UserSettings.default
+        settings.onboarding.permissionsGranted = PermissionsGranted(
+            microphone: true,
+            accessibility: true
+        )
+
+        // When
+        let verification = await mockService.verifyPermissionStateConsistency(settings: settings)
+
+        // Then
+        XCTAssertFalse(verification.hasMismatch)
+    }
+
+    func test_mockPermissionService_verifyPermissionStateConsistency_noMismatchOnFirstLaunch() async {
+        // Given: Mock service with actual permissions denied (first launch)
+        let mockService = MockPermissionService()
+        mockService.microphoneGranted = false
+        mockService.accessibilityGranted = false
+
+        // Settings with stored permissions as denied (first launch state)
+        var settings = UserSettings.default
+        settings.onboarding.permissionsGranted = PermissionsGranted(
+            microphone: false,
+            accessibility: false
+        )
+
+        // When
+        let verification = await mockService.verifyPermissionStateConsistency(settings: settings)
+
+        // Then
+        XCTAssertFalse(verification.hasMismatch)
     }
 }

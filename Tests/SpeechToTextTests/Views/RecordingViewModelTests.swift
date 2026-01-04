@@ -457,6 +457,176 @@ final class RecordingViewModelTests: XCTestCase {
         // Then
         XCTAssertEqual(error.errorDescription, "Text insertion failed: Accessibility error")
     }
+
+    // MARK: - New Properties Tests (showAccessibilityPrompt, lastTranscriptionCopiedToClipboard)
+
+    func test_initialization_setsAccessibilityPromptFalse() {
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+        XCTAssertFalse(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    func test_cancelRecording_resetsAccessibilityPromptState() async throws {
+        // Given
+        try await sut.startRecording()
+        sut.showAccessibilityPrompt = true
+        sut.lastTranscriptionCopiedToClipboard = true
+
+        // When
+        await sut.cancelRecording()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+        XCTAssertFalse(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    // MARK: - onHotkeyReleased Tests
+
+    func test_onHotkeyReleased_throwsWhenNotRecording() async {
+        // When/Then
+        do {
+            try await sut.onHotkeyReleased()
+            XCTFail("Expected notRecording error")
+        } catch let error as RecordingError {
+            XCTAssertEqual(error, .notRecording)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func test_onHotkeyReleased_stopsRecording() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test", confidence: 0.9, durationMs: 1000))
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then
+        XCTAssertFalse(sut.isRecording)
+        XCTAssertTrue(mockAudioService.stopCaptureCalled)
+    }
+
+    func test_onHotkeyReleased_throwsWhenNoAudio() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = []
+
+        // When/Then
+        do {
+            try await sut.onHotkeyReleased()
+            XCTFail("Expected noAudioCaptured error")
+        } catch let error as RecordingError {
+            XCTAssertEqual(error, .noAudioCaptured)
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func test_onHotkeyReleased_usesInsertTextWithFallback() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Hello world", confidence: 0.95, durationMs: 1500))
+        mockTextInsertionService.mockFallbackResult = .insertedViaAccessibility
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then
+        XCTAssertTrue(mockTextInsertionService.insertTextWithFallbackCalled)
+        XCTAssertEqual(mockTextInsertionService.lastInsertedText, "Hello world")
+    }
+
+    func test_onHotkeyReleased_showsAccessibilityPromptWhenRequired() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test", confidence: 0.9, durationMs: 1000))
+        mockTextInsertionService.mockFallbackResult = .requiresAccessibilityPermission
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then
+        XCTAssertTrue(sut.showAccessibilityPrompt)
+        XCTAssertTrue(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    func test_onHotkeyReleased_setsClipboardOnlyFlag() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test", confidence: 0.9, durationMs: 1000))
+        mockTextInsertionService.mockFallbackResult = .copiedToClipboardOnly(reason: .userPreference)
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+        XCTAssertTrue(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    func test_onHotkeyReleased_clearsAccessibilityPromptFlagOnSuccess() async throws {
+        // Given
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test", confidence: 0.9, durationMs: 1000))
+        mockTextInsertionService.mockFallbackResult = .insertedViaAccessibility
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+        XCTAssertFalse(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    func test_onHotkeyReleased_resetsPromptStateBeforeProcessing() async throws {
+        // Given - set prompt state from previous session
+        sut.showAccessibilityPrompt = true
+        sut.lastTranscriptionCopiedToClipboard = true
+
+        try await sut.startRecording()
+        mockAudioService.mockSamples = [100, 200, 300]
+        await mockFluidAudioService.setMockResult(TranscriptionResult(text: "Test", confidence: 0.9, durationMs: 1000))
+        mockTextInsertionService.mockFallbackResult = .insertedViaAccessibility
+
+        // When
+        try await sut.onHotkeyReleased()
+
+        // Then - should reset and then set based on result
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+        XCTAssertFalse(sut.lastTranscriptionCopiedToClipboard)
+    }
+
+    // MARK: - dismissAccessibilityPrompt Tests
+
+    func test_dismissAccessibilityPrompt_hidesPrompt() {
+        // Given
+        sut.showAccessibilityPrompt = true
+
+        // When
+        sut.dismissAccessibilityPrompt()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+    }
+
+    // MARK: - setClipboardOnlyMode Tests
+
+    func test_setClipboardOnlyMode_hidesPrompt() {
+        // Given
+        sut.showAccessibilityPrompt = true
+
+        // When
+        sut.setClipboardOnlyMode()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+    }
 }
 
 // MARK: - Mock Services
@@ -523,10 +693,18 @@ actor MockFluidAudioServiceForRecording: FluidAudioServiceProtocol {
 
 class MockTextInsertionServiceForRecording: TextInsertionService {
     var insertTextCalled = false
+    var insertTextWithFallbackCalled = false
     var lastInsertedText: String?
+    var mockFallbackResult: TextInsertionResult = .insertedViaAccessibility
 
     override func insertText(_ text: String) async throws {
         insertTextCalled = true
         lastInsertedText = text
+    }
+
+    override func insertTextWithFallback(_ text: String) async -> TextInsertionResult {
+        insertTextWithFallbackCalled = true
+        lastInsertedText = text
+        return mockFallbackResult
     }
 }

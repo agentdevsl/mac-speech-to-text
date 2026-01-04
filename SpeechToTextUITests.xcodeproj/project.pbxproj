@@ -1,0 +1,321 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		/* UI Test Files */
+		C10000001A000001 /* UITestBase.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000001; };
+		C10000001A000002 /* UITestHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000002; };
+		C10000001A000003 /* OnboardingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000003; };
+		C10000001A000004 /* RecordingFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000004; };
+		C10000001A000005 /* TestInfrastructureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000005; };
+		C10000001A000006 /* ErrorStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000006; };
+		C10000001A000007 /* LanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000007; };
+		C10000001A000008 /* SettingsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000008; };
+		C10000001A000009 /* AccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000009; };
+		C10000001A00000A /* SpeechToTextUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000A; };
+		C10000001A00000B /* LaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000B; };
+		C10000001A00000C /* AccessibilityIDs.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000C; };
+		C10000001A00000D /* GlassOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000D; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		/* UI Test Files */
+		D10000001A000001 /* UITestBase.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestBase.swift; sourceTree = "<group>"; };
+		D10000001A000002 /* UITestHelpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UITestHelpers.swift; sourceTree = "<group>"; };
+		D10000001A000003 /* OnboardingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowTests.swift; sourceTree = "<group>"; };
+		D10000001A000004 /* RecordingFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingFlowTests.swift; sourceTree = "<group>"; };
+		D10000001A000005 /* TestInfrastructureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestInfrastructureTests.swift; sourceTree = "<group>"; };
+		D10000001A000006 /* ErrorStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorStateTests.swift; sourceTree = "<group>"; };
+		D10000001A000007 /* LanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageTests.swift; sourceTree = "<group>"; };
+		D10000001A000008 /* SettingsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsTests.swift; sourceTree = "<group>"; };
+		D10000001A000009 /* AccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityTests.swift; sourceTree = "<group>"; };
+		D10000001A00000A /* SpeechToTextUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechToTextUITests.swift; sourceTree = "<group>"; };
+		D10000001A00000B /* LaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchArguments.swift; sourceTree = "<group>"; };
+		D10000001A00000C /* AccessibilityIDs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityIDs.swift; sourceTree = "<group>"; };
+		D10000001A00000D /* GlassOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOverlayTests.swift; sourceTree = "<group>"; };
+		/* Products */
+		F10000001A000003 /* SpeechToTextUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpeechToTextUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F10000001A000011 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		G10000001A000000 /* Main */ = {
+			isa = PBXGroup;
+			children = (
+				G10000001A000050 /* UITests */,
+				G10000001A000099 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G10000001A000050 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				G10000001A000051 /* Base */,
+				G10000001A000052 /* P1 */,
+				G10000001A000053 /* P2 */,
+				G10000001A000054 /* P3 */,
+				D10000001A00000A /* SpeechToTextUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		G10000001A000051 /* Base */ = {
+			isa = PBXGroup;
+			children = (
+				D10000001A00000C /* AccessibilityIDs.swift */,
+				D10000001A00000B /* LaunchArguments.swift */,
+				D10000001A000001 /* UITestBase.swift */,
+				D10000001A000002 /* UITestHelpers.swift */,
+			);
+			path = Base;
+			sourceTree = "<group>";
+		};
+		G10000001A000052 /* P1 */ = {
+			isa = PBXGroup;
+			children = (
+				D10000001A00000D /* GlassOverlayTests.swift */,
+				D10000001A000003 /* OnboardingFlowTests.swift */,
+				D10000001A000004 /* RecordingFlowTests.swift */,
+				D10000001A000005 /* TestInfrastructureTests.swift */,
+			);
+			path = P1;
+			sourceTree = "<group>";
+		};
+		G10000001A000053 /* P2 */ = {
+			isa = PBXGroup;
+			children = (
+				D10000001A000006 /* ErrorStateTests.swift */,
+				D10000001A000007 /* LanguageTests.swift */,
+				D10000001A000008 /* SettingsTests.swift */,
+			);
+			path = P2;
+			sourceTree = "<group>";
+		};
+		G10000001A000054 /* P3 */ = {
+			isa = PBXGroup;
+			children = (
+				D10000001A000009 /* AccessibilityTests.swift */,
+			);
+			path = P3;
+			sourceTree = "<group>";
+		};
+		G10000001A000099 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F10000001A000003 /* SpeechToTextUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F10000001A000100 /* SpeechToTextUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000001A000120;
+			buildPhases = (
+				F10000001A000130 /* Sources */,
+				F10000001A000011 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SpeechToTextUITests;
+			productName = SpeechToTextUITests;
+			productReference = F10000001A000003;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		089C1665FE841209C02AAC07 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					F10000001A000100 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = F10000001A000200;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = G10000001A000000;
+			productRefGroup = G10000001A000099;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F10000001A000100 /* SpeechToTextUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F10000001A000130 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000001A00000C /* AccessibilityIDs.swift in Sources */,
+				C10000001A00000B /* LaunchArguments.swift in Sources */,
+				C10000001A000001 /* UITestBase.swift in Sources */,
+				C10000001A000002 /* UITestHelpers.swift in Sources */,
+				C10000001A00000D /* GlassOverlayTests.swift in Sources */,
+				C10000001A000003 /* OnboardingFlowTests.swift in Sources */,
+				C10000001A000004 /* RecordingFlowTests.swift in Sources */,
+				C10000001A000005 /* TestInfrastructureTests.swift in Sources */,
+				C10000001A000006 /* ErrorStateTests.swift in Sources */,
+				C10000001A000007 /* LanguageTests.swift in Sources */,
+				C10000001A000008 /* SettingsTests.swift in Sources */,
+				C10000001A000009 /* AccessibilityTests.swift in Sources */,
+				C10000001A00000A /* SpeechToTextUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F10000001A000201 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F10000001A000202 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		F10000001A000121 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.SpeechToTextUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F10000001A000122 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.SpeechToTextUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000001A000200 /* Build configuration list for PBXProject "SpeechToTextUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F10000001A000201 /* Debug */,
+				F10000001A000202 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000001A000120 /* Build configuration list for PBXNativeTarget "SpeechToTextUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F10000001A000121 /* Debug */,
+				F10000001A000122 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 089C1665FE841209C02AAC07 /* Project object */;
+}

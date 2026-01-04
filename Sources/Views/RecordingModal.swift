@@ -39,43 +39,96 @@ struct RecordingModal: View {
 
     var body: some View {
         ZStack {
-            // Background dimming
-            Color.black.opacity(0.2)
+            // Subtle background for click-to-dismiss
+            Color.black.opacity(0.01)
                 .ignoresSafeArea()
                 .onTapGesture {
                     // T030: Dismiss on outside click
                     handleDismiss()
                 }
 
-            // Main modal content
-            VStack(spacing: 24) {
-                // Header
-                headerView
+            // Compact glass modal
+            VStack(spacing: 12) {
+                // Compact header
+                compactHeaderView
 
-                // Waveform visualization (T026)
+                // Waveform visualization - smaller
                 WaveformView(audioLevel: Float(viewModel.audioLevel))
-                    .frame(height: 80)
+                    .frame(height: 44)
+                    .padding(.horizontal, 4)
                     .accessibilityIdentifier("waveformView")
                     .accessibilityLabel("Audio waveform")
                     .accessibilityValue("\(Int(viewModel.audioLevel * 100))% audio level")
 
-                // Status text
-                statusView
+                // Compact status
+                compactStatusView
 
                 // Error message (T031)
                 if let errorMessage = viewModel.errorMessage, showError {
-                    errorView(message: errorMessage)
+                    compactErrorView(message: errorMessage)
                 }
 
-                // Action buttons
-                actionButtons
+                // Inline microphone permission prompt
+                if viewModel.showMicrophonePrompt {
+                    InlineMicrophonePrompt(
+                        onOpenSettings: {
+                            viewModel.openMicrophoneSettings()
+                        },
+                        onCancel: {
+                            viewModel.dismissMicrophonePrompt()
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // Inline accessibility prompt (Phase 2.3)
+                if viewModel.showAccessibilityPrompt {
+                    InlineAccessibilityPrompt(
+                        onEnableAutoPaste: {
+                            viewModel.openAccessibilitySettings()
+                            viewModel.dismissAccessibilityPrompt()
+                        },
+                        onUseClipboardOnly: {
+                            viewModel.setClipboardOnlyMode()
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // Compact action buttons
+                compactActionButtons
             }
-            .padding(32)
-            .frame(width: 400)
-            .background(.ultraThinMaterial) // Frosted glass effect
+            .padding(16)
+            .frame(width: 280)
+            .background(
+                ZStack {
+                    // Deep glass effect
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.95)
+
+                    // Inner glow
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.08),
+                                    Color.clear
+                                ],
+                                center: .top,
+                                startRadius: 0,
+                                endRadius: 150
+                            )
+                        )
+
+                    // Subtle border
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                }
+            )
             .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
-            .scaleEffect(isVisible ? 1.0 : 0.8)
+            .shadow(color: .black.opacity(0.25), radius: 20, x: 0, y: 8)
+            .scaleEffect(isVisible ? 1.0 : 0.9)
             .opacity(isVisible ? 1.0 : 0.0)
         }
         .onAppear {
@@ -132,23 +185,31 @@ struct RecordingModal: View {
 
     // MARK: - Subviews
 
-    /// Header with icon and title
+    /// Header with icon and title - enhanced contrast
     private var headerView: some View {
-        HStack(spacing: 12) {
-            // Microphone icon
-            Image(systemName: viewModel.isRecording ? "mic.fill" : "mic.slash.fill")
-                .font(.system(size: 32))
-                .foregroundStyle(viewModel.isRecording ? .red : .gray)
-                .symbolEffect(.pulse, isActive: viewModel.isRecording)
+        HStack(spacing: 14) {
+            // Microphone icon with amber/red glow
+            ZStack {
+                Circle()
+                    .fill(viewModel.isRecording ? Color.red.opacity(0.15) : Color.amberPrimary.opacity(0.1))
+                    .frame(width: 48, height: 48)
 
-            VStack(alignment: .leading, spacing: 4) {
+                Image(systemName: viewModel.isRecording ? "mic.fill" : "mic.slash.fill")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundStyle(viewModel.isRecording ? .red : Color.amberPrimary)
+                    .symbolEffect(.pulse, isActive: viewModel.isRecording)
+            }
+            .shadow(color: viewModel.isRecording ? .red.opacity(0.3) : .clear, radius: 8, x: 0, y: 2)
+
+            VStack(alignment: .leading, spacing: 3) {
                 Text(statusTitle)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .accessibilityIdentifier("recordingStatus")
 
                 if viewModel.isRecording {
                     Text("Speak now...")
-                        .font(.caption)
+                        .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -159,24 +220,24 @@ struct RecordingModal: View {
             if let language = viewModel.currentLanguageModel {
                 HStack(spacing: 4) {
                     Text(language.flag)
-                        .font(.caption)
+                        .font(.system(size: 14))
 
                     if viewModel.isLanguageSwitching {
                         ProgressView()
                             .scaleEffect(0.5)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color("AmberPrimary", bundle: nil).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.amberPrimary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
-            // Close button (keyboard shortcut handled by .onKeyPress above)
+            // Close button
             Button(action: handleDismiss) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 22))
+                    .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
             .accessibilityIdentifier("closeButton")
@@ -185,41 +246,42 @@ struct RecordingModal: View {
         .accessibilityIdentifier("recordingHeader")
     }
 
-    /// Status text based on current state
+    /// Status text based on current state - enhanced readability
     private var statusView: some View {
         Group {
             if viewModel.isTranscribing {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ProgressView()
-                        .scaleEffect(0.8)
+                        .scaleEffect(0.7)
                     Text("Transcribing...")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.8))
                 }
             } else if viewModel.isInserting {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ProgressView()
-                        .scaleEffect(0.8)
+                        .scaleEffect(0.7)
                     Text("Inserting text...")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.8))
                 }
             } else if !viewModel.transcribedText.isEmpty {
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     Text(viewModel.transcribedText)
-                        .font(.body)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.primary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                        .padding(.horizontal, 8)
 
                     if viewModel.confidence > 0 {
                         Text("Confidence: \(Int(viewModel.confidence * 100))%")
-                            .font(.caption)
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
                 }
             }
         }
-        .frame(minHeight: 60)
+        .frame(minHeight: 50)
     }
 
     /// Error message view

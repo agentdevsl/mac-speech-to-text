@@ -32,23 +32,16 @@ final class TestInfrastructureTests: UITestBase {
 
     /// Test that UITestHelpers functions work correctly
     func test_infrastructure_helpersFunction() throws {
-        // Launch app with onboarding (to have predictable UI elements)
+        // Launch app with welcome flow (to have predictable UI elements)
         launchApp(arguments: [
-            LaunchArguments.resetOnboarding,
+            LaunchArguments.resetWelcome,
             LaunchArguments.skipPermissionChecks
         ])
 
-        // Test waitForElement helper
-        let welcomeText = app.staticTexts["Welcome to Speech-to-Text"]
+        // Test waitForWelcomeView helper
         XCTAssertTrue(
-            UITestHelpers.waitForElement(welcomeText, timeout: 10),
-            "Welcome text should appear within timeout"
-        )
-
-        // Test verifyTextExists helper
-        XCTAssertTrue(
-            UITestHelpers.verifyTextExists("Welcome to Speech-to-Text", in: app),
-            "Should find welcome text in app"
+            waitForWelcomeView(timeout: 10),
+            "Welcome view should appear within timeout"
         )
 
         // Test that non-existent elements return false
@@ -58,52 +51,52 @@ final class TestInfrastructureTests: UITestBase {
             "Non-existent element should not be found"
         )
 
-        // Test button tap helper
-        let continueButton = app.buttons["Continue"]
-        if UITestHelpers.waitForElement(continueButton, timeout: 5) {
+        // Test button tap helper with Get Started button
+        let getStartedButton = app.buttons["getStartedButton"]
+        if UITestHelpers.waitForElement(getStartedButton, timeout: 5) {
             XCTAssertNoThrow(
-                try UITestHelpers.tapButton(continueButton),
-                "Should be able to tap Continue button"
+                try UITestHelpers.tapButton(getStartedButton),
+                "Should be able to tap Get Started button"
             )
         }
     }
 
-    // MARK: - TI-003: Reset Onboarding
+    // MARK: - TI-003: Reset Welcome
 
-    /// Test that --reset-onboarding clears state for fresh test runs
-    func test_infrastructure_resetOnboarding() throws {
-        // First, launch and complete onboarding
+    /// Test that -resetWelcome clears state for fresh test runs
+    func test_infrastructure_resetWelcome() throws {
+        // First, launch with welcome skipped
         launchApp(arguments: [
-            LaunchArguments.skipOnboarding,
+            LaunchArguments.skipWelcome,
             LaunchArguments.skipPermissionChecks
         ])
 
-        // Verify onboarding is skipped (no onboarding window)
-        let onboardingWindow = app.windows["Welcome to Speech-to-Text"]
+        // Verify welcome is skipped (no welcome view)
+        let welcomeView = app.otherElements["welcomeView"]
         XCTAssertFalse(
-            onboardingWindow.waitForExistence(timeout: 2),
-            "Onboarding should be skipped"
+            welcomeView.waitForExistence(timeout: 2),
+            "Welcome should be skipped"
         )
 
         // Terminate and relaunch with reset
         app.terminate()
 
         launchApp(arguments: [
-            LaunchArguments.resetOnboarding,
+            LaunchArguments.resetWelcome,
             LaunchArguments.skipPermissionChecks
         ])
 
-        // Verify onboarding appears after reset
+        // Verify welcome view appears after reset
         XCTAssertTrue(
-            onboardingWindow.waitForExistence(timeout: 5),
-            "Onboarding should appear after reset"
+            waitForWelcomeView(timeout: 5),
+            "Welcome view should appear after reset"
         )
 
-        // Verify welcome content is present
-        let welcomeText = app.staticTexts["Welcome to Speech-to-Text"]
+        // Verify Get Started button is present
+        let getStartedButton = app.buttons["getStartedButton"]
         XCTAssertTrue(
-            welcomeText.waitForExistence(timeout: 3),
-            "Welcome text should be visible"
+            getStartedButton.waitForExistence(timeout: 3),
+            "Get Started button should be visible"
         )
     }
 
@@ -133,5 +126,7 @@ final class TestInfrastructureTests: UITestBase {
         XCTAssertEqual(LaunchArguments.resetOnboarding, "--reset-onboarding")
         XCTAssertEqual(LaunchArguments.skipPermissionChecks, "--skip-permission-checks")
         XCTAssertEqual(LaunchArguments.triggerRecording, "--trigger-recording")
+        XCTAssertEqual(LaunchArguments.skipWelcome, "--skip-welcome")
+        XCTAssertEqual(LaunchArguments.resetWelcome, "--reset-welcome")
     }
 }

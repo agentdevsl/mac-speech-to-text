@@ -1,128 +1,62 @@
-# =============================================================================
-# Node.js / TypeScript
-# =============================================================================
+# Xcode
+#
+# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
 
-# Dependencies
-node_modules/
-.pnp
-.pnp.js
+## User settings
+xcuserdata/
 
-# Build outputs
-dist/
-build/
+## Obj-C/Swift specific
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager
+#
+# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
+# Packages/
+# Package.pins
+# Package.resolved
+# *.xcodeproj
+#
+# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
+# hence it is not needed unless you have added a package configuration file to your project
+# .swiftpm
+
 .build/
-.next/
-out/
 
-# TypeScript
-*.tsbuildinfo
+# CocoaPods
+#
+# We recommend against adding the Pods directory to your .gitignore. However
+# you should judge for yourself, the pros and cons are mentioned at:
+# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
+#
+# Pods/
+#
+# Add this line if you want to avoid checking in source code from the Xcode workspace
+# *.xcworkspace
 
-# Testing
-coverage/
-.nyc_output/
+# Carthage
+#
+# Add this line if you want to avoid checking in source code from Carthage dependencies.
+# Carthage/Checkouts
 
-# =============================================================================
-# Environment / Secrets
-# =============================================================================
+Carthage/Build/
 
-# Environment files
-.env
-.env.local
-.env.*.local
-.env.development
-.env.test
-.env.production
-*.env
+# fastlane
+#
+# It is recommended to not store the screenshots in the git repo.
+# Instead, use fastlane to re-generate the screenshots whenever they are needed.
+# For more information about the recommended setup visit:
+# https://docs.fastlane.tools/best-practices/source-control/#source-control
 
-# Secrets
-.secret
-secrets.yml
-config.yaml
-config.json
-credentials.json
-
-# =============================================================================
-# IDE / Editor
-# =============================================================================
-
-.idea/
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-*.swp
-*.swo
-.DS_Store
-*.sublime-project
-*.sublime-workspace
-
-# =============================================================================
-# Logs / Debug
-# =============================================================================
-
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# =============================================================================
-# Terraform / IaC (preserved from original)
-# =============================================================================
-
-# Local .terraform directories
-**/.terraform/*
-
-# Terraform state files
-*.tfstate
-*.tfstate.*
-
-# Crash log files
-crash.log
-
-# Exclude override files
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
-
-# Terraform variable files
-*.tfvars
-*.tfvars.json
-
-# Terraform plan files
-*.tfplan
-
-# Sensitive files
-.terraformrc
-terraform.rc
-
-# Sandbox files
-sandbox.auto.tfvars
-sandbox.backend.tf
-
-# =============================================================================
-# Cache / Temp
-# =============================================================================
-
-.cache/
-.parcel-cache/
-.turbo/
-*.tmp
-*.temp
-.copilot/logs
-configstore/
-
-# =============================================================================
-# OS Files
-# =============================================================================
-
-.DS_Store
-Thumbs.db
-
-# =============================================================================
-# macOS Code Signing
-# =============================================================================
-
-# Local signing identity (per-developer, not committed)
-.signing-identity
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output

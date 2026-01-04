@@ -34,14 +34,18 @@ class UITestBase: XCTestCase {
 
     // MARK: - Setup & Teardown
 
+    /// Bundle identifier of the app under test
+    private static let appBundleIdentifier = "com.speechtotext.app"
+
     override func setUpWithError() throws {
         try super.setUpWithError()
 
         // Stop immediately when a failure occurs
         continueAfterFailure = false
 
-        // Initialize the application
-        app = XCUIApplication()
+        // Initialize the application with explicit bundle identifier
+        // This is required when the app is built externally (not through the same Xcode project)
+        app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
 
         // Create screenshot directory if it doesn't exist
         createScreenshotDirectoryIfNeeded()
@@ -49,7 +53,7 @@ class UITestBase: XCTestCase {
 
     override func tearDownWithError() throws {
         // Capture screenshot on failure
-        captureScreenshotOnFailure()
+        captureFailureScreenshot()
 
         // Terminate the app
         if app != nil {
@@ -79,12 +83,32 @@ class UITestBase: XCTestCase {
         app.launch()
     }
 
-    /// Launch the app with onboarding skipped (most common case)
+    /// Launch the app with welcome skipped (most common case)
+    /// - Parameters:
+    ///   - arguments: Additional launch arguments
+    func launchAppSkippingWelcome(arguments: [String] = []) {
+        var allArguments = [
+            LaunchArguments.skipWelcome,
+            LaunchArguments.skipPermissionChecks
+        ]
+        allArguments.append(contentsOf: arguments)
+        launchApp(arguments: allArguments)
+    }
+
+    /// Launch the app with onboarding skipped (alias for launchAppSkippingWelcome)
     /// - Parameters:
     ///   - arguments: Additional launch arguments
     func launchAppSkippingOnboarding(arguments: [String] = []) {
+        launchAppSkippingWelcome(arguments: arguments)
+    }
+
+    /// Launch the app with fresh welcome state
+    /// Shows the single-screen WelcomeView
+    /// - Parameters:
+    ///   - arguments: Additional launch arguments
+    func launchAppWithFreshWelcome(arguments: [String] = []) {
         var allArguments = [
-            LaunchArguments.skipOnboarding,
+            LaunchArguments.resetWelcome,
             LaunchArguments.skipPermissionChecks
         ]
         allArguments.append(contentsOf: arguments)
@@ -92,15 +116,11 @@ class UITestBase: XCTestCase {
     }
 
     /// Launch the app with fresh onboarding state
+    /// Alias for launchAppWithFreshWelcome for clarity
     /// - Parameters:
     ///   - arguments: Additional launch arguments
     func launchAppWithFreshOnboarding(arguments: [String] = []) {
-        var allArguments = [
-            LaunchArguments.resetOnboarding,
-            LaunchArguments.skipPermissionChecks
-        ]
-        allArguments.append(contentsOf: arguments)
-        launchApp(arguments: allArguments)
+        launchAppWithFreshWelcome(arguments: arguments)
     }
 
     /// Launch the app and trigger recording modal immediately
@@ -108,7 +128,7 @@ class UITestBase: XCTestCase {
     ///   - arguments: Additional launch arguments
     func launchAppWithRecordingModal(arguments: [String] = []) {
         var allArguments = [
-            LaunchArguments.skipOnboarding,
+            LaunchArguments.skipWelcome,
             LaunchArguments.skipPermissionChecks,
             LaunchArguments.triggerRecording
         ]
@@ -127,7 +147,7 @@ class UITestBase: XCTestCase {
     // MARK: - Screenshot Capture
 
     /// Capture screenshot on test failure
-    private func captureScreenshotOnFailure() {
+    private func captureFailureScreenshot() {
         guard let testRun = testRun, testRun.failureCount > 0 else { return }
 
         let screenshot = XCUIScreen.main.screenshot()
@@ -155,7 +175,7 @@ class UITestBase: XCTestCase {
         saveScreenshotToFile(screenshot, name: name)
     }
 
-    /// Save screenshot to file
+    /// Save screenshot to file and append to manifest
     private func saveScreenshotToFile(_ screenshot: XCUIScreenshot, name: String) {
         let sanitizedName = name
             .replacingOccurrences(of: " ", with: "_")
@@ -170,9 +190,52 @@ class UITestBase: XCTestCase {
 
         do {
             try screenshot.pngRepresentation.write(to: fileURL)
+            // Append to manifest for design evaluation
+            appendToManifest(
+                path: fileURL.path,
+                name: sanitizedName,
+                timestamp: timestamp
+            )
         } catch {
             // Non-fatal - just log
             print("Failed to save screenshot: \(error)")
+        }
+    }
+
+    /// Append screenshot metadata to manifest for design evaluation
+    private func appendToManifest(path: String, name: String, timestamp: String) {
+        let manifestURL = getScreenshotDirectoryURL().appendingPathComponent("manifest.json")
+
+        // Read existing manifest or create new
+        var manifest: [[String: String]] = []
+
+        if FileManager.default.fileExists(atPath: manifestURL.path) {
+            do {
+                let data = try Data(contentsOf: manifestURL)
+                if let existing = try JSONSerialization.jsonObject(with: data) as? [[String: String]] {
+                    manifest = existing
+                }
+            } catch {
+                print("Failed to read manifest: \(error)")
+            }
+        }
+
+        // Add new entry
+        let entry: [String: String] = [
+            "path": path,
+            "name": name,
+            "testClass": String(describing: type(of: self)),
+            "testMethod": self.name,
+            "timestamp": timestamp
+        ]
+        manifest.append(entry)
+
+        // Write updated manifest
+        do {
+            let data = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted])
+            try data.write(to: manifestURL)
+        } catch {
+            print("Failed to write manifest: \(error)")
         }
     }
 
@@ -207,7 +270,7 @@ class UITestBase: XCTestCase {
     /// Set up handlers for system permission dialogs
     func setupPermissionDialogHandlers() {
         // Handle microphone permission dialog
-        addUIInterruptionMonitor(forInterruptionType: .alert) { alert in
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
             let okButton = alert.buttons["OK"]
             let allowButton = alert.buttons["Allow"]
 
@@ -220,6 +283,210 @@ class UITestBase: XCTestCase {
             }
             return false
         }
+    }
+}
+
+// MARK: - Main View Helpers (New Unified UI)
+
+extension UITestBase {
+    /// Wait for the main window to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if main window appears within timeout
+    @discardableResult
+    func waitForMainWindow(timeout: TimeInterval? = nil) -> Bool {
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        return mainWindow.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Wait for the main view content to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if main view appears within timeout
+    @discardableResult
+    func waitForMainView(timeout: TimeInterval? = nil) -> Bool {
+        let mainView = app.otherElements["mainView"]
+        return mainView.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Wait for the home section to appear (first launch experience)
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if home section appears within timeout
+    @discardableResult
+    func waitForHomeSection(timeout: TimeInterval? = nil) -> Bool {
+        let homeSection = app.otherElements["homeSection"]
+        return homeSection.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Get the main window element
+    func getMainWindow() -> XCUIElement? {
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        if mainWindow.waitForExistence(timeout: extendedTimeout) {
+            return mainWindow
+        }
+        return nil
+    }
+
+    /// Navigate to a specific section in the sidebar
+    /// - Parameter sectionId: The accessibility identifier of the sidebar item (e.g., "sidebarHome", "sidebarGeneral")
+    /// - Returns: true if navigation succeeded
+    @discardableResult
+    func navigateToSection(_ sectionId: String) -> Bool {
+        let sidebarItem = app.otherElements[sectionId]
+        if sidebarItem.waitForExistence(timeout: defaultTimeout) {
+            sidebarItem.tap()
+            return true
+        }
+        // Try as button
+        let sidebarButton = app.buttons[sectionId]
+        if sidebarButton.waitForExistence(timeout: 2) {
+            sidebarButton.tap()
+            return true
+        }
+        return false
+    }
+
+    /// Close the main window using the quit button
+    /// - Returns: true if quit succeeded
+    @discardableResult
+    func closeMainWindow() -> Bool {
+        let quitButton = app.buttons["quitButton"]
+        if quitButton.waitForExistence(timeout: defaultTimeout) && quitButton.isEnabled {
+            quitButton.tap()
+            return true
+        }
+        return false
+    }
+}
+
+// MARK: - Glass Overlay Helpers
+
+extension UITestBase {
+    /// Wait for the glass recording overlay to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if overlay appears within timeout
+    @discardableResult
+    func waitForGlassOverlay(timeout: TimeInterval? = nil) -> Bool {
+        let overlay = app.otherElements["glassRecordingOverlay"]
+        return overlay.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Get the glass overlay element
+    func getGlassOverlay() -> XCUIElement? {
+        let overlay = app.otherElements["glassRecordingOverlay"]
+        if overlay.waitForExistence(timeout: defaultTimeout) {
+            return overlay
+        }
+        return nil
+    }
+
+    /// Check if overlay is in recording state
+    func isOverlayRecording() -> Bool {
+        let statusText = app.staticTexts["overlayStatusText"]
+        if statusText.waitForExistence(timeout: 2) {
+            return statusText.label.contains("Recording")
+        }
+        return false
+    }
+
+    /// Check if overlay is in transcribing state
+    func isOverlayTranscribing() -> Bool {
+        let statusText = app.staticTexts["overlayStatusText"]
+        if statusText.waitForExistence(timeout: 2) {
+            return statusText.label.contains("Transcribing")
+        }
+        return false
+    }
+}
+
+// MARK: - Legacy Welcome Flow Helpers (Compatibility)
+
+extension UITestBase {
+    /// Wait for the welcome view to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if welcome view appears within timeout
+    /// - Note: Maps to waitForMainWindow for new UI structure
+    @discardableResult
+    func waitForWelcomeView(timeout: TimeInterval? = nil) -> Bool {
+        // New UI: MainWindow with HomeSection serves as welcome
+        return waitForMainWindow(timeout: timeout) || waitForHomeSection(timeout: timeout)
+    }
+
+    /// Dismiss the welcome screen
+    /// - Returns: true if dismissal succeeded
+    /// - Note: In new UI, window stays open - use closeMainWindow() to close
+    @discardableResult
+    func dismissWelcome() -> Bool {
+        // New UI doesn't have a "Get Started" button - the window stays open
+        // Closing the window is done via the quit button or window close button
+        return closeMainWindow()
+    }
+
+    /// Get the welcome view element
+    /// - Note: Returns main window for compatibility
+    func getWelcomeView() -> XCUIElement? {
+        return getMainWindow()
+    }
+
+    /// Navigate through onboarding steps
+    /// - Note: Deprecated - new UI uses single-window NavigationSplitView
+    @discardableResult
+    func navigateOnboardingSteps(count stepsToAdvance: Int = 5, clickGetStarted: Bool = true) -> Bool {
+        // New UI doesn't have multi-step onboarding
+        return waitForMainWindow()
+    }
+
+    /// Get the onboarding window
+    /// - Note: Returns main window for compatibility
+    func getOnboardingWindow() -> XCUIElement? {
+        return getMainWindow()
+    }
+}
+
+// MARK: - Wait Helpers
+
+extension UITestBase {
+    /// Wait for an element's value to change
+    @discardableResult
+    func waitForValueChange(
+        _ element: XCUIElement,
+        from initialValue: String?,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let predicate = NSPredicate { _, _ in
+            element.value as? String != initialValue
+        }
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Wait for section content to appear after navigation
+    @discardableResult
+    func waitForSectionContent(_ sectionId: String, timeout: TimeInterval = 3) -> Bool {
+        let section = app.otherElements[sectionId]
+        return section.waitForExistence(timeout: timeout)
+    }
+
+    /// Wait for toggle state to change
+    @discardableResult
+    func waitForToggleChange(
+        _ toggle: XCUIElement,
+        wasOn: Bool,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let targetValue = wasOn ? "0" : "1"
+        let predicate = NSPredicate(format: "value == %@", targetValue)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: toggle)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Wait for a specific time (for animation capture only)
+    func waitForAnimationFrame(_ duration: TimeInterval = 1.0) {
+        let animationExpectation = expectation(description: "Animation frame")
+        animationExpectation.isInverted = true
+        wait(for: [animationExpectation], timeout: duration)
     }
 }
 

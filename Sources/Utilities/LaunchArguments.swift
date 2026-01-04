@@ -48,6 +48,26 @@ public enum LaunchArguments {
     /// Effects: Enables verbose accessibility labels, logs a11y tree
     public static let accessibilityTesting = "--accessibility-testing"
 
+    // MARK: - Welcome Flow Arguments
+
+    /// Skip the welcome flow entirely (alias for skipOnboarding)
+    /// Effects: Sets welcome as completed, doesn't show welcome view
+    public static let skipWelcome = "--skip-welcome"
+
+    /// Reset welcome flow state to first-launch experience
+    /// Effects: Clears welcome completion flag in UserDefaults
+    public static let resetWelcome = "--reset-welcome"
+
+    /// Check if welcome should be skipped
+    public static var shouldSkipWelcome: Bool {
+        isPresent(skipWelcome) || shouldSkipOnboarding
+    }
+
+    /// Check if welcome should be reset
+    public static var shouldResetWelcome: Bool {
+        isPresent(resetWelcome) || shouldResetOnboarding
+    }
+
     /// Simulate error conditions for error state testing
     /// Format: --simulate-error=transcription or --simulate-error=audio
     /// Effects: Forces error state in specified component

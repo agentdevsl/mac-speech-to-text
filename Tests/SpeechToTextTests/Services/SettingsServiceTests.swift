@@ -181,7 +181,8 @@ final class SettingsServiceTests: XCTestCase {
             showWaveform: false,
             showConfidenceIndicator: false,
             animationsEnabled: false,
-            menuBarIcon: .minimal
+            menuBarIcon: .minimal,
+            recordingMode: .holdToRecord
         )
 
         // When
@@ -221,11 +222,10 @@ final class SettingsServiceTests: XCTestCase {
         // Given
         let newOnboarding = OnboardingState(
             completed: true,
-            currentStep: 5,
+            currentStep: 4,
             permissionsGranted: PermissionsGranted(
                 microphone: true,
-                accessibility: true,
-                inputMonitoring: true
+                accessibility: true
             ),
             skippedSteps: ["step2"]
         )
@@ -236,7 +236,7 @@ final class SettingsServiceTests: XCTestCase {
         // Then
         let loadedSettings = service.load()
         XCTAssertTrue(loadedSettings.onboarding.completed)
-        XCTAssertEqual(loadedSettings.onboarding.currentStep, 5)
+        XCTAssertEqual(loadedSettings.onboarding.currentStep, 4)
         XCTAssertTrue(loadedSettings.onboarding.permissionsGranted.allGranted)
     }
 
@@ -264,8 +264,7 @@ final class SettingsServiceTests: XCTestCase {
         // Given
         let newPermissions = PermissionsGranted(
             microphone: true,
-            accessibility: true,
-            inputMonitoring: false
+            accessibility: true
         )
 
         // When
@@ -275,7 +274,6 @@ final class SettingsServiceTests: XCTestCase {
         let loadedSettings = service.load()
         XCTAssertTrue(loadedSettings.onboarding.permissionsGranted.microphone)
         XCTAssertTrue(loadedSettings.onboarding.permissionsGranted.accessibility)
-        XCTAssertFalse(loadedSettings.onboarding.permissionsGranted.inputMonitoring)
     }
 
     // MARK: - Error Handling Tests

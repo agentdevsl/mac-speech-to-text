@@ -1,59 +1,128 @@
+import AppKit
 import Carbon
 import Foundation
 import OSLog
 
-/// Service for managing global hotkey registration using Carbon Event Manager
+/// State machine for hold-to-record tracking
+enum HoldState: Sendable {
+    case idle
+    case keyDown(startTime: Date)
+    case recording(startTime: Date)
+    case releasing
+}
+
+/// Service for managing global hotkey registration using Carbon APIs
+/// Note: Carbon RegisterEventHotKey does NOT require Input Monitoring permission
 @MainActor
 class HotkeyService {
-    // Mark cleanup resources as nonisolated(unsafe) to allow access from deinit
-    // This is safe because deinit guarantees exclusive access (no other references)
-    private nonisolated(unsafe) var hotKeyRef: EventHotKeyRef?
-    private nonisolated(unsafe) var eventHandler: EventHandlerRef?
-    private nonisolated(unsafe) var userDataPointer: UnsafeMutableRawPointer?
+    /// Carbon event handler reference
+    private var eventHandlerRef: EventHandlerRef?
+
+    /// Registered hotkey reference
+    private var hotkeyRef: EventHotKeyRef?
+
+    /// Hotkey ID for Carbon
+    private var hotkeyID: EventHotKeyID
+
+    /// Registered hotkey configuration
+    private var registeredKeyCode: Int?
+    private var registeredModifiers: Set<KeyModifier> = []
+
+    /// Callback to invoke when hotkey is pressed (toggle mode)
     private var callback: (@Sendable () -> Void)?
 
-    deinit {
-        // Clean up Carbon resources directly - safe due to nonisolated(unsafe) properties
-        // Note: userDataPointer is NOT released here because unregisterHotkey() handles it.
-        // Double-release protection: if unregisterHotkey() was called, userDataPointer will be nil.
-        // If unregisterHotkey() was NOT called (abnormal teardown), we need to clean up.
-        if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
-            hotKeyRef = nil
-        }
-        if let handler = eventHandler {
-            RemoveEventHandler(handler)
-            eventHandler = nil
-        }
-        // Only release userData if it hasn't been released by unregisterHotkey()
-        if let userData = userDataPointer {
-            Unmanaged<HotkeyService>.fromOpaque(userData).release()
-            userDataPointer = nil
-        }
+    /// Callbacks for hold-to-record mode
+    private var onKeyDownCallback: (@Sendable () -> Void)?
+    private var onKeyUpCallback: (@Sendable (TimeInterval) -> Void)?
+
+    /// Current hold state
+    private var holdState: HoldState = .idle
+
+    /// Minimum hold duration to trigger recording (100ms)
+    private let minimumHoldDuration: TimeInterval = 0.1
+
+    /// Whether using hold-to-record mode
+    private var isHoldMode: Bool = false
+
+    /// Singleton instance for Carbon callback access (fileprivate for callback, nonisolated for deinit)
+    fileprivate nonisolated(unsafe) static var sharedInstance: HotkeyService?
+
+    /// Copies of Carbon refs for nonisolated deinit cleanup
+    private nonisolated(unsafe) var deinitHotkeyRef: EventHotKeyRef?
+    private nonisolated(unsafe) var deinitEventHandlerRef: EventHandlerRef?
+
+    init() {
+        // Create a unique hotkey ID
+        hotkeyID = EventHotKeyID(signature: OSType(0x5354_5854), id: 1) // "STXT"
+        HotkeyService.sharedInstance = self
     }
 
-    /// Register a global hotkey
+    deinit {
+        // Clean up Carbon resources from nonisolated context
+        if let hotkey = deinitHotkeyRef {
+            UnregisterEventHotKey(hotkey)
+        }
+        if let handler = deinitEventHandlerRef {
+            RemoveEventHandler(handler)
+        }
+        HotkeyService.sharedInstance = nil
+    }
+
+    /// Register a global hotkey (toggle mode)
+    /// - Parameters:
+    ///   - keyCode: The virtual key code (e.g., 49 for Space)
+    ///   - modifiers: Array of modifier keys (e.g., [.command, .control])
+    ///   - callback: Closure to call when hotkey is pressed
     func registerHotkey(
         keyCode: Int,
         modifiers: [KeyModifier],
         callback: @escaping @Sendable () -> Void
     ) async throws {
         unregisterHotkey()
+
         self.callback = callback
+        self.registeredKeyCode = keyCode
+        self.registeredModifiers = Set(modifiers)
+        self.isHoldMode = false
 
-        let carbonModifiers = convertModifiers(modifiers)
-        var hotkeyID = EventHotKeyID(signature: 0x53545458, id: UInt32(keyCode))
+        try registerCarbonHotkey(keyCode: keyCode, modifiers: modifiers)
 
-        let userData = Unmanaged.passRetained(self).toOpaque()
-        userDataPointer = userData
-
-        try installEventHandler(userData: userData)
-        try registerHotKey(keyCode: keyCode, modifiers: carbonModifiers, hotkeyID: &hotkeyID)
+        AppLogger.service.info("Registered global hotkey: keyCode=\(keyCode), modifiers=\(modifiers.map { $0.rawValue })")
     }
 
-    // MARK: - Private Helpers
+    /// Register a hold-to-record hotkey with separate keyDown and keyUp callbacks
+    /// - Parameters:
+    ///   - keyCode: The virtual key code (e.g., 49 for Space)
+    ///   - modifiers: Array of modifier keys (e.g., [.command, .control])
+    ///   - onKeyDown: Closure called when hotkey is pressed (start recording)
+    ///   - onKeyUp: Closure called when hotkey is released with hold duration
+    func registerHoldHotkey(
+        keyCode: Int,
+        modifiers: [KeyModifier],
+        onKeyDown: @escaping @Sendable () -> Void,
+        onKeyUp: @escaping @Sendable (TimeInterval) -> Void
+    ) async throws {
+        unregisterHotkey()
 
-    private func convertModifiers(_ modifiers: [KeyModifier]) -> UInt32 {
+        self.isHoldMode = true
+        self.onKeyDownCallback = onKeyDown
+        self.onKeyUpCallback = onKeyUp
+        self.registeredKeyCode = keyCode
+        self.registeredModifiers = Set(modifiers)
+        self.holdState = .idle
+
+        try registerCarbonHotkey(keyCode: keyCode, modifiers: modifiers)
+
+        AppLogger.service.info(
+            "Registered hold-to-record hotkey: keyCode=\(keyCode), modifiers=\(modifiers.map { $0.rawValue })"
+        )
+    }
+
+    // MARK: - Carbon Hotkey Registration
+
+    /// Register hotkey using Carbon API
+    private func registerCarbonHotkey(keyCode: Int, modifiers: [KeyModifier]) throws {
+        // Convert modifiers to Carbon format
         var carbonModifiers: UInt32 = 0
         for modifier in modifiers {
             switch modifier {
@@ -63,98 +132,127 @@ class HotkeyService {
             case .shift: carbonModifiers |= UInt32(shiftKey)
             }
         }
-        return carbonModifiers
-    }
 
-    private func installEventHandler(userData: UnsafeMutableRawPointer) throws {
-        var eventSpec = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
-        let eventHandlerCallback: EventHandlerUPP = { _, _, userData -> OSStatus in
-            guard let userData = userData else { return OSStatus(eventNotHandledErr) }
-            let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
-            // Dispatch callback to MainActor since this callback runs on Carbon's event loop thread
-            // and HotkeyService is @MainActor isolated
-            Task { @MainActor in
-                service.callback?()
-            }
-            return noErr
-        }
+        // Set up event type spec for hotkey events
+        var eventTypes = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
 
+        // Install event handler
         let status = InstallEventHandler(
-            GetApplicationEventTarget(), eventHandlerCallback, 1, &eventSpec, userData, &eventHandler
+            GetApplicationEventTarget(),
+            carbonHotkeyCallback,
+            eventTypes.count,
+            &eventTypes,
+            nil,
+            &eventHandlerRef
         )
 
         guard status == noErr else {
-            releaseUserData()
-            throw HotkeyError.installationFailed("Failed to install event handler: \(status)")
+            throw HotkeyError.installationFailed("Failed to install Carbon event handler: \(status)")
         }
-    }
 
-    private func registerHotKey(keyCode: Int, modifiers: UInt32, hotkeyID: inout EventHotKeyID) throws {
-        let status = RegisterEventHotKey(
-            UInt32(keyCode), modifiers, hotkeyID, GetApplicationEventTarget(), 0, &hotKeyRef
+        // Register the hotkey
+        let registerStatus = RegisterEventHotKey(
+            UInt32(keyCode),
+            carbonModifiers,
+            hotkeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotkeyRef
         )
 
-        guard status == noErr else {
-            cleanupEventHandler()
-            throw HotkeyError.registrationFailed("Failed to register hotkey: \(status)")
+        guard registerStatus == noErr else {
+            // Clean up event handler if registration failed
+            if let handler = eventHandlerRef {
+                RemoveEventHandler(handler)
+                eventHandlerRef = nil
+                deinitEventHandlerRef = nil
+            }
+            throw HotkeyError.registrationFailed("Failed to register hotkey: \(registerStatus)")
         }
-    }
 
-    private func releaseUserData() {
-        if let userData = userDataPointer {
-            Unmanaged<HotkeyService>.fromOpaque(userData).release()
-            userDataPointer = nil
-        }
-    }
-
-    private func cleanupEventHandler() {
-        if let handler = eventHandler {
-            RemoveEventHandler(handler)
-            eventHandler = nil
-        }
-        releaseUserData()
+        // Sync deinit copies for nonisolated cleanup
+        deinitHotkeyRef = hotkeyRef
+        deinitEventHandlerRef = eventHandlerRef
     }
 
     /// Unregister current hotkey
     func unregisterHotkey() {
-        if let hotKeyRef = hotKeyRef {
-            let status = UnregisterEventHotKey(hotKeyRef)
-            if status != noErr {
-                AppLogger.service.warning("Failed to unregister hotkey: \(status, privacy: .public)")
-            }
-            self.hotKeyRef = nil
+        // Unregister hotkey
+        if let hotkey = hotkeyRef {
+            UnregisterEventHotKey(hotkey)
+            hotkeyRef = nil
+            deinitHotkeyRef = nil
+            AppLogger.service.debug("Unregistered Carbon hotkey")
         }
 
-        if let eventHandler = eventHandler {
-            let status = RemoveEventHandler(eventHandler)
-            if status != noErr {
-                AppLogger.service.warning("Failed to remove event handler: \(status, privacy: .public)")
-            }
-
-            // Release the retained self reference that was created in registerHotkey
-            if let userData = userDataPointer {
-                Unmanaged<HotkeyService>.fromOpaque(userData).release()
-                userDataPointer = nil
-            }
-
-            self.eventHandler = nil
+        // Remove event handler
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
+            deinitEventHandlerRef = nil
         }
 
+        registeredKeyCode = nil
+        registeredModifiers = []
         callback = nil
+
+        // Clear hold-mode state
+        isHoldMode = false
+        onKeyDownCallback = nil
+        onKeyUpCallback = nil
+        holdState = .idle
+    }
+
+    // MARK: - Event Handling
+
+    /// Handle hotkey pressed event from Carbon
+    func handleHotkeyPressed() {
+        if isHoldMode {
+            // Hold-to-record mode: start recording
+            let startTime = Date()
+            holdState = .recording(startTime: startTime)
+            AppLogger.service.debug("Hold hotkey: pressed")
+            onKeyDownCallback?()
+        } else {
+            // Toggle mode: invoke callback
+            callback?()
+        }
+    }
+
+    /// Handle hotkey released event from Carbon
+    func handleHotkeyReleased() {
+        guard isHoldMode else { return }
+
+        switch holdState {
+        case .recording(let startTime):
+            let duration = Date().timeIntervalSince(startTime)
+            AppLogger.service.debug("Hold hotkey: released after \(duration)s")
+
+            if duration >= minimumHoldDuration {
+                onKeyUpCallback?(duration)
+            } else {
+                AppLogger.service.debug("Hold too short (\(duration)s), minimum is \(self.minimumHoldDuration)s")
+            }
+            holdState = .idle
+
+        default:
+            holdState = .idle
+        }
     }
 
     /// Check if a hotkey conflicts with system shortcuts
     func checkConflict(keyCode: Int, modifiers: [KeyModifier]) -> Bool {
-        // Common system shortcuts
+        // Common system shortcuts to avoid
         let systemShortcuts: [(keyCode: Int, modifiers: Set<KeyModifier>)] = [
-            (36, [.command]), // Cmd+Enter
-            (48, [.command]), // Cmd+Tab
-            (49, [.command]), // Cmd+Space (Spotlight)
-            (12, [.command]), // Cmd+Q (Quit)
-            (13, [.command]) // Cmd+W (Close window)
+            (36, [.command]),          // Cmd+Enter
+            (48, [.command]),          // Cmd+Tab
+            (49, [.command]),          // Cmd+Space (Spotlight)
+            (49, [.command, .control]), // Cmd+Ctrl+Space (Emoji picker)
+            (12, [.command]),          // Cmd+Q (Quit)
+            (13, [.command])           // Cmd+W (Close window)
         ]
 
         let modifierSet = Set(modifiers)
@@ -172,6 +270,51 @@ class HotkeyService {
     func simulateHotkeyPress() {
         callback?()
     }
+
+    /// Simulate hold-to-record cycle (for testing)
+    /// - Parameter duration: Simulated hold duration
+    func simulateHoldCycle(duration: TimeInterval = 0.5) {
+        guard isHoldMode else {
+            callback?()
+            return
+        }
+
+        onKeyDownCallback?()
+        if duration >= minimumHoldDuration {
+            onKeyUpCallback?(duration)
+        }
+    }
+
+    /// Get current hold state (for testing/debugging)
+    var currentHoldState: HoldState {
+        holdState
+    }
+}
+
+// MARK: - Carbon Callback
+
+/// Carbon event handler callback (must be a C function pointer)
+private func carbonHotkeyCallback(
+    nextHandler: EventHandlerCallRef?,
+    event: EventRef?,
+    userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+    guard let event = event else { return OSStatus(eventNotHandledErr) }
+
+    let eventKind = GetEventKind(event)
+
+    // Dispatch to main actor
+    Task { @MainActor in
+        guard let service = HotkeyService.sharedInstance else { return }
+
+        if eventKind == UInt32(kEventHotKeyPressed) {
+            service.handleHotkeyPressed()
+        } else if eventKind == UInt32(kEventHotKeyReleased) {
+            service.handleHotkeyReleased()
+        }
+    }
+
+    return noErr
 }
 
 /// Errors related to hotkey registration

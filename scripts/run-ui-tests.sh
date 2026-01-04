@@ -149,11 +149,37 @@ print_info "Resolving Swift packages..."
 cd "$PROJECT_ROOT"
 swift package resolve 2>/dev/null || true
 
-# Build xcodebuild command
+# Use a shared derived data path
+DERIVED_DATA_PATH="${PROJECT_ROOT}/.build/DerivedData"
+APP_PRODUCTS_DIR="${DERIVED_DATA_PATH}/Build/Products/Debug"
+
+# First, build the main app using build-app.sh (creates proper .app bundle)
+print_info "Building SpeechToText.app bundle..."
+"${SCRIPT_DIR}/build-app.sh" --clean 2>&1 || {
+    print_error "Failed to build SpeechToText.app"
+    exit 2
+}
+print_success "App built successfully"
+
+# Copy the .app bundle to the DerivedData location where UI tests expect it
+print_info "Setting up UI test environment..."
+mkdir -p "${APP_PRODUCTS_DIR}"
+rm -rf "${APP_PRODUCTS_DIR}/SpeechToText.app"
+cp -R "${PROJECT_ROOT}/build/SpeechToText.app" "${APP_PRODUCTS_DIR}/"
+
+# Create symlink for xcodebuild to find the executable
+rm -f "${APP_PRODUCTS_DIR}/SpeechToText"
+ln -sf "${APP_PRODUCTS_DIR}/SpeechToText.app/Contents/MacOS/SpeechToText" "${APP_PRODUCTS_DIR}/SpeechToText"
+print_success "App copied to test location"
+
+# Build xcodebuild command for UI tests
+# Uses the workspace that combines Package.swift with UI test project
 XCODEBUILD_CMD=(
     xcodebuild test
-    -scheme SpeechToText
+    -workspace SpeechToText.xcworkspace
+    -scheme SpeechToTextUITests
     -destination 'platform=macOS'
+    -derivedDataPath "$DERIVED_DATA_PATH"
 )
 
 # Add test plan if specified
