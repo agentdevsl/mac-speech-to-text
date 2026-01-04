@@ -55,6 +55,9 @@ struct RecordingModal: View {
                 // Waveform visualization (T026)
                 WaveformView(audioLevel: Float(viewModel.audioLevel))
                     .frame(height: 80)
+                    .accessibilityIdentifier("waveformView")
+                    .accessibilityLabel("Audio waveform")
+                    .accessibilityValue("\(Int(viewModel.audioLevel * 100))% audio level")
 
                 // Status text
                 statusView
@@ -176,7 +179,10 @@ struct RecordingModal: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("closeButton")
+            .accessibilityLabel("Close recording modal")
         }
+        .accessibilityIdentifier("recordingHeader")
     }
 
     /// Status text based on current state
@@ -230,6 +236,8 @@ struct RecordingModal: View {
         .background(Color.red.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .transition(.move(edge: .bottom).combined(with: .opacity))
+        .accessibilityIdentifier("errorMessage")
+        .accessibilityLabel("Error: \(message)")
     }
 
     /// Action buttons
@@ -249,6 +257,7 @@ struct RecordingModal: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return)
+                .accessibilityIdentifier("stopRecordingButton")
             }
 
             // Cancel button (keyboard shortcut handled by .onKeyPress above)
@@ -256,7 +265,9 @@ struct RecordingModal: View {
                 handleDismiss()
             }
             .buttonStyle(.bordered)
+            .accessibilityIdentifier("cancelButton")
         }
+        .accessibilityIdentifier("actionButtons")
     }
 
     // MARK: - Computed Properties

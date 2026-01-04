@@ -35,14 +35,49 @@ protocol PermissionChecker {
 /// Real implementation of permission service
 @MainActor
 class PermissionService: PermissionChecker {
+    /// Mock permission state for testing (from launch arguments)
+    private var mockState: MockPermissionState? {
+        LaunchArguments.mockPermissionState
+    }
+
+    /// Whether to skip permission checks entirely
+    private var skipChecks: Bool {
+        LaunchArguments.shouldSkipPermissionChecks
+    }
+
     /// Check microphone permission status
     func checkMicrophonePermission() async -> Bool {
+        // Handle mock state for testing
+        if let mockState = mockState {
+            AppLogger.system.debug("Using mock microphone permission: \(mockState.rawValue, privacy: .public)")
+            return mockState == .granted
+        }
+
+        // Skip checks if requested (always return true)
+        if skipChecks {
+            AppLogger.system.debug("Skipping microphone permission check")
+            return true
+        }
+
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         return status == .authorized
     }
 
     /// Request microphone permission
     func requestMicrophonePermission() async throws {
+        // Handle mock state for testing
+        if let mockState = mockState {
+            if mockState == .denied {
+                throw PermissionError.microphoneDenied
+            }
+            return
+        }
+
+        // Skip if requested
+        if skipChecks {
+            return
+        }
+
         let granted = await AVCaptureDevice.requestAccess(for: .audio)
         if !granted {
             throw PermissionError.microphoneDenied
@@ -52,6 +87,18 @@ class PermissionService: PermissionChecker {
     /// Check accessibility permission status
     /// This is required for text insertion via Accessibility APIs
     func checkAccessibilityPermission() -> Bool {
+        // Handle mock state for testing
+        if let mockState = mockState {
+            AppLogger.system.debug("Using mock accessibility permission: \(mockState.rawValue, privacy: .public)")
+            return mockState == .granted
+        }
+
+        // Skip checks if requested (always return true)
+        if skipChecks {
+            AppLogger.system.debug("Skipping accessibility permission check")
+            return true
+        }
+
         // Use string literal to avoid Swift 6 concurrency warnings with global kAXTrustedCheckOptionPrompt
         let options: NSDictionary = ["AXTrustedCheckOptionPrompt": false]
         let isTrusted = AXIsProcessTrustedWithOptions(options)
@@ -68,6 +115,19 @@ class PermissionService: PermissionChecker {
     /// Request accessibility permission
     /// Note: macOS doesn't allow programmatic granting - must guide user to System Settings
     func requestAccessibilityPermission() throws {
+        // Handle mock state for testing
+        if let mockState = mockState {
+            if mockState == .denied {
+                throw PermissionError.accessibilityDenied
+            }
+            return
+        }
+
+        // Skip if requested
+        if skipChecks {
+            return
+        }
+
         // Use string literal to avoid Swift 6 concurrency warnings with global kAXTrustedCheckOptionPrompt
         let options: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
         let trusted = AXIsProcessTrustedWithOptions(options)
@@ -90,6 +150,18 @@ class PermissionService: PermissionChecker {
     /// This is required for global hotkeys on macOS 10.15+
     /// Uses IOHIDCheckAccess to check input monitoring permission
     func checkInputMonitoringPermission() -> Bool {
+        // Handle mock state for testing
+        if let mockState = mockState {
+            AppLogger.system.debug("Using mock input monitoring permission: \(mockState.rawValue, privacy: .public)")
+            return mockState == .granted
+        }
+
+        // Skip checks if requested (always return true)
+        if skipChecks {
+            AppLogger.system.debug("Skipping input monitoring permission check")
+            return true
+        }
+
         // Use IOHIDCheckAccess to check input monitoring permission (macOS 10.15+)
         // This API returns true if the app has input monitoring permission
         let status = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)

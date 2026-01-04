@@ -8,57 +8,114 @@
 # Usage: ./scripts/run-ui-tests.sh [options]
 #
 # Options:
+#   --test-plan <plan>    Run specific test plan (AllUITests, P1OnlyTests, AccessibilityTests)
 #   --grant-permissions   Pre-grant permissions via tccutil (requires sudo)
-#   --reset              Reset app state before testing
-#   --verbose            Show detailed output
-#   --help               Show this help message
+#   --reset               Reset app state before testing
+#   --verbose             Show detailed xcodebuild output
+#   --timeout <seconds>   Test timeout (default: 600 = 10 minutes)
+#   --help                Show this help message
+#
+# Environment Variables:
+#   UI_TEST_TIMEOUT       Timeout in seconds (default: 600)
+#   UI_TEST_VERBOSE       Set to "1" for verbose output
 #
 # Prerequisites:
 #   - macOS 14+
 #   - Xcode 15+
-#   - SpeechToText.xcodeproj with UITests target
+#   - SpeechToText scheme with UITests target
+#
+# Exit Codes:
+#   0 - All tests passed
+#   1 - One or more tests failed
+#   2 - Configuration or setup error
+#   124 - Timeout exceeded
 # =============================================================================
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
-BUNDLE_ID="com.speechtotext.app"
+BUNDLE_ID="com.example.SpeechToText"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
+BOLD='\033[1m'
 
 print_header() {
     echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BLUE}$1${NC}"
+    echo -e "${BOLD}${CYAN}$1${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 }
 
-print_info() { echo -e "${BLUE}ℹ${NC} $1"; }
-print_success() { echo -e "${GREEN}✓${NC} $1"; }
-print_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
-print_error() { echo -e "${RED}✗${NC} $1"; }
+print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+print_success() { echo -e "${GREEN}[PASS]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+print_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 
+# Default values
 GRANT_PERMISSIONS=false
 RESET_STATE=false
-VERBOSE=false
+VERBOSE="${UI_TEST_VERBOSE:-false}"
+TEST_PLAN=""
+TIMEOUT="${UI_TEST_TIMEOUT:-600}"
+START_TIME=$(date +%s)
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --grant-permissions) GRANT_PERMISSIONS=true; shift ;;
-        --reset) RESET_STATE=true; shift ;;
-        --verbose) VERBOSE=true; shift ;;
-        --help) head -20 "$0" | tail -15; exit 0 ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        --test-plan)
+            TEST_PLAN="$2"
+            shift 2
+            ;;
+        --test-plan=*)
+            TEST_PLAN="${1#*=}"
+            shift
+            ;;
+        --grant-permissions)
+            GRANT_PERMISSIONS=true
+            shift
+            ;;
+        --reset)
+            RESET_STATE=true
+            shift
+            ;;
+        --verbose)
+            VERBOSE=true
+            shift
+            ;;
+        --timeout)
+            TIMEOUT="$2"
+            shift 2
+            ;;
+        --timeout=*)
+            TIMEOUT="${1#*=}"
+            shift
+            ;;
+        --help|-h)
+            head -30 "$0" | tail -26
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 2
+            ;;
     esac
 done
 
 print_header "XCUITest Runner for SpeechToText"
+
+echo -e "${CYAN}Configuration:${NC}"
+echo "  Test Plan:   ${TEST_PLAN:-All}"
+echo "  Timeout:     ${TIMEOUT}s"
+echo "  Verbose:     ${VERBOSE}"
+echo "  Reset State: ${RESET_STATE}"
+echo ""
 
 # Pre-grant permissions if requested (requires sudo)
 if [ "$GRANT_PERMISSIONS" = true ]; then
@@ -66,6 +123,7 @@ if [ "$GRANT_PERMISSIONS" = true ]; then
 
     # Reset and grant microphone access
     sudo tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
+    sudo tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
     # Note: tccutil can reset but not grant - actual grant requires user interaction
     # For automated testing, use MDM profiles or test on pre-configured machines
 
@@ -80,37 +138,92 @@ if [ "$RESET_STATE" = true ]; then
     print_success "App state reset"
 fi
 
-# Check for Xcode project
-if [ ! -f "${PROJECT_ROOT}/SpeechToText.xcodeproj/project.pbxproj" ]; then
-    print_warning "No Xcode project found. Creating one..."
-    # For SPM projects, generate Xcode project
-    cd "$PROJECT_ROOT"
-    swift package generate-xcodeproj 2>/dev/null || true
+# Check for Xcode
+if ! command -v xcodebuild &>/dev/null; then
+    print_error "xcodebuild not found. Please install Xcode Command Line Tools."
+    exit 2
+fi
+
+# Resolve Swift packages
+print_info "Resolving Swift packages..."
+cd "$PROJECT_ROOT"
+swift package resolve 2>/dev/null || true
+
+# Build xcodebuild command
+XCODEBUILD_CMD=(
+    xcodebuild test
+    -scheme SpeechToText
+    -destination 'platform=macOS'
+)
+
+# Add test plan if specified
+if [ -n "$TEST_PLAN" ]; then
+    # Check if test plan file exists
+    TEST_PLAN_FILE="${PROJECT_ROOT}/UITests/TestPlans/${TEST_PLAN}.xctestplan"
+    if [ -f "$TEST_PLAN_FILE" ]; then
+        XCODEBUILD_CMD+=(-testPlan "$TEST_PLAN")
+        print_info "Using test plan: $TEST_PLAN"
+    else
+        print_warning "Test plan file not found: $TEST_PLAN_FILE"
+        print_info "Running all tests instead"
+    fi
+fi
+
+# Add quiet flag if not verbose
+if [ "$VERBOSE" != "true" ]; then
+    XCODEBUILD_CMD+=(-quiet)
 fi
 
 print_info "Running UI tests..."
+print_info "Command: ${XCODEBUILD_CMD[*]}"
+echo ""
 
-# Run XCUITest
-cd "$PROJECT_ROOT"
+# Run tests with timeout
+TEST_EXIT_CODE=0
+set +e
 
-if [ "$VERBOSE" = true ]; then
-    xcodebuild test \
-        -scheme SpeechToText \
-        -destination 'platform=macOS' \
-        -testPlan UITests \
-        2>&1 | xcpretty || xcodebuild test \
-        -scheme SpeechToText \
-        -destination 'platform=macOS' \
-        2>&1
+if command -v timeout &>/dev/null; then
+    timeout "${TIMEOUT}" "${XCODEBUILD_CMD[@]}" 2>&1
+    TEST_EXIT_CODE=$?
+elif command -v gtimeout &>/dev/null; then
+    # macOS with coreutils installed via homebrew
+    gtimeout "${TIMEOUT}" "${XCODEBUILD_CMD[@]}" 2>&1
+    TEST_EXIT_CODE=$?
 else
-    xcodebuild test \
-        -scheme SpeechToText \
-        -destination 'platform=macOS' \
-        -quiet \
-        2>&1 || {
-            print_error "UI tests failed"
-            exit 1
-        }
+    # Fallback: run without timeout
+    print_warning "timeout command not found, running without timeout limit"
+    "${XCODEBUILD_CMD[@]}" 2>&1
+    TEST_EXIT_CODE=$?
 fi
 
-print_success "UI tests completed"
+set -e
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+echo ""
+print_header "Test Results"
+
+# Handle exit codes
+if [ $TEST_EXIT_CODE -eq 0 ]; then
+    print_success "All UI tests passed (${DURATION}s)"
+    exit 0
+elif [ $TEST_EXIT_CODE -eq 124 ]; then
+    print_error "UI tests timed out after ${TIMEOUT}s"
+    exit 124
+else
+    print_error "UI tests failed with exit code ${TEST_EXIT_CODE} (${DURATION}s)"
+
+    # Provide helpful information
+    echo ""
+    echo "Troubleshooting:"
+    echo "  1. Run with --verbose for detailed output"
+    echo "  2. Check test-screenshots/ for failure screenshots"
+    echo "  3. Open xcresult bundle in Xcode for detailed logs"
+    echo ""
+    echo "To run only P1 tests (faster):"
+    echo "  ./scripts/run-ui-tests.sh --test-plan P1OnlyTests"
+    echo ""
+
+    exit 1
+fi

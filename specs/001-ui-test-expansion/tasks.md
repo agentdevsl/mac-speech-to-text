@@ -27,12 +27,12 @@ Based on plan.md structure:
 
 **Purpose**: Create base test infrastructure that all UI tests depend on
 
-- [ ] T001 Create UITests/Base/ directory structure for shared test utilities
-- [ ] T002 [P] Implement UITestBase.swift base class with setup/teardown in UITests/Base/UITestBase.swift
-- [ ] T003 [P] Implement UITestHelpers.swift helper functions in UITests/Base/UITestHelpers.swift
-- [ ] T004 [P] Create UITestError enum in UITests/Base/UITestHelpers.swift for consistent error handling
-- [ ] T005 [P] Add XCUIElement+SafeTap extension in UITests/Base/UITestHelpers.swift
-- [ ] T006 [P] Add XCTestCase+Screenshot extension in UITests/Base/UITestHelpers.swift
+- [X] T001 Create UITests/Base/ directory structure for shared test utilities
+- [X] T002 [P] Implement UITestBase.swift base class with setup/teardown in UITests/Base/UITestBase.swift
+- [X] T003 [P] Implement UITestHelpers.swift helper functions in UITests/Base/UITestHelpers.swift
+- [X] T004 [P] Create UITestError enum in UITests/Base/UITestHelpers.swift for consistent error handling
+- [X] T005 [P] Add XCUIElement+SafeTap extension in UITests/Base/UITestHelpers.swift
+- [X] T006 [P] Add XCTestCase+Screenshot extension in UITests/Base/UITestHelpers.swift
 
 **Acceptance**:
 - UITestBase provides consistent app launch with configurable arguments
@@ -50,15 +50,15 @@ Based on plan.md structure:
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Create LaunchArguments enum constants in Sources/Utilities/LaunchArguments.swift
-- [ ] T008 Create UITestConfiguration struct in Sources/Models/UITestConfiguration.swift
-- [ ] T009 Create LaunchArgumentParser in Sources/Utilities/LaunchArgumentParser.swift
-- [ ] T010 Add MockPermissionState and SimulatedErrorType enums in Sources/Models/UITestConfiguration.swift
-- [ ] T011 Modify AppDelegate.swift to parse and apply UITestConfiguration on launch
-- [ ] T012 Add --trigger-recording support to show recording modal on launch in Sources/SpeechToTextApp/AppDelegate.swift
-- [ ] T013 Add --mock-permissions support to PermissionService in Sources/Services/PermissionService.swift
-- [ ] T014 Add --simulate-error support to FluidAudioService in Sources/Services/FluidAudioService.swift
-- [ ] T015 Verify existing --uitesting, --reset-onboarding, --skip-permission-checks, --skip-onboarding arguments still work
+- [X] T007 Create LaunchArguments enum constants in Sources/Utilities/LaunchArguments.swift
+- [X] T008 Create UITestConfiguration struct in Sources/Models/UITestConfiguration.swift
+- [X] T009 Create LaunchArgumentParser in Sources/Utilities/LaunchArgumentParser.swift
+- [X] T010 Add MockPermissionState and SimulatedErrorType enums in Sources/Models/UITestConfiguration.swift
+- [X] T011 Modify AppDelegate.swift to parse and apply UITestConfiguration on launch
+- [X] T012 Add --trigger-recording support to show recording modal on launch in Sources/SpeechToTextApp/AppDelegate.swift
+- [X] T013 Add --mock-permissions support to PermissionService in Sources/Services/PermissionService.swift
+- [X] T014 Add --simulate-error support to FluidAudioService in Sources/Services/FluidAudioService.swift
+- [X] T015 Verify existing --uitesting, --reset-onboarding, --skip-permission-checks, --skip-onboarding arguments still work
 
 **Acceptance**:
 - All launch arguments from data-model.md are functional
@@ -79,12 +79,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 8
 
-- [ ] T016 [P] [US8] Create UITests/P1/ directory for P1 priority tests
-- [ ] T017 [P] [US8] Create TestInfrastructureTests.swift in UITests/P1/TestInfrastructureTests.swift
-- [ ] T018 [US8] Implement test_infrastructure_screenshotCaptured in UITests/P1/TestInfrastructureTests.swift
-- [ ] T019 [US8] Implement test_infrastructure_helpersFunction in UITests/P1/TestInfrastructureTests.swift
-- [ ] T020 [US8] Implement test_infrastructure_resetOnboarding in UITests/P1/TestInfrastructureTests.swift
-- [ ] T021 [US8] Add test-screenshots/ directory creation and management in UITestBase.swift
+- [X] T016 [P] [US8] Create UITests/P1/ directory for P1 priority tests
+- [X] T017 [P] [US8] Create TestInfrastructureTests.swift in UITests/P1/TestInfrastructureTests.swift
+- [X] T018 [US8] Implement test_infrastructure_screenshotCaptured in UITests/P1/TestInfrastructureTests.swift
+- [X] T019 [US8] Implement test_infrastructure_helpersFunction in UITests/P1/TestInfrastructureTests.swift
+- [X] T020 [US8] Implement test_infrastructure_resetOnboarding in UITests/P1/TestInfrastructureTests.swift
+- [X] T021 [US8] Add test-screenshots/ directory creation and management in UITestBase.swift
 
 **Acceptance**:
 - TI-001: Screenshot captured on failure (verify in xcresult)
@@ -104,14 +104,14 @@ Based on plan.md structure:
 
 ### Implementation for User Story 1
 
-- [ ] T022 [US1] Create RecordingFlowTests.swift in UITests/P1/RecordingFlowTests.swift
-- [ ] T023 [US1] Implement test_recording_modalAppearsOnTrigger (RF-001) in UITests/P1/RecordingFlowTests.swift
-- [ ] T024 [US1] Implement test_recording_waveformIsVisible (RF-002) in UITests/P1/RecordingFlowTests.swift
-- [ ] T025 [US1] Implement test_recording_cancelDismissesModal (RF-003) in UITests/P1/RecordingFlowTests.swift
-- [ ] T026 [US1] Implement test_recording_stopInitiatesTranscription (RF-004) in UITests/P1/RecordingFlowTests.swift
-- [ ] T027 [US1] Implement test_recording_escapeKeyDismisses (RF-005) in UITests/P1/RecordingFlowTests.swift
-- [ ] T027b [US1] Implement test_recording_silenceAutoStop (FR-026) in UITests/P1/RecordingFlowTests.swift - verify auto-stop after 1.5s silence
-- [ ] T028 [US1] Add accessibility identifiers to RecordingModal.swift for test element queries
+- [X] T022 [US1] Create RecordingFlowTests.swift in UITests/P1/RecordingFlowTests.swift
+- [X] T023 [US1] Implement test_recording_modalAppearsOnTrigger (RF-001) in UITests/P1/RecordingFlowTests.swift
+- [X] T024 [US1] Implement test_recording_waveformIsVisible (RF-002) in UITests/P1/RecordingFlowTests.swift
+- [X] T025 [US1] Implement test_recording_cancelDismissesModal (RF-003) in UITests/P1/RecordingFlowTests.swift
+- [X] T026 [US1] Implement test_recording_stopInitiatesTranscription (RF-004) in UITests/P1/RecordingFlowTests.swift
+- [X] T027 [US1] Implement test_recording_escapeKeyDismisses (RF-005) in UITests/P1/RecordingFlowTests.swift
+- [X] T027b [US1] Implement test_recording_silenceAutoStop (FR-026) in UITests/P1/RecordingFlowTests.swift - verify auto-stop after 1.5s silence
+- [X] T028 [US1] Add accessibility identifiers to RecordingModal.swift for test element queries
 
 **Acceptance**:
 - RF-001: Recording modal appears when launched with --trigger-recording
@@ -134,16 +134,16 @@ Based on plan.md structure:
 
 ### Implementation for User Story 2
 
-- [ ] T029 [US2] Modify scripts/run-ui-tests.sh to support --test-plan flag for selective test execution
-- [ ] T030 [US2] Add --verbose flag to scripts/run-ui-tests.sh for detailed output
-- [ ] T031 [US2] Add timeout handling to scripts/run-ui-tests.sh using UI_TEST_TIMEOUT env var
-- [ ] T032 [US2] Modify scripts/remote-test.sh to include --include-ui-tests flag
-- [ ] T033 [US2] Create pre-push hook script at scripts/pre-push with unit + UI test integration
-- [ ] T034 [US2] Add SKIP_UI_TESTS environment variable support to scripts/pre-push
-- [ ] T035 [US2] Add UI_TESTS_ONLY environment variable support to scripts/pre-push
-- [ ] T036 [US2] Add result parsing and clear error output format to scripts/pre-push
-- [ ] T037 [US2] Add installation instructions for pre-push hook to scripts/pre-push header
-- [ ] T038 [US2] Create scripts/install-hooks.sh to install pre-push hook to .git/hooks/
+- [X] T029 [US2] Modify scripts/run-ui-tests.sh to support --test-plan flag for selective test execution
+- [X] T030 [US2] Add --verbose flag to scripts/run-ui-tests.sh for detailed output
+- [X] T031 [US2] Add timeout handling to scripts/run-ui-tests.sh using UI_TEST_TIMEOUT env var
+- [X] T032 [US2] Modify scripts/remote-test.sh to include --include-ui-tests flag
+- [X] T033 [US2] Create pre-push hook script at scripts/pre-push with unit + UI test integration
+- [X] T034 [US2] Add SKIP_UI_TESTS environment variable support to scripts/pre-push
+- [X] T035 [US2] Add UI_TESTS_ONLY environment variable support to scripts/pre-push
+- [X] T036 [US2] Add result parsing and clear error output format to scripts/pre-push
+- [X] T037 [US2] Add installation instructions for pre-push hook to scripts/pre-push header
+- [X] T038 [US2] Create scripts/install-hooks.sh to install pre-push hook to .git/hooks/
 
 **Acceptance**:
 - PH-001: Default git push runs both unit tests and UI tests on macdev
@@ -165,14 +165,14 @@ Based on plan.md structure:
 
 ### Implementation for User Story 3
 
-- [ ] T039 [P] [US3] Create UITests/P2/ directory for P2 priority tests
-- [ ] T040 [US3] Create OnboardingFlowTests.swift in UITests/P2/OnboardingFlowTests.swift
-- [ ] T041 [US3] Implement test_onboarding_welcomeStepVisible (ON-001) in UITests/P2/OnboardingFlowTests.swift
-- [ ] T042 [US3] Implement test_onboarding_continueAdvances (ON-002) in UITests/P2/OnboardingFlowTests.swift
-- [ ] T043 [US3] Implement test_onboarding_completion (ON-003) in UITests/P2/OnboardingFlowTests.swift
-- [ ] T044 [US3] Implement test_onboarding_skipShowsWarning (ON-004) in UITests/P2/OnboardingFlowTests.swift
-- [ ] T045 [US3] Add accessibility identifiers to OnboardingView.swift for test element queries
-- [ ] T046 [US3] Refactor existing SpeechToTextUITests.swift onboarding tests to use new base class
+- [X] T039 [P] [US3] Create UITests/P2/ directory for P2 priority tests
+- [X] T040 [US3] Create OnboardingFlowTests.swift in UITests/P1/OnboardingFlowTests.swift (placed in P1 for core flow importance)
+- [X] T041 [US3] Implement test_onboarding_welcomeStepVisible (ON-001) in UITests/P1/OnboardingFlowTests.swift
+- [X] T042 [US3] Implement test_onboarding_continueAdvances (ON-002) in UITests/P1/OnboardingFlowTests.swift
+- [X] T043 [US3] Implement test_onboarding_completion (ON-003) in UITests/P1/OnboardingFlowTests.swift
+- [X] T044 [US3] Implement test_onboarding_skipShowsWarning (ON-004) in UITests/P1/OnboardingFlowTests.swift
+- [X] T045 [US3] Add accessibility identifiers to OnboardingView.swift for test element queries
+- [X] T046 [US3] Refactor existing SpeechToTextUITests.swift onboarding tests to use new base class
 
 **Acceptance**:
 - ON-001: Welcome step visible with all expected elements
@@ -193,12 +193,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 4
 
-- [ ] T047 [US4] Create SettingsTests.swift in UITests/P2/SettingsTests.swift
-- [ ] T048 [US4] Implement test_settings_windowOpens (ST-001) in UITests/P2/SettingsTests.swift
-- [ ] T049 [US4] Implement test_settings_languageTabWorks (ST-002) in UITests/P2/SettingsTests.swift
-- [ ] T050 [US4] Implement test_settings_changesPersist (ST-003) in UITests/P2/SettingsTests.swift
-- [ ] T051 [US4] Implement test_settings_resetToDefaults (ST-004) in UITests/P2/SettingsTests.swift
-- [ ] T052 [US4] Add accessibility identifiers to Settings views for test element queries
+- [X] T047 [US4] Create SettingsTests.swift in UITests/P2/SettingsTests.swift
+- [X] T048 [US4] Implement test_settings_windowOpens (ST-001) in UITests/P2/SettingsTests.swift
+- [X] T049 [US4] Implement test_settings_languageTabWorks (ST-002) in UITests/P2/SettingsTests.swift
+- [X] T050 [US4] Implement test_settings_changesPersist (ST-003) in UITests/P2/SettingsTests.swift
+- [X] T051 [US4] Implement test_settings_resetToDefaults (ST-004) in UITests/P2/SettingsTests.swift
+- [X] T052 [US4] Add accessibility identifiers to Settings views for test element queries
 
 **Acceptance**:
 - ST-001: Settings window opens with Cmd+, shortcut
@@ -219,12 +219,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 5
 
-- [ ] T053 [US5] Create ErrorStateTests.swift in UITests/P2/ErrorStateTests.swift
-- [ ] T054 [US5] Implement test_error_microphoneDeniedMessage (ER-001) in UITests/P2/ErrorStateTests.swift
-- [ ] T055 [US5] Implement test_error_accessibilityDeniedMessage (ER-002) in UITests/P2/ErrorStateTests.swift
-- [ ] T056 [US5] Implement test_error_transcriptionFailure (ER-003) in UITests/P2/ErrorStateTests.swift
-- [ ] T057 [US5] Add error message accessibility identifiers to RecordingModal.swift
-- [ ] T058 [US5] Add error simulation support to RecordingViewModel for --simulate-error argument
+- [X] T053 [US5] Create ErrorStateTests.swift in UITests/P2/ErrorStateTests.swift
+- [X] T054 [US5] Implement test_error_microphoneDeniedMessage (ER-001) in UITests/P2/ErrorStateTests.swift
+- [X] T055 [US5] Implement test_error_accessibilityDeniedMessage (ER-002) in UITests/P2/ErrorStateTests.swift
+- [X] T056 [US5] Implement test_error_transcriptionFailure (ER-003) in UITests/P2/ErrorStateTests.swift
+- [X] T057 [US5] Add error message accessibility identifiers to RecordingModal.swift
+- [X] T058 [US5] Add error simulation support to RecordingViewModel for --simulate-error argument
 
 **Acceptance**:
 - ER-001: Microphone denied shows permission error with instructions
@@ -244,12 +244,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 6
 
-- [ ] T059 [P] [US6] Create UITests/P3/ directory for P3 priority tests
-- [ ] T060 [US6] Create LanguageSelectionTests.swift in UITests/P3/LanguageSelectionTests.swift
-- [ ] T061 [US6] Implement test_language_searchFilters (LS-001) in UITests/P3/LanguageSelectionTests.swift
-- [ ] T062 [US6] Implement test_language_indicatorInModal (LS-002) in UITests/P3/LanguageSelectionTests.swift
-- [ ] T063 [US6] Implement test_language_selectionPersists (LS-003) in UITests/P3/LanguageSelectionTests.swift
-- [ ] T064 [US6] Add accessibility identifiers to language picker components
+- [X] T059 [P] [US6] Create UITests/P3/ directory for P3 priority tests
+- [X] T060 [US6] Create LanguageTests.swift in UITests/P2/LanguageTests.swift
+- [X] T061 [US6] Implement test_language_searchFilters (LS-001) in UITests/P2/LanguageTests.swift
+- [X] T062 [US6] Implement test_language_indicatorInModal (LS-002) in UITests/P2/LanguageTests.swift
+- [X] T063 [US6] Implement test_language_selectionPersists (LS-003) in UITests/P2/LanguageTests.swift
+- [X] T064 [US6] Add accessibility identifiers to language picker components
 
 **Acceptance**:
 - LS-001: Language search filters list as user types
@@ -269,12 +269,12 @@ Based on plan.md structure:
 
 ### Implementation for User Story 7
 
-- [ ] T065 [US7] Create AccessibilityTests.swift in UITests/P3/AccessibilityTests.swift
-- [ ] T066 [US7] Implement test_accessibility_voiceOverLabels (AC-001) in UITests/P3/AccessibilityTests.swift
-- [ ] T067 [US7] Implement test_accessibility_keyboardNav (AC-002) in UITests/P3/AccessibilityTests.swift
-- [ ] T068 [US7] Implement test_accessibility_waveformAnnounces (AC-003) in UITests/P3/AccessibilityTests.swift
-- [ ] T069 [US7] Add accessibility labels to all interactive elements in Views/
-- [ ] T070 [US7] Add accessibilityValue for waveform audio level in Views/Components/WaveformView.swift
+- [X] T065 [US7] Create AccessibilityTests.swift in UITests/P3/AccessibilityTests.swift
+- [X] T066 [US7] Implement test_accessibility_voiceOverLabels (AC-001) in UITests/P3/AccessibilityTests.swift
+- [X] T067 [US7] Implement test_accessibility_keyboardNav (AC-002) in UITests/P3/AccessibilityTests.swift
+- [X] T068 [US7] Implement test_accessibility_waveformAnnounces (AC-003) in UITests/P3/AccessibilityTests.swift
+- [X] T069 [US7] Add accessibility labels to all interactive elements in Views/
+- [X] T070 [US7] Add accessibilityValue for waveform audio level in Views/Components/WaveformView.swift
 
 **Acceptance**:
 - AC-001: All interactive elements in onboarding have VoiceOver labels
@@ -291,16 +291,16 @@ Based on plan.md structure:
 
 **Purpose**: Documentation, test plans, and cleanup that affect multiple user stories
 
-- [ ] T071 [P] Create UITests/TestPlans/AllUITests.xctestplan for all UI tests
-- [ ] T072 [P] Create UITests/TestPlans/P1OnlyTests.xctestplan for P1 tests only (quick validation)
-- [ ] T073 [P] Create UITests/TestPlans/AccessibilityTests.xctestplan for accessibility tests only
-- [ ] T074 Update CLAUDE.md with new UI test commands and flags
-- [ ] T075 Update AGENTS.md with UI testing patterns and best practices
-- [ ] T076 Refactor SpeechToTextUITests.swift to import new base class and remove duplicated code
-- [ ] T077 [P] Verify all SC-001 through SC-008 success criteria are met
-- [ ] T078 Run full test suite and verify no unit test regressions (SC-008)
-- [ ] T079 Time pre-push hook execution and verify <10 minutes (SC-002)
-- [ ] T080 Test SKIP_UI_TESTS reduces time by at least 50% (SC-005)
+- [X] T071 [P] Create UITests/TestPlans/AllUITests.xctestplan for all UI tests
+- [X] T072 [P] Create UITests/TestPlans/P1OnlyTests.xctestplan for P1 tests only (quick validation)
+- [X] T073 [P] Create UITests/TestPlans/AccessibilityTests.xctestplan for accessibility tests only
+- [X] T074 Update CLAUDE.md with new UI test commands and flags
+- [X] T075 Update AGENTS.md with UI testing patterns and best practices
+- [X] T076 Refactor SpeechToTextUITests.swift to import new base class and remove duplicated code
+- [X] T077 [P] Verify all SC-001 through SC-008 success criteria are met
+- [X] T078 Run full test suite and verify no unit test regressions (SC-008)
+- [X] T079 Time pre-push hook execution and verify <10 minutes (SC-002)
+- [X] T080 Test SKIP_UI_TESTS reduces time by at least 50% (SC-005)
 
 **Acceptance**:
 - Test plans enable selective execution

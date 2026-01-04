@@ -1,0 +1,38 @@
+{
+  "configurations" : [
+    {
+      "id" : "all-tests",
+      "name" : "All UI Tests",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "UI_TEST_MODE",
+            "value" : "1"
+          }
+        ],
+        "testExecutionOrdering" : "alphabetical",
+        "testTimeoutsEnabled" : true,
+        "defaultTestExecutionTimeAllowance" : 120,
+        "maximumTestExecutionTimeAllowance" : 300
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:",
+      "identifier" : "SpeechToText",
+      "name" : "SpeechToText"
+    }
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SpeechToTextUITests",
+        "name" : "SpeechToTextUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

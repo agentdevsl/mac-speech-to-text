@@ -10,12 +10,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
 
+    /// UI test configuration parsed from launch arguments
+    private lazy var testConfig: UITestConfiguration = {
+        UITestConfiguration.fromProcessInfo()
+    }()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Ensure only one instance of the app runs
         if NSRunningApplication.runningApplications(withBundleIdentifier: Constants.App.bundleIdentifier).count > 1 {
             NSApp.terminate(nil)
             return
         }
+
+        // Apply UI test configuration if in test mode
+        applyUITestConfiguration()
 
         // Always setup notification observers for menu actions
         // (works with MenuBarExtra from SpeechToTextApp)
@@ -27,10 +35,68 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Check if first launch - show onboarding (T040)
-        let settings = settingsService.load()
-        if !settings.onboarding.completed {
+        // Skip if --skip-onboarding or reset if --reset-onboarding
+        if testConfig.skipOnboarding {
+            AppLogger.app.debug("Skipping onboarding (--skip-onboarding)")
+            // Mark onboarding as completed
+            var settings = settingsService.load()
+            settings.onboarding.completed = true
+            settingsService.save(settings)
+        } else if testConfig.resetOnboarding {
+            AppLogger.app.debug("Resetting onboarding state (--reset-onboarding)")
+            var settings = settingsService.load()
+            settings.onboarding.completed = false
+            settingsService.save(settings)
             showOnboarding()
+        } else {
+            let settings = settingsService.load()
+            if !settings.onboarding.completed {
+                showOnboarding()
+            }
         }
+
+        // Trigger recording modal if requested (for UI tests)
+        if testConfig.triggerRecordingOnLaunch {
+            AppLogger.app.debug("Triggering recording modal on launch (--trigger-recording)")
+            // Small delay to ensure app is fully loaded
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+                self.showRecordingModal()
+            }
+        }
+    }
+
+    // MARK: - UI Test Configuration
+
+    /// Apply UI test configuration settings
+    private func applyUITestConfiguration() {
+        guard testConfig.isUITesting else { return }
+
+        AppLogger.app.info("Running in UI test mode")
+
+        // Disable animations for faster tests
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+        }
+
+        // Apply initial language if specified
+        if let language = testConfig.initialLanguage {
+            AppLogger.app.debug("Setting initial language to: \(language, privacy: .public)")
+            var settings = settingsService.load()
+            settings.language.defaultLanguage = language
+            settingsService.save(settings)
+        }
+
+        // Log configuration for debugging
+        AppLogger.app.debug("""
+            UI Test Configuration:
+            - skipPermissionChecks: \(self.testConfig.skipPermissionChecks)
+            - skipOnboarding: \(self.testConfig.skipOnboarding)
+            - resetOnboarding: \(self.testConfig.resetOnboarding)
+            - triggerRecordingOnLaunch: \(self.testConfig.triggerRecordingOnLaunch)
+            - mockPermissionState: \(String(describing: self.testConfig.mockPermissionState))
+            - simulatedError: \(String(describing: self.testConfig.simulatedError))
+            """)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

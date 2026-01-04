@@ -166,10 +166,13 @@ struct OnboardingView: View {
                 .font(.system(size: 80))
                 .foregroundStyle(Color("AmberPrimary", bundle: nil))
                 .symbolEffect(.pulse)
+                .accessibilityIdentifier("welcomeIcon")
+                .accessibilityLabel("Speech-to-Text app icon")
 
             Text("Welcome to Speech-to-Text")
                 .font(.largeTitle)
                 .fontWeight(.bold)
+                .accessibilityAddTraits(.isHeader)
 
             Text("A privacy-first dictation app that runs 100% locally on your Mac. No cloud, no tracking, no data collection.")
                 .font(.title3)
@@ -183,7 +186,10 @@ struct OnboardingView: View {
                 FeatureRow(icon: "bolt.fill", text: "<100ms transcription latency")
             }
             .padding(.top)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Features list")
         }
+        .accessibilityIdentifier("welcomeStep")
     }
 
     /// Step 1: Microphone permission
