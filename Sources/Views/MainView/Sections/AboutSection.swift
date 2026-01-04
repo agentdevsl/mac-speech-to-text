@@ -292,8 +292,13 @@ final class AboutSectionViewModel {
 
     // MARK: - URLs
 
-    private let supportURL = URL(string: "https://speechtotext.app/support")!
-    private let privacyPolicyURL = URL(string: "https://speechtotext.app/privacy")!
+    private static let supportURLString = "https://speechtotext.app/support"
+    private static let privacyPolicyURLString = "https://speechtotext.app/privacy"
+
+    // MARK: - State
+
+    /// Tracks whether acknowledgments are shown (fallback for notification)
+    var isShowingAcknowledgments: Bool = false
 
     // MARK: - Initialization
 
@@ -302,11 +307,27 @@ final class AboutSectionViewModel {
     // MARK: - Methods
 
     func openSupport(openURL: OpenURLAction) {
-        openURL(supportURL)
+        guard let url = URL(string: Self.supportURLString) else {
+            AppLogger.system.error("Invalid support URL: \(Self.supportURLString)")
+            return
+        }
+        openURL(url) { success in
+            if !success {
+                AppLogger.system.error("Failed to open support URL")
+            }
+        }
     }
 
     func openPrivacyPolicy(openURL: OpenURLAction) {
-        openURL(privacyPolicyURL)
+        guard let url = URL(string: Self.privacyPolicyURLString) else {
+            AppLogger.system.error("Invalid privacy policy URL: \(Self.privacyPolicyURLString)")
+            return
+        }
+        openURL(url) { success in
+            if !success {
+                AppLogger.system.error("Failed to open privacy policy URL")
+            }
+        }
     }
 
     func showAcknowledgments() {
@@ -315,6 +336,14 @@ final class AboutSectionViewModel {
             name: .showAcknowledgments,
             object: nil
         )
+
+        // Also set local state as fallback if no listener is registered
+        // Views can observe isShowingAcknowledgments as an alternative to the notification
+        isShowingAcknowledgments = true
+    }
+
+    func hideAcknowledgments() {
+        isShowingAcknowledgments = false
     }
 }
 

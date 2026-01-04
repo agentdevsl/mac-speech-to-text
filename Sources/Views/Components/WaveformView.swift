@@ -104,6 +104,130 @@ struct WaveformView: View {
     }
 }
 
+// MARK: - Compact Wave Animation
+
+/// A minimal, elegant sound wave animation for compact recording modals
+struct CompactSoundWave: View {
+    /// Current audio level (0.0 - 1.0)
+    let audioLevel: Float
+
+    /// Number of wave bars
+    private let barCount = 5
+
+    /// Animation phase for continuous flow
+    @State private var phase: CGFloat = 0
+
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<barCount, id: \.self) { index in
+                WaveBar(
+                    audioLevel: audioLevel,
+                    index: index,
+                    phase: phase
+                )
+            }
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+                phase = 2 * .pi
+            }
+        }
+    }
+}
+
+/// Individual animated bar in the compact wave
+private struct WaveBar: View {
+    let audioLevel: Float
+    let index: Int
+    let phase: CGFloat
+
+    var body: some View {
+        let offset = CGFloat(index) * 0.4
+        let waveHeight = calculateWaveHeight(offset: offset)
+
+        RoundedRectangle(cornerRadius: 1.5)
+            .fill(barColor)
+            .frame(width: 3, height: max(4, waveHeight))
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: audioLevel)
+    }
+
+    private func calculateWaveHeight(offset: CGFloat) -> CGFloat {
+        let baseHeight: CGFloat = 8
+        let maxAmplitude: CGFloat = 28
+        let sineValue = sin(phase + offset)
+        let amplitude = CGFloat(audioLevel) * maxAmplitude * (0.5 + sineValue * 0.5)
+        return baseHeight + amplitude
+    }
+
+    private var barColor: Color {
+        if audioLevel < 0.1 {
+            return Color.gray.opacity(0.3)
+        } else if audioLevel < 0.5 {
+            return Color.primary.opacity(0.6)
+        } else {
+            return Color.red.opacity(0.8)
+        }
+    }
+}
+
+/// Flowing sound wave visualization with smooth organic movement
+struct FlowingSoundWave: View {
+    /// Current audio level (0.0 - 1.0)
+    let audioLevel: Float
+
+    /// Animation time
+    @State private var time: CGFloat = 0
+
+    var body: some View {
+        Canvas { context, size in
+            let midY = size.height / 2
+            let amplitude = CGFloat(audioLevel) * size.height * 0.4
+
+            // Draw multiple overlapping waves for depth
+            for waveIndex in 0..<3 {
+                let opacity = 1.0 - Double(waveIndex) * 0.3
+                let phaseOffset = CGFloat(waveIndex) * 0.5
+                let waveAmplitude = amplitude * (1.0 - CGFloat(waveIndex) * 0.2)
+
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: midY))
+
+                for xPos in stride(from: 0, through: size.width, by: 2) {
+                    let progress = xPos / size.width
+                    let frequency: CGFloat = 3.0
+                    let wave1 = sin(progress * frequency * .pi + time + phaseOffset)
+                    let wave2 = sin(progress * frequency * 2 * .pi + time * 1.5 + phaseOffset) * 0.3
+                    let envelope = sin(progress * .pi) // Fade edges
+
+                    let yPos = midY + (wave1 + wave2) * waveAmplitude * envelope
+                    path.addLine(to: CGPoint(x: xPos, y: yPos))
+                }
+
+                context.stroke(
+                    path,
+                    with: .color(waveColor.opacity(opacity)),
+                    lineWidth: 2 - CGFloat(waveIndex) * 0.5
+                )
+            }
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
+                time = 2 * .pi
+            }
+        }
+    }
+
+    private var waveColor: Color {
+        if audioLevel < 0.1 {
+            return .gray
+        } else if audioLevel < 0.5 {
+            return .primary
+        } else {
+            return .red
+        }
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Idle") {
@@ -132,6 +256,56 @@ struct WaveformView: View {
 
 #Preview("Animated") {
     WaveformAnimatedPreview()
+}
+
+#Preview("Compact Wave") {
+    VStack(spacing: 20) {
+        CompactSoundWave(audioLevel: 0.0)
+        CompactSoundWave(audioLevel: 0.3)
+        CompactSoundWave(audioLevel: 0.7)
+    }
+    .padding()
+    .frame(height: 120)
+    .background(.ultraThinMaterial)
+}
+
+#Preview("Flowing Wave") {
+    FlowingSoundWavePreview()
+}
+
+/// Preview helper for flowing sound wave
+private struct FlowingSoundWavePreview: View {
+    @State private var level: Float = 0.5
+    @State private var previewTimer: Timer?
+
+    var body: some View {
+        VStack(spacing: 16) {
+            FlowingSoundWave(audioLevel: level)
+                .frame(height: 50)
+                .padding()
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Slider(value: Binding(
+                get: { Double(level) },
+                set: { level = Float($0) }
+            ), in: 0...1)
+            .padding(.horizontal)
+        }
+        .padding()
+        .onAppear {
+            previewTimer?.invalidate()
+            previewTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                Task { @MainActor in
+                    level = Float.random(in: 0.2...0.8)
+                }
+            }
+        }
+        .onDisappear {
+            previewTimer?.invalidate()
+            previewTimer = nil
+        }
+    }
 }
 
 /// Preview helper for animated waveform

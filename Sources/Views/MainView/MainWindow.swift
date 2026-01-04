@@ -100,7 +100,9 @@ final class MainWindow: NSObject, NSWindowDelegate {
     }
 
     /// Close and release the window
+    /// Note: Delegate is nil'd before closing to prevent callbacks during deallocation (CRIT-5, HIGH-10)
     func close() {
+        window?.delegate = nil
         window?.close()
         window = nil
     }
@@ -161,8 +163,12 @@ final class MainWindow: NSObject, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     /// Called when window is about to close - clears reference to prevent stale state
+    /// Note: Delegate nil'd to break retain cycle before clearing window reference (HIGH-9)
     func windowWillClose(_ notification: Notification) {
+        window?.delegate = nil
         window = nil
+        // Notify controller to release MainWindow reference, preventing stale state
+        NotificationCenter.default.post(name: .mainWindowDidClose, object: nil)
     }
 }
 
@@ -180,9 +186,29 @@ final class MainWindowController {
 
     private var mainWindow: MainWindow?
 
+    /// Observer for window close notifications
+    private var windowCloseObserver: NSObjectProtocol?
+
     // MARK: - Initialization
 
-    private init() {}
+    private init() {
+        // Listen for window close to clean up MainWindow reference (HIGH-9)
+        windowCloseObserver = NotificationCenter.default.addObserver(
+            forName: .mainWindowDidClose,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.mainWindow = nil
+            }
+        }
+    }
+
+    deinit {
+        if let observer = windowCloseObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
 
     // MARK: - Public Methods
 
@@ -241,4 +267,7 @@ extension Notification.Name {
 
     /// Posted when the main window should navigate to a specific section
     static let navigateToSection = Notification.Name("navigateToSection")
+
+    /// Posted when the main window has closed (for cleanup)
+    static let mainWindowDidClose = Notification.Name("mainWindowDidClose")
 }

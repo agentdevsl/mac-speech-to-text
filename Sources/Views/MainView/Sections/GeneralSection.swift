@@ -4,6 +4,7 @@
 // Main View - General Settings Section
 // Recording mode, startup, text insertion, and hotkey configuration
 
+import ServiceManagement
 import SwiftUI
 
 /// GeneralSection provides configuration for recording behavior and general app settings
@@ -16,6 +17,7 @@ struct GeneralSection: View {
 
     @State private var settings: UserSettings
     @State private var isSaving: Bool = false
+    @State private var saveError: String?
 
     // MARK: - Initialization
 
@@ -29,6 +31,23 @@ struct GeneralSection: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                // Error banner
+                if let error = saveError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.white)
+                        Text(error)
+                            .font(.callout)
+                            .foregroundStyle(.white)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(Color.red.opacity(0.9))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .accessibilityIdentifier("saveErrorBanner")
+                }
+
                 // Section header
                 sectionHeader
 
@@ -48,6 +67,7 @@ struct GeneralSection: View {
                 hotkeySection
             }
             .padding(24)
+            .animation(.easeInOut(duration: 0.3), value: saveError)
         }
         .accessibilityIdentifier("generalSection")
     }
@@ -120,6 +140,7 @@ struct GeneralSection: View {
                         get: { settings.general.launchAtLogin },
                         set: { newValue in
                             settings.general.launchAtLogin = newValue
+                            updateLaunchAtLogin(enabled: newValue)
                             saveSettings()
                         }
                     )
@@ -223,12 +244,41 @@ struct GeneralSection: View {
 
     private func saveSettings() {
         isSaving = true
+        saveError = nil
         do {
             try settingsService.save(settings)
         } catch {
             AppLogger.service.error("Failed to save settings: \(error.localizedDescription)")
+            saveError = "Failed to save settings. Please try again."
+            // Clear error after 3 seconds
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                saveError = nil
+            }
         }
         isSaving = false
+    }
+
+    private func updateLaunchAtLogin(enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+                AppLogger.system.info("Registered app for launch at login")
+            } else {
+                try SMAppService.mainApp.unregister()
+                AppLogger.system.info("Unregistered app from launch at login")
+            }
+        } catch {
+            AppLogger.service.error("Failed to update launch at login: \(error.localizedDescription)")
+            saveError = "Failed to update launch at login setting."
+            // Revert the setting since the system call failed
+            settings.general.launchAtLogin = !enabled
+            // Clear error after 3 seconds
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                saveError = nil
+            }
+        }
     }
 }
 

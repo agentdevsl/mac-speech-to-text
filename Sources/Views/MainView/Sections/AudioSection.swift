@@ -14,23 +14,36 @@ struct AudioSection: View {
     let settingsService: SettingsService
 
     // MARK: - State
+    // HIGH-8 Fix: Use settings.audio.inputDeviceId as single source of truth
+    // Removed duplicate @State selectedDeviceId - now derived from settings
 
     @State private var settings: UserSettings
     @State private var isSaving: Bool = false
     @State private var availableDevices: [AudioDevice] = []
-    @State private var selectedDeviceId: String?
 
     // Loading & Error States
     @State private var isLoadingDevices: Bool = false
     @State private var deviceError: AudioDeviceError?
     @State private var showDeviceReconnectHint: Bool = false
+    @State private var saveError: String?
+
+    // HIGH-7 Fix: Device change observer for connect/disconnect events
+    #if os(macOS)
+    @State private var deviceObserver: NSObjectProtocol?
+    #endif
+
+    // MARK: - Computed Properties
+
+    /// Single source of truth for selected device ID (HIGH-8 fix)
+    private var selectedDeviceId: String? {
+        settings.audio.inputDeviceId
+    }
 
     // MARK: - Initialization
 
     init(settingsService: SettingsService) {
         self.settingsService = settingsService
         self._settings = State(initialValue: settingsService.load())
-        self._selectedDeviceId = State(initialValue: settingsService.load().audio.inputDeviceId)
     }
 
     // MARK: - Body
@@ -68,6 +81,72 @@ struct AudioSection: View {
         .task {
             await loadAudioDevices()
         }
+        .onAppear {
+            setupDeviceObserver()
+        }
+        .onDisappear {
+            removeDeviceObserver()
+        }
+        // MED-11 Fix: Show save error alert
+        .alert("Save Error", isPresented: Binding(
+            get: { saveError != nil },
+            set: { if !$0 { saveError = nil } }
+        )) {
+            Button("OK") { saveError = nil }
+        } message: {
+            if let error = saveError {
+                Text(error)
+            }
+        }
+    }
+
+    // MARK: - Device Observation (HIGH-7 Fix)
+
+    /// Set up observer for audio device connect/disconnect events
+    private func setupDeviceObserver() {
+        #if os(macOS)
+        // Remove any existing observer first
+        removeDeviceObserver()
+
+        // Observe audio hardware configuration changes
+        // This notification is posted when devices are connected/disconnected
+        deviceObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.AVCaptureDeviceWasConnected,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            Task { @MainActor in
+                await loadAudioDevices()
+            }
+        }
+
+        // Also observe device disconnection
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name.AVCaptureDeviceWasDisconnected,
+            object: nil,
+            queue: .main
+        ) { [self] _ in
+            Task { @MainActor in
+                await loadAudioDevices()
+            }
+        }
+        #endif
+    }
+
+    /// Remove the device observer when view disappears
+    private func removeDeviceObserver() {
+        #if os(macOS)
+        if let observer = deviceObserver {
+            NotificationCenter.default.removeObserver(observer)
+            deviceObserver = nil
+        }
+        // Also remove the disconnection observer
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name.AVCaptureDeviceWasDisconnected,
+            object: nil
+        )
+        #endif
     }
 
     // MARK: - Section Header
@@ -382,8 +461,8 @@ struct AudioSection: View {
         deviceError = nil
         isLoadingDevices = true
 
-        // Introduce small delay for UX (avoid flash of loading state)
-        try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+        // MED-10 Fix: Removed 300ms artificial delay - it's unnecessary
+        // and creates poor UX. Loading indicator will show briefly if needed.
 
         // Get available audio input devices
         var devices: [AudioDevice] = []
@@ -412,7 +491,7 @@ struct AudioSection: View {
            !devices.contains(where: { $0.id == previousId }) {
             // Device was disconnected - show hint and reset to default
             showDeviceReconnectHint = true
-            selectedDeviceId = nil
+            // HIGH-8 Fix: Only update settings (single source of truth)
             settings.audio.inputDeviceId = nil
             saveSettings()
         }
@@ -428,7 +507,8 @@ struct AudioSection: View {
     }
 
     private func selectDevice(_ device: AudioDevice) {
-        selectedDeviceId = device.id
+        // HIGH-8 Fix: Only update settings (single source of truth)
+        // The selectedDeviceId computed property automatically reflects this change
         settings.audio.inputDeviceId = device.id
         saveSettings()
     }
@@ -437,7 +517,11 @@ struct AudioSection: View {
         isSaving = true
         do {
             try settingsService.save(settings)
+            // MED-11 Fix: Clear any previous save error on success
+            saveError = nil
         } catch {
+            // MED-11 Fix: Set saveError to show alert to user instead of silently swallowing
+            saveError = "Failed to save audio settings: \(error.localizedDescription)"
             AppLogger.service.error("Failed to save audio settings: \(error.localizedDescription)")
         }
         isSaving = false
