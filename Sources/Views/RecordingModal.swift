@@ -145,6 +145,7 @@ struct RecordingModal: View {
                 Text(statusTitle)
                     .font(.title2)
                     .fontWeight(.semibold)
+                    .accessibilityIdentifier("recordingStatus")
 
                 if viewModel.isRecording {
                     Text("Speak now...")

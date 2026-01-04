@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length
 // RecordingViewModel.swift
 // macOS Local Speech-to-Text Application
 //
@@ -5,6 +6,7 @@
 // Task T025: RecordingViewModel - @Observable class coordinating audio capture,
 // FluidAudio transcription, and text insertion
 
+import AppKit
 import AVFoundation
 import Foundation
 import Observation
@@ -50,6 +52,12 @@ final class RecordingViewModel {
     var currentLanguageModel: LanguageModel? {
         LanguageModel.supportedLanguages.first { $0.code == currentLanguage }
     }
+
+    /// Whether to show the inline accessibility permission prompt
+    var showAccessibilityPrompt: Bool = false
+
+    /// Whether the last transcription was copied to clipboard (not inserted)
+    var lastTranscriptionCopiedToClipboard: Bool = false
 
     // MARK: - Dependencies
     // All services are @ObservationIgnored to prevent @Observable from tracking them
@@ -292,7 +300,95 @@ final class RecordingViewModel {
         transcribedText = ""
         confidence = 0.0
         errorMessage = nil
+        showAccessibilityPrompt = false
+        lastTranscriptionCopiedToClipboard = false
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Recording cancelled and state reset")
+    }
+
+    /// Handle hotkey release for hold-to-record mode
+    ///
+    /// This method is called when the hotkey is released in hold-to-record mode.
+    /// It stops recording, transcribes the audio, and inserts text with fallback handling.
+    /// If accessibility permission is not granted, it shows an inline prompt.
+    func onHotkeyReleased() async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] onHotkeyReleased() called, isRecording=\(isRecording)")
+
+        guard isRecording else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] onHotkeyReleased: not recording")
+            throw RecordingError.notRecording
+        }
+
+        // Reset accessibility prompt state
+        showAccessibilityPrompt = false
+        lastTranscriptionCopiedToClipboard = false
+
+        AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isRecording")
+        isRecording = false
+        inactivityTimer?.invalidate()
+        inactivityTimer = nil
+        deinitInactivityTimer = nil
+
+        do {
+            // Stop audio capture and get samples (only if active)
+            guard isAudioCaptureActive else {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] onHotkeyReleased: audio capture not active")
+                throw RecordingError.notRecording
+            }
+            isAudioCaptureActive = false
+
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Stopping audio capture...")
+            let samples = try await audioService.stopCapture()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples")
+
+            guard !samples.isEmpty else {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] No audio captured")
+                throw RecordingError.noAudioCaptured
+            }
+
+            // Update session
+            currentSession?.endTime = Date()
+            currentSession?.audioData = samples
+            if let session = currentSession {
+                let duration = session.endTime?.timeIntervalSince(session.startTime) ?? 0
+                AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Session duration: \(String(format: "%.2f", duration))s")
+            }
+
+            // Transcribe audio
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription...")
+            try await transcribeWithFallback(samples: samples)
+
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] onHotkeyReleased error: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            throw error
+        }
+    }
+
+    /// Dismiss the accessibility prompt and remember the user's choice
+    func dismissAccessibilityPrompt() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] dismissAccessibilityPrompt() called")
+        showAccessibilityPrompt = false
+
+        // Remember that user dismissed the prompt
+        do {
+            var settings = settingsService.load()
+            settings.general.accessibilityPromptDismissed = true
+            try settingsService.save(settings)
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saved accessibilityPromptDismissed=true")
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to save settings: \(error.localizedDescription)")
+        }
+    }
+
+    /// Open System Settings to accessibility preferences
+    func openAccessibilitySettings() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] openAccessibilitySettings() called")
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            let opened = NSWorkspace.shared.open(url)
+            if !opened {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to open System Settings")
+            }
+        }
     }
 
     // MARK: - Private Methods
@@ -395,6 +491,120 @@ final class RecordingViewModel {
         }
     }
 
+    /// Transcribe audio samples and insert text with fallback handling
+    ///
+    /// This method is used by hold-to-record mode to handle the full workflow
+    /// with graceful degradation when accessibility permission is not granted.
+    private func transcribeWithFallback(samples: [Int16]) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribeWithFallback() called with \(samples.count) samples")
+
+        guard var session = currentSession else {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] transcribeWithFallback: no active session")
+            throw RecordingError.noActiveSession
+        }
+
+        AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isTranscribing")
+        isTranscribing = true
+        session.state = .transcribing
+        currentSession = session
+
+        do {
+            // Initialize FluidAudio if needed
+            let settings = settingsService.load()
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Initializing FluidAudio with language=\(settings.language.defaultLanguage)")
+            try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
+
+            // Transcribe
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
+            let result = try await fluidAudioService.transcribe(samples: samples)
+            AppLogger.info(
+                AppLogger.viewModel,
+                "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
+            )
+
+            // Update session
+            session.transcribedText = result.text
+            session.confidenceScore = Double(result.confidence)
+            currentSession = session
+
+            // Update local state
+            transcribedText = result.text
+            confidence = Double(result.confidence)
+
+            AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isTranscribing")
+            isTranscribing = false
+
+            // Insert text with fallback handling
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Proceeding to text insertion with fallback...")
+            try await insertTextWithFallback(result.text)
+
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
+            isTranscribing = false
+            errorMessage = "Transcription failed: \(error.localizedDescription)"
+            session.errorMessage = error.localizedDescription
+            session.state = .cancelled
+            currentSession = session
+            throw RecordingError.transcriptionFailed(error.localizedDescription)
+        }
+    }
+
+    /// Insert text with fallback to clipboard and show accessibility prompt if needed
+    private func insertTextWithFallback(_ text: String) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback() called, textLength=\(text.count)")
+
+        guard var session = currentSession else {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback: no active session")
+            throw RecordingError.noActiveSession
+        }
+
+        AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isInserting")
+        isInserting = true
+        session.state = .inserting
+        currentSession = session
+
+        // Use fallback-aware insertion
+        let insertionResult = await textInsertionService.insertTextWithFallback(text)
+
+        switch insertionResult {
+        case .insertedViaAccessibility:
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text inserted via accessibility")
+            session.insertionSuccess = true
+            lastTranscriptionCopiedToClipboard = false
+
+        case .copiedToClipboardOnly(let reason):
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text copied to clipboard: \(String(describing: reason))")
+            session.insertionSuccess = true // Clipboard copy is still a success
+            lastTranscriptionCopiedToClipboard = true
+
+            // Don't show prompt for user preference or if already dismissed
+            switch reason {
+            case .userPreference, .accessibilityNotGranted:
+                // User chose clipboard-only or already dismissed prompt
+                break
+            case .insertionFailed:
+                // Insertion failed but clipboard worked - no prompt needed
+                break
+            }
+
+        case .requiresAccessibilityPermission:
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Showing accessibility permission prompt")
+            session.insertionSuccess = true // Clipboard copy is still a success
+            lastTranscriptionCopiedToClipboard = true
+            showAccessibilityPrompt = true
+        }
+
+        session.state = .completed
+        currentSession = session
+
+        AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
+        isInserting = false
+
+        // Save statistics
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
+        await saveStatistics(session: session)
+    }
+
     /// Handle audio level update - detect talking and manage inactivity timer
     private func handleAudioLevel(_ level: Double) {
         audioLevel = level
@@ -480,3 +690,5 @@ enum RecordingError: LocalizedError, Equatable, Sendable {
         }
     }
 }
+
+// swiftlint:enable file_length type_body_length

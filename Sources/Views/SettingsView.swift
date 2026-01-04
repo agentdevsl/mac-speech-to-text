@@ -1,12 +1,17 @@
 // SettingsView.swift
 // macOS Local Speech-to-Text Application
 //
+// DEPRECATED: Settings are now accessible from the menu bar dropdown.
+// This separate settings window has been replaced by inline settings in MenuBarView.
+// This file is kept for backwards compatibility but is not shown to users.
+//
 // User Story 4: Customizable Settings
 // Task T052: SettingsView with tabs for General, Language, Audio, and Privacy settings
 
 import SwiftUI
 
 /// SettingsView provides comprehensive app configuration
+/// @deprecated Use menu bar settings via MenuBarView instead
 struct SettingsView: View {
     // MARK: - State
 

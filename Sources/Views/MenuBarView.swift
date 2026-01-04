@@ -1,13 +1,16 @@
+// swiftlint:disable type_body_length
 // MenuBarView.swift
 // macOS Local Speech-to-Text Application
 //
 // User Story 3: Menu Bar Quick Access and Stats
 // Task T044: MenuBarView - Menu bar content with quick stats display
 // and menu options (Start Recording, Open Settings, Quit)
+//
+// Phase 3: UI Simplification - Inline settings replacing separate settings window
 
 import SwiftUI
 
-/// MenuBarView provides the menu bar dropdown content
+/// MenuBarView provides the menu bar dropdown content with inline settings
 struct MenuBarView: View {
     // MARK: - State
 
@@ -18,30 +21,39 @@ struct MenuBarView: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header with app name
-            headerSection
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Header with app name
+                headerSection
 
-            Divider()
+                Divider()
 
-            // Quick stats section
-            statsSection
+                // Quick stats section
+                statsSection
 
-            Divider()
+                Divider()
 
-            // Menu actions
-            actionsSection
+                // Settings sections (Phase 3)
+                settingsSections
 
-            Divider()
+                Divider()
 
-            // Quit button
-            quitSection
+                // Permissions status
+                permissionsSection
+
+                Divider()
+
+                // Quit button
+                quitSection
+            }
         }
-        .frame(width: 250)
+        .frame(width: 280)
+        .frame(maxHeight: 480)
         .onAppear {
             // Store task for potential cancellation
             refreshTask = Task {
                 await viewModel.refreshStatistics()
+                await viewModel.refreshPermissions()
             }
         }
         .onDisappear {
@@ -68,6 +80,8 @@ struct MenuBarView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
+
+            Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -75,145 +89,319 @@ struct MenuBarView: View {
 
     /// Quick stats section
     private var statsSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label {
-                HStack {
-                    Text("Words Today")
-                    Spacer()
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                    } else {
-                        Text("\(viewModel.wordsToday)")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color("AmberPrimary", bundle: nil))
-                    }
-                }
-            } icon: {
+        HStack(spacing: 16) {
+            // Words today
+            HStack(spacing: 6) {
                 Image(systemName: "text.alignleft")
+                    .font(.caption)
                     .foregroundStyle(.blue)
-            }
 
-            Label {
-                HStack {
-                    Text("Sessions Today")
-                    Spacer()
-                    if viewModel.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                    } else {
-                        Text("\(viewModel.sessionsToday)")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color("AmberPrimary", bundle: nil))
-                    }
+                Text("Words:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if viewModel.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                } else {
+                    Text("\(viewModel.wordsToday)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color("AmberPrimary", bundle: nil))
                 }
-            } icon: {
-                Image(systemName: "mic.fill")
-                    .foregroundStyle(.green)
             }
 
-            // Last updated
-            Text("Updated: \(formattedUpdateTime)")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            // Sessions today
+            HStack(spacing: 6) {
+                Image(systemName: "mic.fill")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+
+                Text("Sessions:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if viewModel.isLoading {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                } else {
+                    Text("\(viewModel.sessionsToday)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color("AmberPrimary", bundle: nil))
+                }
+            }
+
+            Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .font(.callout)
+        .padding(.vertical, 8)
     }
 
-    /// Actions section with main menu items
-    private var actionsSection: some View {
+    /// Settings sections with collapsible disclosure groups
+    private var settingsSections: some View {
         VStack(spacing: 0) {
-            MenuButton(
-                icon: "mic.fill",
-                title: "Start Recording",
-                subtitle: "⌘⌃Space",
-                action: viewModel.startRecording
-            )
+            // Recording section
+            recordingSection
 
-            MenuButton(
-                icon: "gear",
-                title: "Open Settings",
-                subtitle: "Configure app",
-                action: viewModel.openSettings
-            )
+            // Language section
+            languageSection
 
-            // Language quick-switch (T063)
-            languageQuickSwitchMenu
+            // Audio section
+            audioSection
 
-            MenuButton(
-                icon: "arrow.clockwise",
-                title: "Refresh Stats",
-                subtitle: "Update statistics",
-                action: {
-                    Task {
-                        await viewModel.refreshStatistics()
-                    }
+            // Behavior section
+            behaviorSection
+
+            // Privacy section
+            privacySection
+        }
+    }
+
+    // MARK: - Recording Section
+
+    private var recordingSection: some View {
+        MenuBarSettingsSection(
+            icon: "mic.fill",
+            title: "Recording",
+            subtitle: "Start Recording \(viewModel.hotkeyDisplayString)",
+            isExpanded: $viewModel.recordingSectionExpanded
+        ) {
+            Button {
+                viewModel.startRecording()
+            } label: {
+                HStack {
+                    Image(systemName: "record.circle")
+                        .foregroundStyle(.red)
+                    Text("Start Recording")
+                    Spacer()
+                    Text(viewModel.hotkeyDisplayString)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 8)
+                .background(Color("AmberPrimary", bundle: nil).opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                Task {
+                    await viewModel.refreshStatistics()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh Stats")
+                }
+                .font(.callout)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 4)
+        }
+    }
+
+    // MARK: - Language Section
+
+    private var languageSection: some View {
+        MenuBarSettingsSection(
+            icon: "globe",
+            title: "Language",
+            subtitle: viewModel.currentLanguageModel.map { "\($0.flag) \($0.name)" } ?? "English",
+            isExpanded: $viewModel.languageSectionExpanded
+        ) {
+            InlineLanguagePicker(
+                selectedLanguageCode: $viewModel.currentLanguage,
+                recentLanguages: viewModel.recentLanguages,
+                onLanguageSelected: { language in
+                    await viewModel.switchLanguage(to: language)
                 }
             )
         }
     }
 
-    /// Language quick-switch menu (T063)
-    private var languageQuickSwitchMenu: some View {
-        Menu {
-            ForEach(viewModel.recentLanguages, id: \.code) { language in
-                Button {
+    // MARK: - Audio Section
+
+    private var audioSection: some View {
+        MenuBarSettingsSection(
+            icon: "waveform",
+            title: "Audio",
+            subtitle: "Sensitivity \(String(format: "%.0f%%", viewModel.settings.audio.sensitivity * 100))",
+            isExpanded: $viewModel.audioSectionExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsSliderRow(
+                    title: "Sensitivity",
+                    value: $viewModel.settings.audio.sensitivity,
+                    range: 0.1...1.0,
+                    step: 0.05,
+                    format: "%.0f%%",
+                    lowLabel: "Low",
+                    highLabel: "High"
+                )
+                .onChange(of: viewModel.settings.audio.sensitivity) { _, newValue in
                     Task {
-                        await viewModel.switchLanguage(to: language)
+                        await viewModel.updateAudioSensitivity(newValue)
                     }
-                } label: {
-                    HStack {
-                        Text(language.flag)
-                        Text(language.name)
-                        if language.code == viewModel.currentLanguage {
-                            Spacer()
-                            Image(systemName: "checkmark")
+                }
+
+                SettingsSliderRow(
+                    title: "Silence Threshold",
+                    value: $viewModel.settings.audio.silenceThreshold,
+                    range: 0.5...3.0,
+                    step: 0.1,
+                    format: "%.1fs",
+                    lowLabel: "0.5s",
+                    highLabel: "3.0s"
+                )
+                .onChange(of: viewModel.settings.audio.silenceThreshold) { _, newValue in
+                    Task {
+                        await viewModel.updateSilenceThreshold(newValue)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Behavior Section
+
+    private var behaviorSection: some View {
+        MenuBarSettingsSection(
+            icon: "gearshape",
+            title: "Behavior",
+            subtitle: behaviorSubtitle,
+            isExpanded: $viewModel.behaviorSectionExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                SettingsToggleRow(
+                    title: "Launch at login",
+                    isOn: $viewModel.settings.general.launchAtLogin,
+                    help: "Start app when you log in"
+                )
+                .onChange(of: viewModel.settings.general.launchAtLogin) { _, _ in
+                    Task { await viewModel.updateGeneralSetting() }
+                }
+
+                SettingsToggleRow(
+                    title: "Auto-insert text",
+                    isOn: $viewModel.settings.general.autoInsertText,
+                    help: "Insert text at cursor after transcription"
+                )
+                .onChange(of: viewModel.settings.general.autoInsertText) { _, _ in
+                    Task { await viewModel.updateGeneralSetting() }
+                }
+
+                SettingsToggleRow(
+                    title: "Copy to clipboard",
+                    isOn: $viewModel.settings.general.copyToClipboard,
+                    help: "Always copy transcribed text"
+                )
+                .onChange(of: viewModel.settings.general.copyToClipboard) { _, _ in
+                    Task { await viewModel.updateGeneralSetting() }
+                }
+            }
+        }
+    }
+
+    private var behaviorSubtitle: String {
+        var parts: [String] = []
+        if viewModel.settings.general.launchAtLogin {
+            parts.append("Launch")
+        }
+        if viewModel.settings.general.autoInsertText {
+            parts.append("Auto-insert")
+        }
+        if parts.isEmpty {
+            return "Configure behavior"
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    // MARK: - Privacy Section
+
+    private var privacySection: some View {
+        MenuBarSettingsSection(
+            icon: "lock.shield",
+            title: "Privacy",
+            subtitle: viewModel.settings.privacy.collectAnonymousStats ? "Stats enabled" : "Stats disabled",
+            isExpanded: $viewModel.privacySectionExpanded
+        ) {
+            VStack(alignment: .leading, spacing: 8) {
+                SettingsToggleRow(
+                    title: "Anonymous statistics",
+                    isOn: $viewModel.settings.privacy.collectAnonymousStats,
+                    help: "Track word count and sessions locally"
+                )
+                .onChange(of: viewModel.settings.privacy.collectAnonymousStats) { _, _ in
+                    Task { await viewModel.updatePrivacySetting() }
+                }
+
+                SettingsToggleRow(
+                    title: "Store history",
+                    isOn: $viewModel.settings.privacy.storeHistory,
+                    help: "Keep local transcription history"
+                )
+                .onChange(of: viewModel.settings.privacy.storeHistory) { _, _ in
+                    Task { await viewModel.updatePrivacySetting() }
+                }
+
+                // Privacy notice
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color("AmberPrimary", bundle: nil))
+
+                    Text("100% local processing")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    // MARK: - Permissions Section
+
+    private var permissionsSection: some View {
+        HStack(spacing: 8) {
+            Text("Permissions:")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            PermissionStatusIndicator.microphone(isGranted: viewModel.hasMicrophonePermission)
+                .onTapGesture {
+                    if !viewModel.hasMicrophonePermission {
+                        Task {
+                            await viewModel.requestMicrophonePermission()
                         }
                     }
                 }
-            }
 
-            Divider()
-
-            Button("More Languages...") {
-                viewModel.openSettings()
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "globe")
-                    .font(.title3)
-                    .foregroundStyle(Color("AmberPrimary", bundle: nil))
-                    .frame(width: 24, alignment: .center)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Language")
-                        .font(.callout)
-
-                    if let currentLang = viewModel.currentLanguageModel {
-                        Text("\(currentLang.flag) \(currentLang.name)")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text("English")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+            PermissionStatusIndicator.accessibility(isGranted: viewModel.hasAccessibilityPermission)
+                .onTapGesture {
+                    if !viewModel.hasAccessibilityPermission {
+                        viewModel.requestAccessibilityPermission()
                     }
                 }
 
-                Spacer()
+            Spacer()
 
-                Image(systemName: "chevron.right")
+            // Refresh permissions button
+            Button {
+                Task {
+                    await viewModel.refreshPermissions()
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .help("Refresh permission status")
         }
-        .menuStyle(.borderlessButton)
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     /// Quit section
@@ -222,8 +410,15 @@ struct MenuBarView: View {
             HStack(spacing: 8) {
                 Image(systemName: "power")
                     .foregroundStyle(.red)
-                Text("Quit Speech-to-Text")
+                Text("Quit")
                 Spacer()
+                Text("Q")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(Color.gray.opacity(0.2))
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -231,60 +426,6 @@ struct MenuBarView: View {
         }
         .buttonStyle(.plain)
         .keyboardShortcut("q", modifiers: .command)
-    }
-
-    // MARK: - Computed Properties
-
-    /// Cached DateFormatter for performance (avoid creating on every render)
-    private static let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    /// Formatted update time
-    private var formattedUpdateTime: String {
-        Self.timeFormatter.string(from: viewModel.lastUpdated)
-    }
-}
-
-// MARK: - Helper Views
-
-/// Reusable menu button component
-private struct MenuButton: View {
-    let icon: String
-    let title: String
-    let subtitle: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundStyle(Color("AmberPrimary", bundle: nil))
-                    .frame(width: 24, alignment: .center)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.callout)
-
-                    Text(subtitle)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -294,15 +435,9 @@ private struct MenuButton: View {
     MenuBarView()
 }
 
-#Preview("With Stats") {
-    MenuBarViewPreview(wordsToday: 1234, sessionsToday: 42)
+#Preview("Menu Bar View - Scrollable") {
+    MenuBarView()
+        .frame(height: 400)
 }
 
-private struct MenuBarViewPreview: View {
-    let wordsToday: Int
-    let sessionsToday: Int
-
-    var body: some View {
-        MenuBarView()
-    }
-}
+// swiftlint:enable type_body_length

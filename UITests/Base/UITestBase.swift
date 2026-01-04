@@ -96,6 +96,7 @@ class UITestBase: XCTestCase {
     }
 
     /// Launch the app with fresh onboarding state
+    /// Shows the single-screen WelcomeView
     /// - Parameters:
     ///   - arguments: Additional launch arguments
     func launchAppWithFreshOnboarding(arguments: [String] = []) {
@@ -105,6 +106,14 @@ class UITestBase: XCTestCase {
         ]
         allArguments.append(contentsOf: arguments)
         launchApp(arguments: allArguments)
+    }
+
+    /// Launch the app with fresh welcome flow
+    /// Alias for launchAppWithFreshOnboarding for clarity
+    /// - Parameters:
+    ///   - arguments: Additional launch arguments
+    func launchAppWithFreshWelcome(arguments: [String] = []) {
+        launchAppWithFreshOnboarding(arguments: arguments)
     }
 
     /// Launch the app and trigger recording modal immediately
@@ -159,7 +168,7 @@ class UITestBase: XCTestCase {
         saveScreenshotToFile(screenshot, name: name)
     }
 
-    /// Save screenshot to file
+    /// Save screenshot to file and append to manifest
     private func saveScreenshotToFile(_ screenshot: XCUIScreenshot, name: String) {
         let sanitizedName = name
             .replacingOccurrences(of: " ", with: "_")
@@ -174,9 +183,52 @@ class UITestBase: XCTestCase {
 
         do {
             try screenshot.pngRepresentation.write(to: fileURL)
+            // Append to manifest for design evaluation
+            appendToManifest(
+                path: fileURL.path,
+                name: sanitizedName,
+                timestamp: timestamp
+            )
         } catch {
             // Non-fatal - just log
             print("Failed to save screenshot: \(error)")
+        }
+    }
+
+    /// Append screenshot metadata to manifest for design evaluation
+    private func appendToManifest(path: String, name: String, timestamp: String) {
+        let manifestURL = getScreenshotDirectoryURL().appendingPathComponent("manifest.json")
+
+        // Read existing manifest or create new
+        var manifest: [[String: String]] = []
+
+        if FileManager.default.fileExists(atPath: manifestURL.path) {
+            do {
+                let data = try Data(contentsOf: manifestURL)
+                if let existing = try JSONSerialization.jsonObject(with: data) as? [[String: String]] {
+                    manifest = existing
+                }
+            } catch {
+                print("Failed to read manifest: \(error)")
+            }
+        }
+
+        // Add new entry
+        let entry: [String: String] = [
+            "path": path,
+            "name": name,
+            "testClass": String(describing: type(of: self)),
+            "testMethod": self.name,
+            "timestamp": timestamp
+        ]
+        manifest.append(entry)
+
+        // Write updated manifest
+        do {
+            let data = try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted])
+            try data.write(to: manifestURL)
+        } catch {
+            print("Failed to write manifest: \(error)")
         }
     }
 

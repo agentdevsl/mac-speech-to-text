@@ -1,12 +1,18 @@
 // OnboardingFlowTests.swift
 // macOS Local Speech-to-Text Application
 //
-// End-to-end UI tests for the onboarding flow
+// DEPRECATED: This file tests the old 5-step onboarding wizard.
+// For new tests, see WelcomeFlowTests.swift which tests the single-screen welcome.
+//
+// These tests are retained for backwards compatibility and will be removed
+// once the legacy onboarding code is fully deprecated.
+//
 // Part of User Story 3: Onboarding Flow Validation (P1)
 
 import XCTest
 
 /// Tests for the onboarding flow - first-time user experience
+/// @deprecated Use WelcomeFlowTests for new single-screen welcome tests
 /// These tests verify the complete onboarding journey including permissions
 final class OnboardingFlowTests: UITestBase {
     // MARK: - OB-001: Welcome Step Appears

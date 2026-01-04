@@ -22,7 +22,9 @@ struct UserSettings: Codable, Sendable {
         general: GeneralConfiguration(
             launchAtLogin: false,
             autoInsertText: true,
-            copyToClipboard: true
+            copyToClipboard: true,
+            accessibilityPromptDismissed: false,
+            clipboardOnlyMode: false
         ),
         hotkey: HotkeyConfiguration(
             enabled: true,
@@ -49,7 +51,10 @@ struct UserSettings: Codable, Sendable {
             showWaveform: true,
             showConfidenceIndicator: true,
             animationsEnabled: true,
-            menuBarIcon: .default
+            menuBarIcon: .default,
+            showFloatingWidget: true,
+            widgetPosition: .bottomCenter,
+            recordingMode: .holdToRecord
         ),
         privacy: PrivacyConfiguration(
             collectAnonymousStats: true,
@@ -74,6 +79,8 @@ struct GeneralConfiguration: Codable, Sendable {
     var launchAtLogin: Bool
     var autoInsertText: Bool
     var copyToClipboard: Bool
+    var accessibilityPromptDismissed: Bool
+    var clipboardOnlyMode: Bool
 }
 
 struct HotkeyConfiguration: Codable, Sendable {
@@ -123,6 +130,9 @@ struct UIConfiguration: Codable, Sendable {
     var showConfidenceIndicator: Bool
     var animationsEnabled: Bool
     var menuBarIcon: MenuBarIcon
+    var showFloatingWidget: Bool
+    var widgetPosition: WidgetPosition
+    var recordingMode: RecordingMode
 }
 
 enum Theme: String, Codable, Sendable {
@@ -159,6 +169,30 @@ enum MenuBarIcon: String, Codable, Sendable {
         switch self {
         case .default: return "Default"
         case .minimal: return "Minimal"
+        }
+    }
+}
+
+enum RecordingMode: String, Codable, CaseIterable, Sendable {
+    case holdToRecord
+    case toggle
+
+    var displayName: String {
+        switch self {
+        case .holdToRecord: return "Hold to Record"
+        case .toggle: return "Toggle"
+        }
+    }
+}
+
+enum WidgetPosition: String, Codable, CaseIterable, Sendable {
+    case bottomCenter
+    case bottomRight
+
+    var displayName: String {
+        switch self {
+        case .bottomCenter: return "Bottom Center"
+        case .bottomRight: return "Bottom Right"
         }
     }
 }

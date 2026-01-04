@@ -29,7 +29,7 @@ final class ErrorStateTests: UITestBase {
         }
 
         // Stop recording to trigger transcription error
-        let stopButton = app.buttons["Stop Recording"]
+        let stopButton = app.buttons["stopRecordingButton"]
         if stopButton.waitForExistence(timeout: 3) {
             stopButton.tap()
         }
@@ -135,7 +135,7 @@ final class ErrorStateTests: UITestBase {
         }
 
         // Trigger error by stopping
-        let stopButton = app.buttons["Stop Recording"]
+        let stopButton = app.buttons["stopRecordingButton"]
         if stopButton.waitForExistence(timeout: 3) {
             stopButton.tap()
         }
@@ -185,7 +185,7 @@ final class ErrorStateTests: UITestBase {
         }
 
         // Trigger error
-        let stopButton = app.buttons["Stop Recording"]
+        let stopButton = app.buttons["stopRecordingButton"]
         if stopButton.waitForExistence(timeout: 3) {
             stopButton.tap()
         }
@@ -237,7 +237,7 @@ final class ErrorStateTests: UITestBase {
         }
 
         // Wait for recording controls to be ready
-        let stopButton = app.buttons["Stop Recording"]
+        let stopButton = app.buttons["stopRecordingButton"]
         _ = stopButton.waitForExistence(timeout: 3)
 
         captureScreenshot(named: "ER-006-Recording")

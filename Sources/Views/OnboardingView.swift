@@ -1,6 +1,10 @@
 // OnboardingView.swift
 // macOS Local Speech-to-Text Application
 //
+// DEPRECATED: This multi-step wizard has been replaced by WelcomeView.
+// The new single-screen welcome provides a simpler first-time experience.
+// This file is kept for backwards compatibility but should not be used.
+//
 // User Story 2: First-Time Setup and Onboarding
 // Task T035: OnboardingView - Multi-step onboarding flow
 // (welcome, microphone, accessibility, demo, completion)
@@ -8,6 +12,7 @@
 import SwiftUI
 
 /// OnboardingView provides a multi-step onboarding experience
+/// @deprecated Use WelcomeView for new single-screen onboarding
 struct OnboardingView: View {
     // MARK: - Environment
 

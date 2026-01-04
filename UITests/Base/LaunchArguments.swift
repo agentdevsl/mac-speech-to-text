@@ -13,12 +13,13 @@ enum LaunchArguments {
     static let uitesting = "--uitesting"
 
     /// Reset onboarding state to first-launch experience
+    /// Shows the single-screen WelcomeView
     static let resetOnboarding = "--reset-onboarding"
 
     /// Skip all permission checks using mock service
     static let skipPermissionChecks = "--skip-permission-checks"
 
-    /// Skip the onboarding flow entirely
+    /// Skip the onboarding/welcome flow entirely
     static let skipOnboarding = "--skip-onboarding"
 
     /// Trigger recording modal immediately on launch
@@ -26,4 +27,24 @@ enum LaunchArguments {
 
     /// Enable accessibility testing mode
     static let accessibilityTesting = "--accessibility-testing"
+
+    // MARK: - New Arguments for UI Simplification
+
+    /// Show floating widget on launch (default when enabled)
+    static let showFloatingWidget = "--show-floating-widget"
+
+    /// Hide floating widget on launch
+    static let hideFloatingWidget = "--hide-floating-widget"
+
+    /// Force hold-to-record mode
+    static let holdToRecordMode = "--hold-to-record"
+
+    /// Force toggle (click-to-record) mode
+    static let toggleRecordMode = "--toggle-record"
+
+    /// Skip welcome flow (alias for skipOnboarding)
+    static let skipWelcome = "--skip-welcome"
+
+    /// Reset welcome flow state
+    static let resetWelcome = "--reset-welcome"
 }

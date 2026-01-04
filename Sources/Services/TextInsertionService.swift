@@ -3,10 +3,35 @@ import ApplicationServices
 import Foundation
 import OSLog
 
+/// Result of a text insertion attempt with fallback handling
+enum TextInsertionResult: Sendable, Equatable {
+    /// Text was successfully inserted via Accessibility APIs
+    case insertedViaAccessibility
+    /// Text was copied to clipboard only (not inserted)
+    case copiedToClipboardOnly(reason: ClipboardFallbackReason)
+    /// Accessibility permission is required but not granted
+    case requiresAccessibilityPermission
+}
+
+/// Reason why text was copied to clipboard instead of inserted
+enum ClipboardFallbackReason: Sendable, Equatable {
+    /// User has not granted accessibility permission
+    case accessibilityNotGranted
+    /// Accessibility insertion failed with an error
+    case insertionFailed(String)
+    /// User prefers clipboard-only mode
+    case userPreference
+}
+
 /// Service for inserting text using Accessibility APIs
 @MainActor
 class TextInsertionService {
     private let permissionService = PermissionService()
+    private let settingsService: SettingsService
+
+    init(settingsService: SettingsService = SettingsService()) {
+        self.settingsService = settingsService
+    }
 
     /// Insert text at the current cursor position
     func insertText(_ text: String) async throws {
@@ -123,6 +148,74 @@ class TextInsertionService {
         vUp.post(tap: .cghidEventTap)
         try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         cmdUp.post(tap: .cghidEventTap)
+    }
+
+    // MARK: - Fallback-Aware Insertion
+
+    /// Insert text with fallback to clipboard if accessibility is not available
+    ///
+    /// This method provides a graceful degradation path:
+    /// 1. If user prefers clipboard-only mode, copy to clipboard
+    /// 2. If accessibility permission is not granted, copy to clipboard and indicate prompt needed
+    /// 3. Try to insert via accessibility APIs
+    /// 4. Fall back to clipboard if insertion fails
+    ///
+    /// - Parameter text: The text to insert
+    /// - Returns: Result indicating how the text was handled
+    func insertTextWithFallback(_ text: String) async -> TextInsertionResult {
+        let settings = settingsService.load()
+
+        // Check if user prefers clipboard-only mode
+        if settings.general.clipboardOnlyMode {
+            AppLogger.service.info("Using clipboard-only mode (user preference)")
+            do {
+                try await copyToClipboardPublic(text)
+                return .copiedToClipboardOnly(reason: .userPreference)
+            } catch {
+                AppLogger.service.error("Clipboard copy failed in clipboard-only mode: \(error.localizedDescription, privacy: .public)")
+                // Even if clipboard fails, return user preference reason since that was the intent
+                return .copiedToClipboardOnly(reason: .userPreference)
+            }
+        }
+
+        // Check accessibility permission
+        guard permissionService.checkAccessibilityPermission() else {
+            AppLogger.service.info("Accessibility not granted, falling back to clipboard")
+            do {
+                try await copyToClipboardPublic(text)
+                // Check if user has dismissed the accessibility prompt before
+                if settings.general.accessibilityPromptDismissed {
+                    return .copiedToClipboardOnly(reason: .accessibilityNotGranted)
+                } else {
+                    return .requiresAccessibilityPermission
+                }
+            } catch {
+                AppLogger.service.error("Clipboard copy failed: \(error.localizedDescription, privacy: .public)")
+                return .requiresAccessibilityPermission
+            }
+        }
+
+        // Try to insert via accessibility
+        do {
+            try await insertText(text)
+            return .insertedViaAccessibility
+        } catch {
+            AppLogger.service.warning("Accessibility insertion failed, falling back to clipboard: \(error.localizedDescription, privacy: .public)")
+            // Already copied to clipboard as part of simulatePaste fallback in insertText
+            // But if that also failed, try explicit clipboard copy
+            do {
+                try await copyToClipboardPublic(text)
+            } catch {
+                AppLogger.service.error("Final clipboard fallback failed: \(error.localizedDescription, privacy: .public)")
+            }
+            return .copiedToClipboardOnly(reason: .insertionFailed(error.localizedDescription))
+        }
+    }
+
+    /// Public method to copy text to clipboard
+    /// - Parameter text: The text to copy
+    func copyToClipboardPublic(_ text: String) async throws {
+        try await copyToClipboard(text)
     }
 }
 
