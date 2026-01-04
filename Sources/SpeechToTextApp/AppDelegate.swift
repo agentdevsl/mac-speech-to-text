@@ -41,12 +41,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Mark onboarding as completed
             var settings = settingsService.load()
             settings.onboarding.completed = true
-            settingsService.save(settings)
+            try? settingsService.save(settings)
         } else if testConfig.resetOnboarding {
             AppLogger.app.debug("Resetting onboarding state (--reset-onboarding)")
             var settings = settingsService.load()
             settings.onboarding.completed = false
-            settingsService.save(settings)
+            try? settingsService.save(settings)
             showOnboarding()
         } else {
             let settings = settingsService.load()
@@ -84,7 +84,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppLogger.app.debug("Setting initial language to: \(language, privacy: .public)")
             var settings = settingsService.load()
             settings.language.defaultLanguage = language
-            settingsService.save(settings)
+            try? settingsService.save(settings)
         }
 
         // Log configuration for debugging
