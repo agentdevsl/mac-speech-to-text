@@ -126,3 +126,6 @@ Thumbs.db
 
 # Local signing identity (per-developer, not committed)
 .signing-identity
+
+# Certificate fingerprint for identity validation (per-developer, not committed)
+.signing-fingerprint

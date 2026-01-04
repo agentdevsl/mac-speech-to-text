@@ -80,7 +80,8 @@ final class ErrorStateTests: UITestBase {
 
         // Either recording appears (then errors on stop)
         // or error appears immediately
-        let hasResponse = recordingModal.exists || errorIndicator.exists || !app.windows.isEmpty
+        // swiftlint:disable:next empty_count
+        let hasResponse = recordingModal.exists || errorIndicator.exists || app.windows.count > 0
 
         XCTAssertTrue(
             hasResponse,

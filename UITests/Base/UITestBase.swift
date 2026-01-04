@@ -34,14 +34,18 @@ class UITestBase: XCTestCase {
 
     // MARK: - Setup & Teardown
 
+    /// Bundle identifier of the app under test
+    private static let appBundleIdentifier = "com.speechtotext.app"
+
     override func setUpWithError() throws {
         try super.setUpWithError()
 
         // Stop immediately when a failure occurs
         continueAfterFailure = false
 
-        // Initialize the application
-        app = XCUIApplication()
+        // Initialize the application with explicit bundle identifier
+        // This is required when the app is built externally (not through the same Xcode project)
+        app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
 
         // Create screenshot directory if it doesn't exist
         createScreenshotDirectoryIfNeeded()
@@ -49,7 +53,7 @@ class UITestBase: XCTestCase {
 
     override func tearDownWithError() throws {
         // Capture screenshot on failure
-        captureScreenshotOnFailure()
+        captureFailureScreenshot()
 
         // Terminate the app
         if app != nil {
@@ -127,7 +131,7 @@ class UITestBase: XCTestCase {
     // MARK: - Screenshot Capture
 
     /// Capture screenshot on test failure
-    private func captureScreenshotOnFailure() {
+    private func captureFailureScreenshot() {
         guard let testRun = testRun, testRun.failureCount > 0 else { return }
 
         let screenshot = XCUIScreen.main.screenshot()
@@ -207,7 +211,7 @@ class UITestBase: XCTestCase {
     /// Set up handlers for system permission dialogs
     func setupPermissionDialogHandlers() {
         // Handle microphone permission dialog
-        addUIInterruptionMonitor(forInterruptionType: .alert) { alert in
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
             let okButton = alert.buttons["OK"]
             let allowButton = alert.buttons["Allow"]
 

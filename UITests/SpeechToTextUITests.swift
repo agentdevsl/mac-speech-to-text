@@ -14,9 +14,13 @@ import XCTest
 final class SpeechToTextUITests: XCTestCase {
     var app: XCUIApplication!
 
+    /// Bundle identifier of the app under test
+    private static let appBundleIdentifier = "com.speechtotext.app"
+
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
+        // Use explicit bundle identifier for externally built app
+        app = XCUIApplication(bundleIdentifier: Self.appBundleIdentifier)
         // Legacy arguments - use LaunchArguments constants in new tests
         app.launchArguments = ["--uitesting", "--reset-onboarding"]
     }
@@ -31,7 +35,7 @@ final class SpeechToTextUITests: XCTestCase {
     /// Set up handler for system permission dialogs
     func setupPermissionDialogHandler() {
         // Handle microphone permission dialog
-        addUIInterruptionMonitor(forInterruptionType: .alert) { alert in
+        addUIInterruptionMonitor(withDescription: "System Alert") { alert in
             if alert.buttons["OK"].exists {
                 alert.buttons["OK"].tap()
                 return true
@@ -165,6 +169,7 @@ final class SpeechToTextUITests: XCTestCase {
         app.typeKey(",", modifierFlags: .command)
 
         let settingsWindow = app.windows["Settings"]
-        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 3) || !app.windows.isEmpty)
+        // swiftlint:disable:next empty_count
+        XCTAssertTrue(settingsWindow.waitForExistence(timeout: 3) || app.windows.count > 0)
     }
 }
