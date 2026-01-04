@@ -63,15 +63,20 @@ CLEAN_BUILD=false
 SIGN_IDENTITY=""
 SYNC_CODE=false
 CHECK_SIGNING_ONLY=false
+REQUIRE_SIGNING=false  # Set to true to mandate signing (no ad-hoc allowed)
 
 # Check for .signing-identity file
 SIGNING_IDENTITY_FILE="${PROJECT_ROOT}/.signing-identity"
+SIGNING_FINGERPRINT_FILE="${PROJECT_ROOT}/.signing-fingerprint"
 if [ -f "${SIGNING_IDENTITY_FILE}" ]; then
     SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n\r\t ')
     # Validate file is not empty or whitespace-only
     if [ -z "${SIGN_IDENTITY}" ]; then
         echo -e "${YELLOW}[WARNING]${NC} .signing-identity file is empty - using ad-hoc signing"
         SIGN_IDENTITY=""
+    else
+        # If .signing-identity exists, require signing (permissions won't persist otherwise)
+        REQUIRE_SIGNING=true
     fi
 fi
 
@@ -164,6 +169,157 @@ validate_signing_identity() {
 }
 
 # =============================================================================
+# Certificate fingerprint functions for consistent identity validation
+# =============================================================================
+
+# Get SHA-256 fingerprint of a certificate by name
+get_certificate_fingerprint() {
+    local identity="$1"
+
+    if [ -z "$identity" ] || [ "$identity" = "ad-hoc" ]; then
+        echo ""
+        return 1
+    fi
+
+    # Get certificate and compute SHA-256 fingerprint
+    local cert_pem
+    cert_pem=$(security find-certificate -c "${identity}" -p 2>/dev/null)
+
+    if [ -z "$cert_pem" ]; then
+        echo ""
+        return 1
+    fi
+
+    # Compute SHA-256 fingerprint
+    local fingerprint
+    fingerprint=$(echo "$cert_pem" | openssl x509 -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//' | tr -d ':')
+
+    echo "$fingerprint"
+}
+
+# Store fingerprint for future validation
+store_certificate_fingerprint() {
+    local identity="$1"
+    local fingerprint
+    fingerprint=$(get_certificate_fingerprint "$identity")
+
+    if [ -n "$fingerprint" ]; then
+        echo "$fingerprint" > "${SIGNING_FINGERPRINT_FILE}"
+        print_success "Stored certificate fingerprint: ${fingerprint:0:16}..."
+        return 0
+    else
+        print_error "Could not get certificate fingerprint"
+        return 1
+    fi
+}
+
+# Validate current certificate matches stored fingerprint
+validate_certificate_fingerprint() {
+    local identity="$1"
+
+    # If no fingerprint file exists, store the current one
+    if [ ! -f "${SIGNING_FINGERPRINT_FILE}" ]; then
+        print_info "No stored fingerprint found - storing current certificate fingerprint"
+        store_certificate_fingerprint "$identity"
+        return $?
+    fi
+
+    # Get stored fingerprint
+    local stored_fingerprint
+    stored_fingerprint=$(cat "${SIGNING_FINGERPRINT_FILE}" | tr -d '\n\r\t ')
+
+    if [ -z "$stored_fingerprint" ]; then
+        print_warning "Stored fingerprint is empty - storing current certificate fingerprint"
+        store_certificate_fingerprint "$identity"
+        return $?
+    fi
+
+    # Get current fingerprint
+    local current_fingerprint
+    current_fingerprint=$(get_certificate_fingerprint "$identity")
+
+    if [ -z "$current_fingerprint" ]; then
+        print_error "Could not get fingerprint for certificate '${identity}'"
+        return 1
+    fi
+
+    # Compare
+    if [ "$stored_fingerprint" = "$current_fingerprint" ]; then
+        print_success "Certificate fingerprint validated: ${current_fingerprint:0:16}..."
+        return 0
+    else
+        print_error "Certificate fingerprint MISMATCH!"
+        echo ""
+        echo "  Stored:  ${stored_fingerprint:0:32}..."
+        echo "  Current: ${current_fingerprint:0:32}..."
+        echo ""
+        echo "  This means the signing certificate has changed since last build."
+        echo "  macOS TCC will treat this as a DIFFERENT application and"
+        echo "  permissions (Microphone, Accessibility) will be LOST."
+        echo ""
+        echo "  Remediation:"
+        echo "    1. If you intentionally changed the certificate:"
+        echo "       rm ${SIGNING_FINGERPRINT_FILE}"
+        echo "       ./scripts/build-app.sh   # Will store new fingerprint"
+        echo ""
+        echo "    2. If this is unexpected, recreate the original certificate:"
+        echo "       ./scripts/setup-signing.sh --force"
+        echo ""
+        return 1
+    fi
+}
+
+# Verify app signature after build
+verify_app_signature() {
+    local app_path="$1"
+    local expected_identity="$2"
+
+    print_info "Verifying app signature..."
+
+    # Basic signature validation
+    if ! codesign --verify --deep --strict "${app_path}" 2>/dev/null; then
+        print_error "App signature verification failed!"
+        return 1
+    fi
+
+    # Get the designated requirement
+    local designated_req
+    designated_req=$(codesign -d -r- "${app_path}" 2>&1 | grep "designated =>" | sed 's/.*designated => //')
+
+    if [ -z "$designated_req" ]; then
+        print_warning "Could not extract designated requirement"
+        return 0  # Non-fatal
+    fi
+
+    # Verify bundle identifier is correct
+    if echo "$designated_req" | grep -q "identifier \"${BUNDLE_ID}\""; then
+        print_success "Bundle identifier verified: ${BUNDLE_ID}"
+    else
+        print_error "Bundle identifier mismatch in signature!"
+        echo "  Expected: ${BUNDLE_ID}"
+        echo "  Got: ${designated_req}"
+        return 1
+    fi
+
+    # Verify the identity if not ad-hoc
+    if [ -n "$expected_identity" ] && [ "$expected_identity" != "ad-hoc" ]; then
+        # Check that certificate is in the requirement
+        local identity_in_req
+        identity_in_req=$(codesign -d -r- "${app_path}" 2>&1 | grep -c "${expected_identity}" || true)
+
+        if [ "$identity_in_req" -gt 0 ]; then
+            print_success "Signing identity verified in designated requirement"
+        else
+            # This is just informational - the cert name might not appear literally
+            print_info "Signature uses certificate root hash (expected for self-signed)"
+        fi
+    fi
+
+    print_success "App signature verified successfully"
+    return 0
+}
+
+# =============================================================================
 # T012: --check-signing flag implementation
 # =============================================================================
 check_signing_configuration() {
@@ -191,6 +347,31 @@ check_signing_configuration() {
                 local expiry_date
                 expiry_date=$(echo "$cert_info" | openssl x509 -noout -enddate 2>/dev/null | cut -d= -f2 || echo "Unknown")
                 print_info "Certificate expires: ${expiry_date}"
+            fi
+
+            # Check fingerprint file and validation
+            if [ -f "${SIGNING_FINGERPRINT_FILE}" ]; then
+                local stored_fp
+                stored_fp=$(cat "${SIGNING_FINGERPRINT_FILE}" | tr -d '\n\r\t ')
+                local current_fp
+                current_fp=$(get_certificate_fingerprint "${stored_identity}")
+
+                if [ -n "$stored_fp" ] && [ -n "$current_fp" ]; then
+                    if [ "$stored_fp" = "$current_fp" ]; then
+                        print_success "Fingerprint file found and matches: ${stored_fp:0:16}..."
+                    else
+                        print_error "Fingerprint MISMATCH!"
+                        echo "  Stored:  ${stored_fp:0:32}..."
+                        echo "  Current: ${current_fp:0:32}..."
+                        has_issues=true
+                    fi
+                else
+                    print_warning "Could not validate fingerprint"
+                    has_issues=true
+                fi
+            else
+                print_warning "No .signing-fingerprint file found"
+                echo "  Will be created on first build with this identity"
             fi
         else
             print_error "Identity '${stored_identity}' NOT found in keychain!"
@@ -346,12 +527,31 @@ print_header "Building ${APP_NAME} for Local Testing"
 check_macos
 check_swift
 
-# T011: Pre-build identity validation
+# T011: Pre-build identity validation with fingerprint enforcement
 echo ""
 print_info "Validating signing configuration..."
+
+# Check if signing is required but not configured
+if [ "${REQUIRE_SIGNING}" = true ] && { [ -z "${SIGN_IDENTITY}" ] || [ "${SIGN_IDENTITY}" = "ad-hoc" ]; }; then
+    print_error "Code signing is REQUIRED but no valid signing identity is configured!"
+    echo ""
+    echo "  A .signing-identity file exists, which means this project requires"
+    echo "  consistent code signing for permissions to persist across builds."
+    echo ""
+    echo "  Remediation:"
+    echo "    1. Set up code signing certificate:"
+    echo "       ./scripts/setup-signing.sh"
+    echo ""
+    echo "    2. Or check why the identity file is invalid:"
+    echo "       cat .signing-identity"
+    echo ""
+    exit 1
+fi
+
 if [ -n "${SIGN_IDENTITY}" ] && [ "${SIGN_IDENTITY}" != "ad-hoc" ]; then
+    # Validate identity exists in keychain
     if validate_signing_identity "${SIGN_IDENTITY}"; then
-        print_success "Signing identity '${SIGN_IDENTITY}' validated"
+        print_success "Signing identity '${SIGN_IDENTITY}' found in keychain"
     else
         print_error "Signing identity '${SIGN_IDENTITY}' not found in keychain!"
         echo ""
@@ -369,12 +569,48 @@ if [ -n "${SIGN_IDENTITY}" ] && [ "${SIGN_IDENTITY}" != "ad-hoc" ]; then
         echo ""
         exit 1
     fi
+
+    # Validate certificate fingerprint matches stored fingerprint
+    # This ensures the same certificate is used across builds
+    if ! validate_certificate_fingerprint "${SIGN_IDENTITY}"; then
+        print_error "Certificate fingerprint validation failed!"
+        echo ""
+        echo "  Build aborted to prevent permission loss."
+        echo "  See remediation steps above."
+        echo ""
+        exit 1
+    fi
 else
+    # Check if fingerprint file exists but we're using ad-hoc
+    if [ -f "${SIGNING_FINGERPRINT_FILE}" ]; then
+        print_error "Fingerprint file exists but no signing identity configured!"
+        echo ""
+        echo "  This project was previously built with a signing certificate."
+        echo "  Building with ad-hoc signing will break permission persistence."
+        echo ""
+        echo "  Remediation:"
+        echo "    1. Restore the signing certificate:"
+        echo "       ./scripts/setup-signing.sh"
+        echo ""
+        echo "    2. Or clear the fingerprint to start fresh (permissions will be lost):"
+        echo "       rm ${SIGNING_FINGERPRINT_FILE}"
+        echo ""
+        exit 1
+    fi
+
     # T013 & T014: Show prominent ad-hoc warning
     show_adhoc_warning
 fi
 
 cd "${PROJECT_ROOT}"
+
+# Kill running app before building to prevent conflicts
+if pgrep -f "${APP_NAME}.app/Contents/MacOS/${APP_NAME}" > /dev/null 2>&1; then
+    print_info "Stopping running ${APP_NAME} app..."
+    pkill -f "${APP_NAME}.app/Contents/MacOS/${APP_NAME}" 2>/dev/null || true
+    sleep 1
+    print_success "App stopped"
+fi
 
 # Sync code from git if requested
 if [ "$SYNC_CODE" = true ]; then
@@ -600,6 +836,18 @@ else
     print_warning "Ad-hoc signed - permissions will NOT persist across rebuilds"
 fi
 print_success "App bundle created"
+
+# Post-build signature verification
+if [ -n "${SIGN_IDENTITY}" ] && [ "${SIGN_IDENTITY}" != "ad-hoc" ]; then
+    if ! verify_app_signature "${APP_BUNDLE}" "${SIGN_IDENTITY}"; then
+        print_error "Post-build signature verification failed!"
+        echo ""
+        echo "  The app was signed but verification failed. This may indicate"
+        echo "  a signing issue that could affect permission persistence."
+        echo ""
+        exit 1
+    fi
+fi
 
 # =============================================================================
 # Create DMG (if requested)

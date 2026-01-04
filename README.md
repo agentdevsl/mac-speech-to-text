@@ -1,197 +1,148 @@
-# SpeechToText
+# SpeechToText - macOS App
 
-A privacy-focused, local-first macOS menu bar application for speech-to-text
-capture using the FluidAudio SDK.
+A modern macOS application using a **workspace + SPM package** architecture for clean separation between app shell and feature code.
 
-**Status**: Alpha (MVP complete, testing in progress)
+## Project Architecture
 
----
-
-## Features
-
-- **Global Hotkey** (Cmd+Ctrl+Space): Trigger recording from anywhere
-- **Local Transcription**: All processing happens on-device using FluidAudio SDK
-- **Text Insertion**: Automatically paste transcribed text into the frontmost application
-- **Privacy-First**: No cloud services, no data leaves your Mac
-- **25+ Languages**: Support for multiple languages via FluidAudio models
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- macOS 14 (Sonoma) or later
-- Xcode Command Line Tools (`xcode-select --install`)
-- Swift 5.9+
-
-### Setup Code Signing (Recommended)
-
-For persistent permissions across rebuilds:
-
-```bash
-# One-time setup
-./scripts/setup-signing.sh
-
-# Build the app
-./scripts/build-app.sh
-
-# Launch
-open build/SpeechToText.app
 ```
-
-On first launch, grant:
-
-1. **Microphone** permission (dialog prompt)
-2. **Accessibility** permission (System Settings > Privacy & Security)
-
-See [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) for detailed setup instructions.
-
-### Alternative: Xcode Workflow
-
-```bash
-open Package.swift
-# Build and run in Xcode (Cmd+R)
-```
-
-See [docs/XCODE_WORKFLOW.md](docs/XCODE_WORKFLOW.md) for Xcode-specific instructions.
-
----
-
-## Project Structure
-
-```text
 SpeechToText/
-├── Sources/
-│   ├── SpeechToTextApp/     # App entry point
-│   ├── Services/            # Business logic (7 services)
-│   ├── Models/              # Data structures (5 models)
-│   ├── Views/               # SwiftUI views + ViewModels
-│   └── Utilities/           # Extensions and constants
-├── Tests/                   # XCTest suite
-├── scripts/                 # Build and utility scripts
-├── docs/                    # Development documentation
-└── specs/                   # Feature specifications
+├── SpeechToText.xcworkspace/              # Open this file in Xcode
+├── SpeechToText.xcodeproj/                # App shell project
+├── SpeechToText/                          # App target (minimal)
+│   ├── Assets.xcassets/                # App-level assets (icons, colors)
+│   ├── SpeechToTextApp.swift              # App entry point
+│   ├── SpeechToText.entitlements          # App sandbox settings
+│   └── SpeechToText.xctestplan            # Test configuration
+├── SpeechToTextPackage/                   # 🚀 Primary development area
+│   ├── Package.swift                   # Package configuration
+│   ├── Sources/SpeechToTextFeature/       # Your feature code
+│   └── Tests/SpeechToTextFeatureTests/    # Unit tests
+└── SpeechToTextUITests/                   # UI automation tests
 ```
 
----
+## Key Architecture Points
 
-## Development
+### Workspace + SPM Structure
 
-### Building
+- **App Shell**: `SpeechToText/` contains minimal app lifecycle code
+- **Feature Code**: `SpeechToTextPackage/Sources/SpeechToTextFeature/` is where most development happens
+- **Separation**: Business logic lives in the SPM package, app target just imports and displays it
 
-```bash
-# Debug build
-./scripts/build-app.sh
+### Buildable Folders (Xcode 16)
 
-# Release build
-./scripts/build-app.sh --release
+- Files added to the filesystem automatically appear in Xcode
+- No need to manually add files to project targets
+- Reduces project file conflicts in teams
 
-# Release + DMG
-./scripts/build-app.sh --release --dmg
+### App Sandbox
 
-# Clean build
-./scripts/build-app.sh --clean
+The app is sandboxed by default with basic file access permissions. Modify `SpeechToText.entitlements` to add capabilities as needed.
+
+## Development Notes
+
+### Code Organization
+
+Most development happens in `SpeechToTextPackage/Sources/SpeechToTextFeature/` - organize your code as you prefer.
+
+### Public API Requirements
+
+Types exposed to the app target need `public` access:
+
+```swift
+public struct SettingsView: View {
+    public init() {}
+
+    public var body: some View {
+        // Your view code
+    }
+}
 ```
 
-### Testing
+### Adding Dependencies
 
-```bash
-# Run all tests
-swift test --parallel
+Edit `SpeechToTextPackage/Package.swift` to add SPM dependencies:
 
-# Run smoke test (macOS only)
-./scripts/smoke-test.sh --build
-
-# Check permission status
-./scripts/smoke-test.sh --check-permissions
+```swift
+dependencies: [
+    .package(url: "https://github.com/example/SomePackage", from: "1.0.0")
+],
+targets: [
+    .target(
+        name: "SpeechToTextFeature",
+        dependencies: ["SomePackage"]
+    ),
+]
 ```
 
-### Code Quality
+### Test Structure
 
-```bash
-# SwiftLint
-swiftlint
+- **Unit Tests**: `SpeechToTextPackage/Tests/SpeechToTextFeatureTests/` (Swift Testing framework)
+- **UI Tests**: `SpeechToTextUITests/` (XCUITest framework)
+- **Test Plan**: `SpeechToText.xctestplan` coordinates all tests
 
-# Pre-commit hooks
-pre-commit run --all-files
+## Configuration
+
+### XCConfig Build Settings
+
+Build settings are managed through **XCConfig files** in `Config/`:
+
+- `Config/Shared.xcconfig` - Common settings (bundle ID, versions, deployment target)
+- `Config/Debug.xcconfig` - Debug-specific settings
+- `Config/Release.xcconfig` - Release-specific settings
+- `Config/Tests.xcconfig` - Test-specific settings
+
+### App Sandbox & Entitlements
+
+The app is sandboxed by default with basic file access. Edit `SpeechToText/SpeechToText.entitlements` to add capabilities:
+
+```xml
+<key>com.apple.security.files.user-selected.read-write</key>
+<true/>
+<key>com.apple.security.network.client</key>
+<true/>
+<!-- Add other entitlements as needed -->
 ```
 
----
+## macOS-Specific Features
 
-## Code Signing
+### Window Management
 
-For local development, the app uses a self-signed certificate to ensure macOS
-TCC (permissions) persist across rebuilds.
+Add multiple windows and settings panels:
 
-### Why This Matters
+```swift
+@main
+struct SpeechToTextApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
 
-Without proper code signing:
-
-- You must re-grant permissions after every rebuild
-- macOS treats each build as a new application
-- Development becomes tedious
-
-### Quick Setup
-
-```bash
-./scripts/setup-signing.sh
+        Settings {
+            SettingsView()
+        }
+    }
+}
 ```
 
-This creates a self-signed certificate in your login keychain and configures
-builds to use it automatically.
+### Asset Management
 
-For more details, see [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md).
+- **App-Level Assets**: `SpeechToText/Assets.xcassets/` (app icon with multiple sizes, accent color)
+- **Feature Assets**: Add `Resources/` folder to SPM package if needed
 
----
+### SPM Package Resources
 
-## Architecture
+To include assets in your feature package:
 
-- **Language**: Swift 5.9 language mode (Swift 6 compiler with concurrency)
-- **UI**: SwiftUI + AppKit (menu bar integration)
-- **Audio**: AVFoundation (16kHz mono capture)
-- **ML/ASR**: FluidAudio SDK (local speech recognition)
-- **Testing**: XCTest framework
+```swift
+.target(
+    name: "SpeechToTextFeature",
+    dependencies: [],
+    resources: [.process("Resources")]
+)
+```
 
-Key patterns:
+## Notes
 
-- Service layer architecture
-- Actor-based concurrency for thread safety
-- @Observable for state management
-- Protocol-based dependency injection
+### Generated with XcodeBuildMCP
 
-See [AGENTS.md](AGENTS.md) for detailed development guidelines.
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [AGENTS.md](AGENTS.md) | Development guidelines and patterns |
-| [docs/LOCAL_DEVELOPMENT.md](docs/LOCAL_DEVELOPMENT.md) | Local setup and code signing |
-| [docs/XCODE_WORKFLOW.md](docs/XCODE_WORKFLOW.md) | Xcode-specific workflow |
-| [docs/CONCURRENCY_PATTERNS.md](docs/CONCURRENCY_PATTERNS.md) | Swift concurrency patterns |
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Run tests: `swift test --parallel`
-4. Run linter: `swiftlint`
-5. Submit a pull request
-
----
-
-## License
-
-[License details here]
-
----
-
-## Acknowledgments
-
-- FluidAudio SDK for local speech recognition
-- Apple for SwiftUI and AVFoundation frameworks
+This project was scaffolded using [XcodeBuildMCP](https://github.com/cameroncooke/XcodeBuildMCP), which provides tools for AI-assisted macOS development workflows.
