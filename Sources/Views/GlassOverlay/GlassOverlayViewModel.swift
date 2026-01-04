@@ -67,13 +67,23 @@ final class GlassOverlayViewModel {
 
     // MARK: - Public Methods
 
+    /// Force reset to hidden state (use at start of new session to clear any stuck state)
+    func forceReset() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] forceReset() called, current state=\(state)")
+        stopDurationTimer()
+        state = .hidden
+        audioLevel = 0.0
+        recordingDuration = 0.0
+    }
+
     /// Transition to recording state with fade-in animation
     func showRecording() {
-        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] showRecording() called")
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] showRecording() called, current state=\(state)")
 
-        guard state == .hidden else {
-            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] showRecording: already visible in state \(state)")
-            return
+        // If not hidden, force reset first (handles stuck state from previous session)
+        if state != .hidden {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] showRecording: forcing reset from state \(state)")
+            forceReset()
         }
 
         // Reset state for new recording
@@ -89,15 +99,23 @@ final class GlassOverlayViewModel {
     }
 
     /// Transition to transcribing state
-    func showTranscribing() {
-        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] showTranscribing() called")
+    /// - Returns: `true` if transition succeeded, `false` if state was invalid
+    @discardableResult
+    func showTranscribing() -> Bool {
+        AppLogger.info(
+            AppLogger.viewModel,
+            "[\(viewModelId)] showTranscribing() called, currentState=\(state), duration=\(formattedDuration)"
+        )
 
         guard state == .recording else {
             AppLogger.warning(
                 AppLogger.viewModel,
-                "[\(viewModelId)] showTranscribing: cannot transition from \(state)"
+                """
+                [\(viewModelId)] showTranscribing: FAILED - cannot transition from \(state) \
+                (expected .recording). audioLevel=\(audioLevel), duration=\(recordingDuration)s
+                """
             )
-            return
+            return false
         }
 
         // Stop duration timer (keep showing last duration)
@@ -106,6 +124,12 @@ final class GlassOverlayViewModel {
         // Transition to transcribing state
         AppLogger.stateChange(AppLogger.viewModel, from: state, to: OverlayState.transcribing, context: "state")
         state = .transcribing
+
+        AppLogger.debug(
+            AppLogger.viewModel,
+            "[\(viewModelId)] showTranscribing: SUCCESS - transitioned to transcribing after \(formattedDuration)"
+        )
+        return true
     }
 
     /// Hide the overlay with fade-out animation
@@ -144,7 +168,15 @@ final class GlassOverlayViewModel {
 
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.recordingDuration += 1.0
+                // Guard against orphaned timer callbacks - only update if still recording
+                guard let self, self.state == .recording else {
+                    AppLogger.trace(
+                        AppLogger.viewModel,
+                        "Duration timer callback skipped - self deallocated or state != .recording"
+                    )
+                    return
+                }
+                self.recordingDuration += 1.0
             }
         }
         durationTimer = timer

@@ -1,3 +1,4 @@
+import AVFoundation
 import FluidAudio
 import Foundation
 import OSLog
@@ -12,7 +13,7 @@ struct TranscriptionResult: Sendable {
 /// Protocol for FluidAudio service (enables mocking for tests)
 protocol FluidAudioServiceProtocol: Actor {
     func initialize(language: String) async throws
-    func transcribe(samples: [Int16]) async throws -> TranscriptionResult
+    func transcribe(samples: [Int16], sampleRate: Double) async throws -> TranscriptionResult
     func switchLanguage(to language: String) async throws
     func getCurrentLanguage() -> String
     func checkInitialized() -> Bool
@@ -115,12 +116,17 @@ actor FluidAudioService: FluidAudioServiceProtocol {
         }
     }
 
-    /// Transcribe audio samples
-    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+    /// Transcribe audio samples at the given sample rate
+    /// - Parameters:
+    ///   - samples: Int16 audio samples at the native sample rate
+    ///   - sampleRate: The sample rate of the input audio (e.g., 48000.0)
+    func transcribe(samples: [Int16], sampleRate: Double) async throws -> TranscriptionResult {
         transcriptionCount += 1
         let transcriptionId = transcriptionCount
 
-        AppLogger.info(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): \(samples.count) samples")
+        print("[DEBUG] transcribe #\(transcriptionId): \(samples.count) samples at \(Int(sampleRate))Hz")
+        fflush(stdout)
+        AppLogger.info(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): \(samples.count) samples at \(Int(sampleRate))Hz")
 
         // Check for simulated transcription error
         if simulatedError == .transcription {
@@ -145,11 +151,46 @@ actor FluidAudioService: FluidAudioServiceProtocol {
             AppLogger.debug(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): converting to float...")
             let floatSamples = samples.map { Float($0) / 32768.0 }
 
+            // Resample to 16kHz if needed using FluidAudio's AudioConverter
+            let finalSamples: [Float]
+            let targetSampleRate = Double(Constants.Audio.sampleRate)
+
+            if abs(sampleRate - targetSampleRate) > 1.0 {
+                // Need to resample: create AVAudioPCMBuffer and use AudioConverter
+                print("[DEBUG] Resampling from \(Int(sampleRate))Hz to \(Int(targetSampleRate))Hz...")
+                fflush(stdout)
+
+                guard let sourceFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: sampleRate, channels: 1, interleaved: false) else {
+                    throw FluidAudioError.invalidAudioFormat
+                }
+
+                guard let buffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: AVAudioFrameCount(floatSamples.count)) else {
+                    throw FluidAudioError.invalidAudioFormat
+                }
+                buffer.frameLength = AVAudioFrameCount(floatSamples.count)
+
+                // Copy float samples into buffer
+                if let channelData = buffer.floatChannelData {
+                    for index in 0..<floatSamples.count {
+                        channelData[0][index] = floatSamples[index]
+                    }
+                }
+
+                // Use FluidAudio's AudioConverter to resample
+                let audioConverter = AudioConverter()
+                finalSamples = try audioConverter.resampleBuffer(buffer)
+                print("[DEBUG] Resampled: \(floatSamples.count) samples -> \(finalSamples.count) samples")
+                fflush(stdout)
+            } else {
+                // Already at 16kHz
+                finalSamples = floatSamples
+            }
+
             // Log sample statistics for debugging
             if AppLogger.currentLevel >= .trace {
-                let minVal = floatSamples.min() ?? 0
-                let maxVal = floatSamples.max() ?? 0
-                let avgVal = floatSamples.reduce(0, +) / Float(floatSamples.count)
+                let minVal = finalSamples.min() ?? 0
+                let maxVal = finalSamples.max() ?? 0
+                let avgVal = finalSamples.reduce(0, +) / Float(finalSamples.count)
                 AppLogger.trace(
                     AppLogger.service,
                     "[\(serviceId)] transcribe #\(transcriptionId): sample stats min=\(minVal) max=\(maxVal) avg=\(avgVal)"
@@ -157,14 +198,18 @@ actor FluidAudioService: FluidAudioServiceProtocol {
             }
 
             // Perform transcription
-            AppLogger.debug(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): calling ASR...")
-            let result = try await asrManager.transcribe(floatSamples)
+            print("[DEBUG] Calling FluidAudio ASR with \(finalSamples.count) samples at 16kHz...")
+            fflush(stdout)
+            AppLogger.debug(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): calling ASR with \(finalSamples.count) samples...")
+            let result = try await asrManager.transcribe(finalSamples)
 
             let durationMs = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
 
             // FluidAudio SDK returns confidence score directly (non-optional in v3)
             let confidence: Float = result.confidence
 
+            print("[DEBUG] FluidAudio result: text='\(result.text.prefix(100))', confidence=\(confidence), durationMs=\(durationMs)")
+            fflush(stdout)
             AppLogger.info(
                 AppLogger.service,
                 "[\(serviceId)] transcribe #\(transcriptionId): completed in \(durationMs)ms, confidence=\(confidence), text=\"\(result.text.prefix(50))...\""
@@ -177,6 +222,8 @@ actor FluidAudioService: FluidAudioServiceProtocol {
             )
         } catch {
             let durationMs = Int((CFAbsoluteTimeGetCurrent() - startTime) * 1000)
+            print("[DEBUG] FluidAudio transcription FAILED: \(error.localizedDescription)")
+            fflush(stdout)
             AppLogger.error(
                 AppLogger.service,
                 "[\(serviceId)] transcribe #\(transcriptionId): FAILED after \(durationMs)ms: \(error.localizedDescription)"

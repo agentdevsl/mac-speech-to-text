@@ -122,6 +122,9 @@ class HotkeyService {
 
     /// Register hotkey using Carbon API
     private func registerCarbonHotkey(keyCode: Int, modifiers: [KeyModifier]) throws {
+        print("[DEBUG-CARBON-REG] registerCarbonHotkey called: keyCode=\(keyCode), modifiers=\(modifiers)")
+        fflush(stdout)
+
         // Convert modifiers to Carbon format
         var carbonModifiers: UInt32 = 0
         for modifier in modifiers {
@@ -132,6 +135,8 @@ class HotkeyService {
             case .shift: carbonModifiers |= UInt32(shiftKey)
             }
         }
+        print("[DEBUG-CARBON-REG] carbonModifiers=\(carbonModifiers)")
+        fflush(stdout)
 
         // Set up event type spec for hotkey events
         var eventTypes = [
@@ -140,6 +145,8 @@ class HotkeyService {
         ]
 
         // Install event handler
+        print("[DEBUG-CARBON-REG] Installing event handler...")
+        fflush(stdout)
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
             carbonHotkeyCallback,
@@ -149,11 +156,15 @@ class HotkeyService {
             &eventHandlerRef
         )
 
+        print("[DEBUG-CARBON-REG] InstallEventHandler returned status=\(status) (noErr=\(noErr))")
+        fflush(stdout)
         guard status == noErr else {
             throw HotkeyError.installationFailed("Failed to install Carbon event handler: \(status)")
         }
 
         // Register the hotkey
+        print("[DEBUG-CARBON-REG] Registering hotkey with RegisterEventHotKey...")
+        fflush(stdout)
         let registerStatus = RegisterEventHotKey(
             UInt32(keyCode),
             carbonModifiers,
@@ -163,6 +174,8 @@ class HotkeyService {
             &hotkeyRef
         )
 
+        print("[DEBUG-CARBON-REG] RegisterEventHotKey returned status=\(registerStatus) (noErr=\(noErr)), hotkeyRef=\(String(describing: hotkeyRef))")
+        fflush(stdout)
         guard registerStatus == noErr else {
             // Clean up event handler if registration failed
             if let handler = eventHandlerRef {
@@ -172,6 +185,8 @@ class HotkeyService {
             }
             throw HotkeyError.registrationFailed("Failed to register hotkey: \(registerStatus)")
         }
+        print("[DEBUG-CARBON-REG] Hotkey registered successfully!")
+        fflush(stdout)
 
         // Sync deinit copies for nonisolated cleanup
         deinitHotkeyRef = hotkeyRef
@@ -210,12 +225,18 @@ class HotkeyService {
 
     /// Handle hotkey pressed event from Carbon
     func handleHotkeyPressed() {
+        print("[DEBUG-HOTKEY] handleHotkeyPressed() called, isHoldMode=\(isHoldMode)")
+        fflush(stdout)
         if isHoldMode {
             // Hold-to-record mode: start recording
             let startTime = Date()
             holdState = .recording(startTime: startTime)
             AppLogger.service.debug("Hold hotkey: pressed")
+            print("[DEBUG-HOTKEY] Calling onKeyDownCallback...")
+            fflush(stdout)
             onKeyDownCallback?()
+            print("[DEBUG-HOTKEY] onKeyDownCallback returned")
+            fflush(stdout)
         } else {
             // Toggle mode: invoke callback
             callback?()
@@ -293,23 +314,38 @@ class HotkeyService {
 
 // MARK: - Carbon Callback
 
-/// Carbon event handler callback (must be a C function pointer)
-private func carbonHotkeyCallback(
-    nextHandler: EventHandlerCallRef?,
-    event: EventRef?,
-    userData: UnsafeMutableRawPointer?
-) -> OSStatus {
-    guard let event = event else { return OSStatus(eventNotHandledErr) }
+// Carbon event handler callback (must be a C function pointer with @convention(c))
+// Note: @convention(c) is required for Swift functions to be callable from Carbon APIs
+private let carbonHotkeyCallback: EventHandlerUPP = { (_: EventHandlerCallRef?, event: EventRef?, _: UnsafeMutableRawPointer?) -> OSStatus in
+    print("[DEBUG-CARBON] carbonHotkeyCallback called!")
+    fflush(stdout)
+    guard let event = event else {
+        print("[DEBUG-CARBON] event is nil, returning")
+        fflush(stdout)
+        return OSStatus(eventNotHandledErr)
+    }
 
     let eventKind = GetEventKind(event)
+    print("[DEBUG-CARBON] eventKind=\(eventKind), kEventHotKeyPressed=\(kEventHotKeyPressed), kEventHotKeyReleased=\(kEventHotKeyReleased)")
+    fflush(stdout)
 
     // Dispatch to main actor
     Task { @MainActor in
-        guard let service = HotkeyService.sharedInstance else { return }
+        print("[DEBUG-CARBON] Inside MainActor Task, sharedInstance=\(HotkeyService.sharedInstance != nil ? "exists" : "NIL")")
+        fflush(stdout)
+        guard let service = HotkeyService.sharedInstance else {
+            print("[DEBUG-CARBON] sharedInstance is nil, returning")
+            fflush(stdout)
+            return
+        }
 
         if eventKind == UInt32(kEventHotKeyPressed) {
+            print("[DEBUG-CARBON] Calling handleHotkeyPressed")
+            fflush(stdout)
             service.handleHotkeyPressed()
         } else if eventKind == UInt32(kEventHotKeyReleased) {
+            print("[DEBUG-CARBON] Calling handleHotkeyReleased")
+            fflush(stdout)
             service.handleHotkeyReleased()
         }
     }
