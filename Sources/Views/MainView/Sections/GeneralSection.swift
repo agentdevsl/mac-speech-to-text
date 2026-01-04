@@ -84,6 +84,19 @@ struct GeneralSection: View {
             .animation(.easeInOut(duration: 0.3), value: saveError)
         }
         .accessibilityIdentifier("generalSection")
+        .onAppear {
+            // Reload settings when view appears to ensure fresh state
+            let loadedSettings = settingsService.load()
+            AppLogger.system.info(
+                """
+                GeneralSection onAppear: Reloading settings - \
+                launchAtLogin=\(loadedSettings.general.launchAtLogin), \
+                autoInsertText=\(loadedSettings.general.autoInsertText), \
+                copyToClipboard=\(loadedSettings.general.copyToClipboard)
+                """
+            )
+            settings = loadedSettings
+        }
         .alert("Custom Hotkey", isPresented: $showHotkeyAlert) {
             Button("OK", role: .cancel) {}
         } message: {
