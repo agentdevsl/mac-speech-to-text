@@ -69,7 +69,7 @@ REQUIRE_SIGNING=false  # Set to true to mandate signing (no ad-hoc allowed)
 SIGNING_IDENTITY_FILE="${PROJECT_ROOT}/.signing-identity"
 SIGNING_FINGERPRINT_FILE="${PROJECT_ROOT}/.signing-fingerprint"
 if [ -f "${SIGNING_IDENTITY_FILE}" ]; then
-    SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n\r\t ')
+    SIGN_IDENTITY=$(cat "${SIGNING_IDENTITY_FILE}" | tr -d '\n\r\t')
     # Validate file is not empty or whitespace-only
     if [ -z "${SIGN_IDENTITY}" ]; then
         echo -e "${YELLOW}[WARNING]${NC} .signing-identity file is empty - using ad-hoc signing"

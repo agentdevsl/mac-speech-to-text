@@ -52,10 +52,9 @@ struct RecordingModal: View {
                 // Compact header
                 compactHeaderView
 
-                // Waveform visualization - smaller
-                WaveformView(audioLevel: Float(viewModel.audioLevel))
-                    .frame(height: 44)
-                    .padding(.horizontal, 4)
+                // Flowing sound wave visualization
+                FlowingSoundWave(audioLevel: Float(viewModel.audioLevel))
+                    .frame(height: 36)
                     .accessibilityIdentifier("waveformView")
                     .accessibilityLabel("Audio waveform")
                     .accessibilityValue("\(Int(viewModel.audioLevel * 100))% audio level")
@@ -183,7 +182,153 @@ struct RecordingModal: View {
         }
     }
 
-    // MARK: - Subviews
+    // MARK: - Compact Subviews
+
+    /// Compact header with recording indicator
+    private var compactHeaderView: some View {
+        HStack(spacing: 10) {
+            // Recording indicator dot
+            Circle()
+                .fill(viewModel.isRecording ? Color.red : Color.gray.opacity(0.4))
+                .frame(width: 10, height: 10)
+                .shadow(color: viewModel.isRecording ? .red.opacity(0.6) : .clear, radius: 4)
+
+            Text(statusTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .accessibilityIdentifier("recordingStatus")
+
+            Spacer()
+
+            // Close button
+            Button(action: handleDismiss) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("closeButton")
+            .accessibilityLabel("Close")
+        }
+        .accessibilityIdentifier("recordingHeader")
+    }
+
+    /// Compact status view
+    private var compactStatusView: some View {
+        Group {
+            if viewModel.isTranscribing {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                    Text("Transcribing...")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else if viewModel.isInserting {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                    Text("Inserting...")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+            } else if !viewModel.transcribedText.isEmpty {
+                Text(viewModel.transcribedText)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            } else if viewModel.isRecording {
+                Text("Listening...")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(minHeight: 24)
+    }
+
+    /// Compact error view
+    private func compactErrorView(message: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
+
+            Text(message)
+                .font(.system(size: 10))
+                .foregroundStyle(.red)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.red.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .transition(.opacity)
+        .accessibilityIdentifier("errorMessage")
+    }
+
+    /// Compact action buttons
+    private var compactActionButtons: some View {
+        HStack(spacing: 8) {
+            if viewModel.isRecording {
+                Button {
+                    Task {
+                        do {
+                            try await viewModel.stopRecording()
+                            // Brief delay to show result, then auto-dismiss
+                            try? await Task.sleep(nanoseconds: 600_000_000) // 0.6s
+                            handleDismiss()
+                        } catch {
+                            viewModel.errorMessage = error.localizedDescription
+                            AppLogger.viewModel.error("stopRecording failed: \(error.localizedDescription, privacy: .public)")
+                        }
+                    }
+                } label: {
+                    Text("Done")
+                        .font(.system(size: 12, weight: .medium))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+                .keyboardShortcut(.return)
+                .accessibilityIdentifier("stopRecordingButton")
+            } else if viewModel.isTranscribing || viewModel.isInserting {
+                // Show processing state - no buttons during transcription
+                EmptyView()
+            } else if !viewModel.transcribedText.isEmpty {
+                // Success - show copied indicator briefly
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(viewModel.lastTranscriptionCopiedToClipboard ? "Copied!" : "Inserted!")
+                        .font(.system(size: 12, weight: .medium))
+                }
+                .onAppear {
+                    // Auto-dismiss after showing success
+                    Task {
+                        try? await Task.sleep(nanoseconds: 800_000_000) // 0.8s
+                        handleDismiss()
+                    }
+                }
+            }
+
+            if viewModel.isRecording || viewModel.errorMessage != nil {
+                Button {
+                    handleDismiss()
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 12))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityIdentifier("cancelButton")
+            }
+        }
+        .accessibilityIdentifier("actionButtons")
+    }
+
+    // MARK: - Legacy Subviews (kept for compatibility)
 
     /// Header with icon and title - enhanced contrast
     private var headerView: some View {
@@ -205,7 +350,6 @@ struct RecordingModal: View {
                 Text(statusTitle)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .accessibilityIdentifier("recordingStatus")
 
                 if viewModel.isRecording {
                     Text("Speak now...")
@@ -216,23 +360,6 @@ struct RecordingModal: View {
 
             Spacer()
 
-            // Language indicator (T068)
-            if let language = viewModel.currentLanguageModel {
-                HStack(spacing: 4) {
-                    Text(language.flag)
-                        .font(.system(size: 14))
-
-                    if viewModel.isLanguageSwitching {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.amberPrimary.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-
             // Close button
             Button(action: handleDismiss) {
                 Image(systemName: "xmark.circle.fill")
@@ -240,10 +367,7 @@ struct RecordingModal: View {
                     .foregroundStyle(.tertiary)
             }
             .buttonStyle(.plain)
-            .accessibilityIdentifier("closeButton")
-            .accessibilityLabel("Close recording modal")
         }
-        .accessibilityIdentifier("recordingHeader")
     }
 
     /// Status text based on current state - enhanced readability
@@ -298,8 +422,6 @@ struct RecordingModal: View {
         .background(Color.red.opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .transition(.move(edge: .bottom).combined(with: .opacity))
-        .accessibilityIdentifier("errorMessage")
-        .accessibilityLabel("Error: \(message)")
     }
 
     /// Action buttons
@@ -311,6 +433,9 @@ struct RecordingModal: View {
                     Task {
                         do {
                             try await viewModel.stopRecording()
+                            // Auto-dismiss after success
+                            try? await Task.sleep(nanoseconds: 600_000_000)
+                            handleDismiss()
                         } catch {
                             viewModel.errorMessage = "Failed to process recording: \(error.localizedDescription)"
                             AppLogger.viewModel.error("stopRecording failed: \(error.localizedDescription, privacy: .public)")
@@ -319,17 +444,16 @@ struct RecordingModal: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return)
-                .accessibilityIdentifier("stopRecordingButton")
             }
 
-            // Cancel button (keyboard shortcut handled by .onKeyPress above)
-            Button("Cancel") {
-                handleDismiss()
+            if viewModel.isRecording || viewModel.errorMessage != nil {
+                // Cancel button (keyboard shortcut handled by .onKeyPress above)
+                Button("Cancel") {
+                    handleDismiss()
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
-            .accessibilityIdentifier("cancelButton")
         }
-        .accessibilityIdentifier("actionButtons")
     }
 
     // MARK: - Computed Properties

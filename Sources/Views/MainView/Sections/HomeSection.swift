@@ -30,6 +30,7 @@ struct HomeSection: View {
     // MARK: - Focus State
 
     @FocusState private var focusedCard: PermissionCardFocus?
+    @Namespace private var homeFocusScope
 
     // MARK: - State
 
@@ -45,6 +46,10 @@ struct HomeSection: View {
     @State private var isAccessibilityPolling: Bool = false
     @State private var microphoneError: String?
     @State private var accessibilityError: String?
+
+    // Task references for cancellation
+    @State private var microphonePermissionTask: Task<Void, Never>?
+    @State private var accessibilityPermissionTask: Task<Void, Never>?
 
     // MARK: - Constants
 
@@ -82,18 +87,37 @@ struct HomeSection: View {
         .onDisappear {
             typingTask?.cancel()
             typingTask = nil
+            microphonePermissionTask?.cancel()
+            microphonePermissionTask = nil
+            accessibilityPermissionTask?.cancel()
+            accessibilityPermissionTask = nil
         }
+        .focusScope(homeFocusScope)
         .onKeyPress(.tab) {
             handleTabNavigation()
             return .handled
         }
         .onKeyPress(.return) {
-            handleReturnKey()
-            return .handled
+            if focusedCard != nil {
+                handleReturnKey()
+                return .handled
+            }
+            return .ignored
         }
         .onKeyPress(.space) {
-            handleReturnKey()
-            return .handled
+            if focusedCard != nil {
+                handleReturnKey()
+                return .handled
+            }
+            return .ignored
+        }
+        .onAppear {
+            // Set initial focus to microphone card if no permissions granted
+            if !microphoneGranted {
+                focusedCard = .microphone
+            } else if !accessibilityGranted {
+                focusedCard = .accessibility
+            }
         }
     }
 
@@ -367,12 +391,15 @@ struct HomeSection: View {
         microphoneError = nil
         isMicrophoneLoading = true
 
-        Task {
+        microphonePermissionTask?.cancel()
+        microphonePermissionTask = Task { @MainActor in
             do {
                 try await permissionService.requestMicrophonePermission()
+                guard !Task.isCancelled else { return }
                 await refreshPermissions()
                 isMicrophoneLoading = false
             } catch {
+                guard !Task.isCancelled else { return }
                 isMicrophoneLoading = false
                 microphoneError = "Permission denied. Please grant access in System Settings."
                 AppLogger.system.warning("Microphone permission denied")
@@ -384,7 +411,8 @@ struct HomeSection: View {
         accessibilityError = nil
         isAccessibilityPolling = true
 
-        Task {
+        accessibilityPermissionTask?.cancel()
+        accessibilityPermissionTask = Task { @MainActor in
             do {
                 try permissionService.requestAccessibilityPermission()
             } catch {
@@ -397,12 +425,13 @@ struct HomeSection: View {
                 interval: 1.0,
                 maxDuration: 60.0
             ) {
+                // Callback is already @MainActor, no nested Task needed
                 callbackInvoked = true
-                Task { @MainActor in
-                    accessibilityGranted = true
-                    isAccessibilityPolling = false
-                }
+                self.accessibilityGranted = true
+                self.isAccessibilityPolling = false
             }
+
+            guard !Task.isCancelled else { return }
 
             if !callbackInvoked {
                 isAccessibilityPolling = false

@@ -330,26 +330,38 @@ final class PrivacySectionViewModel {
 
     var collectAnonymousStats: Bool {
         didSet {
-            saveSettings()
+            scheduleSave()
         }
     }
 
     var storagePolicy: StoragePolicy {
         didSet {
-            saveSettings()
+            // Keep storeHistory in sync with storagePolicy
+            storeHistory = (storagePolicy == .persistent)
+            scheduleSave()
         }
     }
 
     var dataRetentionDays: Int {
         didSet {
-            saveSettings()
+            scheduleSave()
         }
     }
+
+    /// Derived from storagePolicy - kept in sync for settings persistence
+    private(set) var storeHistory: Bool
 
     // MARK: - Dependencies
 
     @ObservationIgnored
     private let settingsService: SettingsService
+
+    @ObservationIgnored
+    private var saveTask: Task<Void, Never>?
+
+    /// Debounce interval for save operations
+    @ObservationIgnored
+    private let saveDebounceInterval: Duration = .milliseconds(300)
 
     // MARK: - Initialization
 
@@ -360,24 +372,44 @@ final class PrivacySectionViewModel {
         self.collectAnonymousStats = settings.privacy.collectAnonymousStats
         self.storagePolicy = settings.privacy.storagePolicy
         self.dataRetentionDays = settings.privacy.dataRetentionDays
+        // Initialize storeHistory from storagePolicy to ensure consistency
+        self.storeHistory = (settings.privacy.storagePolicy == .persistent)
     }
 
     // MARK: - Methods
 
-    private func saveSettings() {
-        Task { @MainActor in
-            var settings = settingsService.load()
-            settings.privacy.collectAnonymousStats = collectAnonymousStats
-            settings.privacy.storagePolicy = storagePolicy
-            settings.privacy.dataRetentionDays = dataRetentionDays
-            settings.privacy.storeHistory = storagePolicy == .persistent
+    /// Schedules a debounced save operation, canceling any pending save
+    private func scheduleSave() {
+        // Cancel any pending save task
+        saveTask?.cancel()
 
+        // Schedule a new save after debounce interval
+        saveTask = Task { @MainActor [weak self] in
             do {
-                try settingsService.save(settings)
+                try await Task.sleep(for: self?.saveDebounceInterval ?? .milliseconds(300))
             } catch {
-                // Log error but don't crash
-                print("Failed to save privacy settings: \(error)")
+                // Task was cancelled, don't save
+                return
             }
+
+            // Perform the save if not cancelled
+            guard !Task.isCancelled else { return }
+            self?.performSave()
+        }
+    }
+
+    private func performSave() {
+        var settings = settingsService.load()
+        settings.privacy.collectAnonymousStats = collectAnonymousStats
+        settings.privacy.storagePolicy = storagePolicy
+        settings.privacy.dataRetentionDays = dataRetentionDays
+        settings.privacy.storeHistory = storeHistory
+
+        do {
+            try settingsService.save(settings)
+        } catch {
+            // Log error but don't crash
+            AppLogger.service.error("Failed to save privacy settings: \(error.localizedDescription)")
         }
     }
 }

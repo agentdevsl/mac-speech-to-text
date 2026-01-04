@@ -106,7 +106,7 @@ final class RecordingViewModel {
     // MARK: - Initialization
 
     init(
-        audioService: AudioCaptureService = AudioCaptureService(),
+        audioService: AudioCaptureService? = nil,
         fluidAudioService: any FluidAudioServiceProtocol = FluidAudioService(),
         textInsertionService: TextInsertionService = TextInsertionService(),
         settingsService: SettingsService = SettingsService(),
@@ -114,7 +114,8 @@ final class RecordingViewModel {
         permissionService: PermissionService = PermissionService()
     ) {
         self.viewModelId = UUID().uuidString.prefix(8).description
-        self.audioService = audioService
+        // CRIT-1 Fix: Pass settingsService to AudioCaptureService so it can use the selected device
+        self.audioService = audioService ?? AudioCaptureService(settingsService: settingsService)
         self.fluidAudioService = fluidAudioService
         self.textInsertionService = textInsertionService
         self.settingsService = settingsService

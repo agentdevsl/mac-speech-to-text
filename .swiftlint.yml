@@ -22,6 +22,7 @@ excluded:
   - DerivedData
   - Tests
   - Resources
+  - xcode-project
 
 line_length:
   warning: 120

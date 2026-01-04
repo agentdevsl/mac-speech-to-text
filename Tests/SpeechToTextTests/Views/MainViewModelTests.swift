@@ -268,9 +268,10 @@ final class MainViewModelTests: XCTestCase {
         // When
         sut.reset()
 
-        // Then: Persisted section is set to home (via didSet when selectedSection = .home)
+        // Then: Persisted section is cleared (nil) so next instance gets default state
+        // Note: MED-4 fix ensures removeObject happens AFTER didSet, clearing the value
         let persistedSection = testDefaults.string(forKey: "MainView.selectedSection")
-        XCTAssertEqual(persistedSection, "home")
+        XCTAssertNil(persistedSection, "reset() should clear persisted section from UserDefaults")
     }
 
     func test_reset_removesHasLaunchedBefore() {

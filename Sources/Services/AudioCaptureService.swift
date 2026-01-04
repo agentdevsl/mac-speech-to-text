@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 import OSLog
 
@@ -100,8 +101,10 @@ class AudioCaptureService {
     private var bufferProcessor: AudioBufferProcessor?
     private let serviceId: String
     private var isCapturing: Bool = false
+    private let settingsService: SettingsService
 
-    init() {
+    init(settingsService: SettingsService = SettingsService()) {
+        self.settingsService = settingsService
         inputNode = audioEngine.inputNode
         serviceId = UUID().uuidString.prefix(8).description
         AppLogger.lifecycle(AppLogger.audio, self, event: "init[\(serviceId)]")
@@ -136,6 +139,9 @@ class AudioCaptureService {
         let buffer = StreamingAudioBuffer()
         streamingBuffer = buffer
 
+        // Configure the audio engine to use the selected input device (CRIT-1 fix)
+        try configureInputDevice()
+
         // Use the input node's native format to avoid hardware incompatibility issues
         let nativeFormat = inputNode.outputFormat(forBus: 0)
         guard nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0 else {
@@ -162,6 +168,98 @@ class AudioCaptureService {
             inputNode.removeTap(onBus: 0)
             throw AudioCaptureError.engineStartFailed(error.localizedDescription)
         }
+    }
+
+    /// Configure the audio engine to use the selected input device from settings
+    /// Falls back to system default if the selected device is unavailable
+    private func configureInputDevice() throws {
+        let settings = settingsService.load()
+        guard let selectedDeviceId = settings.audio.inputDeviceId else {
+            AppLogger.debug(AppLogger.audio, "[\(serviceId)] No specific device selected, using system default")
+            return
+        }
+
+        #if os(macOS)
+        // Find the selected device using AVCaptureDevice
+        let discoverySession = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.microphone, .external],
+            mediaType: .audio,
+            position: .unspecified
+        )
+
+        guard let selectedDevice = discoverySession.devices.first(where: { $0.uniqueID == selectedDeviceId }) else {
+            AppLogger.warning(
+                AppLogger.audio,
+                "[\(serviceId)] Selected device '\(selectedDeviceId)' not found, using system default"
+            )
+            return
+        }
+
+        // Get the Core Audio device ID from the AVCaptureDevice
+        // AVCaptureDevice's uniqueID for audio devices corresponds to the Core Audio device UID
+        var deviceId: AudioDeviceID = 0
+        var deviceIdSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDeviceForUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+
+        // Create a CFString from the device UID
+        var deviceUID: CFString = selectedDevice.uniqueID as CFString
+        var translation = AudioValueTranslation(
+            mInputData: &deviceUID,
+            mInputDataSize: UInt32(MemoryLayout<CFString>.size),
+            mOutputData: &deviceId,
+            mOutputDataSize: UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        var translationSize = UInt32(MemoryLayout<AudioValueTranslation>.size)
+
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &translationSize,
+            &translation
+        )
+
+        guard status == noErr, deviceId != 0 else {
+            AppLogger.warning(
+                AppLogger.audio,
+                "[\(serviceId)] Failed to get Core Audio device ID for '\(selectedDevice.localizedName)', status=\(status)"
+            )
+            return
+        }
+
+        // Set the audio engine's input device
+        let audioUnit = audioEngine.inputNode.audioUnit
+        guard let audioUnit = audioUnit else {
+            AppLogger.warning(AppLogger.audio, "[\(serviceId)] No audio unit available on input node")
+            return
+        }
+
+        let setStatus = AudioUnitSetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceId,
+            deviceIdSize
+        )
+
+        if setStatus == noErr {
+            AppLogger.info(
+                AppLogger.audio,
+                "[\(serviceId)] Successfully set input device to '\(selectedDevice.localizedName)' (ID: \(deviceId))"
+            )
+        } else {
+            AppLogger.warning(
+                AppLogger.audio,
+                "[\(serviceId)] Failed to set input device '\(selectedDevice.localizedName)', status=\(setStatus)"
+            )
+        }
+        #endif
     }
 
     /// Stop audio capture and return recorded samples

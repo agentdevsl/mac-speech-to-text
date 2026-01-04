@@ -21,36 +21,38 @@ struct LanguageSection: View {
     // MARK: - Body
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            // Section header
-            sectionHeader
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                // Section header
+                sectionHeader
 
-            // Current language display
-            currentLanguageCard
+                // Current language display
+                currentLanguageCard
 
-            // Auto-detect toggle
-            autoDetectToggle
+                // Auto-detect toggle
+                autoDetectToggle
 
-            Divider()
-                .padding(.vertical, 4)
+                Divider()
+                    .padding(.vertical, 4)
 
-            // Recent languages
-            if !viewModel.recentLanguages.isEmpty {
-                recentLanguagesSection
+                // Recent languages (excluding current selection)
+                if !viewModel.recentLanguagesExcludingCurrent.isEmpty {
+                    recentLanguagesSection
+                }
+
+                // Language picker
+                languagePickerSection
+
+                // Downloaded models indicator
+                downloadedModelsSection
+
+                // Global error banner (if any)
+                if let globalError = viewModel.globalError {
+                    errorBanner(message: globalError)
+                }
             }
-
-            // Language picker
-            languagePickerSection
-
-            // Downloaded models indicator
-            downloadedModelsSection
-
-            // Global error banner (if any)
-            if let globalError = viewModel.globalError {
-                errorBanner(message: globalError)
-            }
+            .padding(20)
         }
-        .padding(20)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("languageSection")
     }
@@ -75,11 +77,6 @@ struct LanguageSection: View {
 
     private var currentLanguageCard: some View {
         HStack(spacing: 16) {
-            // Flag
-            Text(viewModel.currentLanguageFlag)
-                .font(.system(size: 32))
-                .accessibilityHidden(true)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text("Current Language")
                     .font(.caption)
@@ -188,20 +185,16 @@ struct LanguageSection: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                ForEach(viewModel.recentLanguages.prefix(4), id: \.code) { language in
+                ForEach(viewModel.recentLanguagesExcludingCurrent.prefix(4), id: \.code) { language in
                     Button {
                         viewModel.selectLanguage(language)
                     } label: {
-                        HStack(spacing: 6) {
-                            Text(language.flag)
-                                .font(.body)
-                            Text(language.code.uppercased())
-                                .font(.caption)
-                                .fontWeight(.medium)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
+                        Text(language.code.uppercased())
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
                             language.code == viewModel.selectedLanguageCode
                                 ? Color.warmAmber.opacity(0.2)
                                 : Color(nsColor: .controlBackgroundColor)
@@ -311,6 +304,7 @@ struct LanguageSection: View {
                     LanguageRowView(
                         language: language,
                         isSelected: language.code == viewModel.selectedLanguageCode,
+                        isDownloaded: viewModel.downloadedModels.contains(language.code),
                         isDownloading: viewModel.downloadingLanguages.contains(language.code),
                         downloadProgress: viewModel.languageDownloadProgress[language.code] ?? 0,
                         downloadError: viewModel.languageDownloadErrors[language.code],
@@ -424,6 +418,7 @@ struct LanguageSection: View {
 private struct LanguageRowView: View {
     let language: LanguageModel
     let isSelected: Bool
+    let isDownloaded: Bool
     let isDownloading: Bool
     let downloadProgress: Double
     let downloadError: String?
@@ -434,10 +429,6 @@ private struct LanguageRowView: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 12) {
-                // Flag
-                Text(language.flag)
-                    .font(.title3)
-
                 // Language info
                 VStack(alignment: .leading, spacing: 2) {
                     Text(language.name)
@@ -495,44 +486,21 @@ private struct LanguageRowView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Download error: \(error). Double tap to retry")
+        } else if isDownloaded {
+            // Downloaded - show checkmark
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(Color.successGreen)
+                .font(.caption)
+                .accessibilityLabel("Downloaded")
         } else {
-            // Standard status from model
-            switch language.downloadStatus {
-            case .downloaded:
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.successGreen)
+            // Not downloaded - show download button
+            Button(action: onDownload) {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.secondary)
                     .font(.caption)
-                    .accessibilityLabel("Downloaded")
-
-            case .downloading(let progress, _):
-                HStack(spacing: 4) {
-                    Text("\(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    ProgressView()
-                        .scaleEffect(0.6)
-                }
-                .accessibilityLabel("Downloading")
-
-            case .notDownloaded:
-                Button(action: onDownload) {
-                    Image(systemName: "arrow.down.circle")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Not downloaded. Double tap to download")
-
-            case .error(let message):
-                Button(action: onRetry) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(Color.warningOrange)
-                        .font(.caption)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Download error: \(message)")
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Not downloaded. Double tap to download")
         }
     }
 }
@@ -545,7 +513,11 @@ final class LanguageSectionViewModel {
     // MARK: - State
 
     var selectedLanguageCode: String
-    var autoDetectEnabled: Bool
+    var autoDetectEnabled: Bool {
+        didSet {
+            Task { await saveLanguageSettings() }
+        }
+    }
     var recentLanguages: [LanguageModel]
     var downloadedModels: [String]
 
@@ -555,6 +527,12 @@ final class LanguageSectionViewModel {
     var languageDownloadErrors: [String: String] = [:]
     var globalError: String?
     var downloadProgress: Double = 0
+
+    // MARK: - Task Management
+
+    /// Active download tasks - used to cancel existing downloads before starting new ones
+    @ObservationIgnored
+    private var downloadTasks: [String: Task<Void, Never>] = [:]
 
     // MARK: - Dependencies
 
@@ -573,6 +551,11 @@ final class LanguageSectionViewModel {
 
     var isCurrentLanguageDownloaded: Bool {
         downloadedModels.contains(selectedLanguageCode)
+    }
+
+    /// Recent languages excluding the currently selected one
+    var recentLanguagesExcludingCurrent: [LanguageModel] {
+        recentLanguages.filter { $0.code != selectedLanguageCode }
     }
 
     var isDownloadingCurrentLanguage: Bool {
@@ -635,6 +618,12 @@ final class LanguageSectionViewModel {
 
     /// Download a language model
     func downloadLanguageModel(for languageCode: String) {
+        // Cancel any existing download task for this language
+        if let existingTask = downloadTasks[languageCode] {
+            existingTask.cancel()
+            downloadTasks.removeValue(forKey: languageCode)
+        }
+
         // Clear any previous error
         languageDownloadErrors.removeValue(forKey: languageCode)
 
@@ -643,9 +632,10 @@ final class LanguageSectionViewModel {
         languageDownloadProgress[languageCode] = 0
 
         // Simulate download (in real implementation, this would call FluidAudio SDK)
-        Task {
+        let task = Task {
             await simulateDownload(for: languageCode)
         }
+        downloadTasks[languageCode] = task
     }
 
     /// Retry failed download for current language
@@ -670,6 +660,7 @@ final class LanguageSectionViewModel {
         settings.language.defaultLanguage = selectedLanguageCode
         settings.language.autoDetectEnabled = autoDetectEnabled
         settings.language.recentLanguages = recentLanguages.map { $0.code }
+        settings.language.downloadedModels = downloadedModels
 
         do {
             try settingsService.save(settings)
@@ -684,6 +675,17 @@ final class LanguageSectionViewModel {
     private func simulateDownload(for languageCode: String) async {
         // Simulate download progress
         for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
+            // Check for task cancellation
+            if Task.isCancelled {
+                downloadingLanguages.remove(languageCode)
+                languageDownloadProgress.removeValue(forKey: languageCode)
+                downloadTasks.removeValue(forKey: languageCode)
+                if languageCode == selectedLanguageCode {
+                    downloadProgress = 0
+                }
+                return
+            }
+
             guard downloadingLanguages.contains(languageCode) else { return }
 
             languageDownloadProgress[languageCode] = progress
@@ -698,21 +700,19 @@ final class LanguageSectionViewModel {
         // Complete download
         downloadingLanguages.remove(languageCode)
         languageDownloadProgress.removeValue(forKey: languageCode)
+        downloadTasks.removeValue(forKey: languageCode)
 
-        // Simulate occasional failure for demo purposes (10% chance)
-        if Double.random(in: 0...1) < 0.1 {
-            languageDownloadErrors[languageCode] = "Network connection failed"
-            if languageCode == selectedLanguageCode {
-                downloadProgress = 0
-            }
-        } else {
-            // Success - add to downloaded models
-            if !downloadedModels.contains(languageCode) {
-                downloadedModels.append(languageCode)
-            }
-            if languageCode == selectedLanguageCode {
-                downloadProgress = 0
-            }
+        // Success - add to downloaded models
+        if !downloadedModels.contains(languageCode) {
+            downloadedModels.append(languageCode)
+        }
+        if languageCode == selectedLanguageCode {
+            downloadProgress = 0
+        }
+
+        // Persist the downloaded models
+        Task {
+            await saveLanguageSettings()
         }
     }
 }

@@ -82,13 +82,20 @@ final class MainViewModel {
 
     @ObservationIgnored private let userDefaults: UserDefaults
 
-    /// Unique ID for logging
+    /// Unique ID for logging (MainActor-isolated)
     @ObservationIgnored private let viewModelId: String
+
+    /// Shadow copy of viewModelId for use in nonisolated deinit (HIGH-12 fix)
+    /// Required because deinit is nonisolated but viewModelId is @MainActor
+    /// Note: String is Sendable so nonisolated(unsafe) not strictly needed, but kept for clarity
+    @ObservationIgnored private let viewModelIdForDeinit: String
 
     // MARK: - Initialization
 
     init(userDefaults: UserDefaults = .standard) {
-        self.viewModelId = UUID().uuidString.prefix(8).description
+        let id = UUID().uuidString.prefix(8).description
+        self.viewModelId = id
+        self.viewModelIdForDeinit = id  // Shadow copy for nonisolated deinit
         self.userDefaults = userDefaults
 
         // Check if this is first launch
@@ -112,7 +119,8 @@ final class MainViewModel {
     }
 
     deinit {
-        AppLogger.trace(AppLogger.viewModel, "MainViewModel[\(viewModelId)] deallocating")
+        // Use nonisolated(unsafe) shadow copy since deinit is nonisolated (HIGH-12 fix)
+        AppLogger.trace(AppLogger.viewModel, "MainViewModel[\(viewModelIdForDeinit)] deallocating")
     }
 
     // MARK: - Public Methods
@@ -139,11 +147,15 @@ final class MainViewModel {
     }
 
     /// Reset state (useful for testing)
+    /// Note: Order matters - clear UserDefaults AFTER setting selectedSection to avoid
+    /// didSet re-persisting the value we just tried to clear (MED-4 fix)
     func reset() {
-        userDefaults.removeObject(forKey: Self.selectedSectionKey)
-        userDefaults.removeObject(forKey: Self.hasLaunchedBeforeKey)
+        // Set state first (triggers didSet which persists)
         selectedSection = .home
         isFirstLaunch = true
+        // Then clear UserDefaults to ensure clean state
+        userDefaults.removeObject(forKey: Self.selectedSectionKey)
+        userDefaults.removeObject(forKey: Self.hasLaunchedBeforeKey)
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] State reset")
     }
 
