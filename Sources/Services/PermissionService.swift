@@ -37,6 +37,36 @@ struct AppIdentityValidation: Sendable {
     let errors: [PermissionError]
 }
 
+/// Result of permission state verification against actual macOS state
+/// Used to detect when stored permission state is stale (e.g., user revoked permissions)
+struct PermissionStateVerification: Sendable {
+    let storedMicrophoneGranted: Bool
+    let actualMicrophoneGranted: Bool
+    let storedAccessibilityGranted: Bool
+    let actualAccessibilityGranted: Bool
+
+    /// Whether stored state claims permission is granted but actual macOS state shows it's denied
+    /// Only flags as mismatch if stored=true but actual=false (stale grant)
+    /// The reverse (stored=false, actual=true) is fine - user may have granted via System Settings
+    var hasMismatch: Bool {
+        (storedMicrophoneGranted && !actualMicrophoneGranted) ||
+            (storedAccessibilityGranted && !actualAccessibilityGranted)
+    }
+
+    /// Human-readable description of the mismatch
+    var mismatchDescription: String? {
+        guard hasMismatch else { return nil }
+        var descriptions: [String] = []
+        if storedMicrophoneGranted && !actualMicrophoneGranted {
+            descriptions.append("microphone (stored: granted, actual: denied)")
+        }
+        if storedAccessibilityGranted && !actualAccessibilityGranted {
+            descriptions.append("accessibility (stored: granted, actual: denied)")
+        }
+        return descriptions.joined(separator: ", ")
+    }
+}
+
 /// Protocol for permission checking (enables testing with mocks)
 @MainActor
 protocol PermissionChecker {
@@ -72,6 +102,12 @@ protocol PermissionChecker {
         maxDuration: TimeInterval,
         onGranted: @escaping @MainActor @Sendable () -> Void
     ) async
+
+    /// Verify stored permission state matches actual macOS permission state
+    /// Detects stale grants (stored says granted but macOS says denied)
+    /// - Parameter settings: Current user settings containing stored permission state
+    /// - Returns: Verification result with details about any mismatches
+    func verifyPermissionStateConsistency(settings: UserSettings) async -> PermissionStateVerification
 }
 
 /// Real implementation of permission service
@@ -693,6 +729,40 @@ class PermissionService: PermissionChecker {
         let validation = validateAppIdentity()
         return (validation.bundleId, validation.teamId)
     }
+
+    // MARK: - Permission State Verification
+
+    /// Verify that stored permission state matches actual macOS permission state
+    /// This catches cases where:
+    /// - User manually revoked permissions in System Settings
+    /// - Identity change detection failed
+    /// - Permissions were granted to a different app instance
+    /// - Parameter settings: Current user settings containing stored permission state
+    /// - Returns: Verification result with details about any mismatches
+    func verifyPermissionStateConsistency(settings: UserSettings) async -> PermissionStateVerification {
+        let storedPermissions = settings.onboarding.permissionsGranted
+
+        // Check actual macOS permission state
+        let actualMicrophone = await checkMicrophonePermission()
+        let actualAccessibility = checkAccessibilityPermission()
+
+        let verification = PermissionStateVerification(
+            storedMicrophoneGranted: storedPermissions.microphone,
+            actualMicrophoneGranted: actualMicrophone,
+            storedAccessibilityGranted: storedPermissions.accessibility,
+            actualAccessibilityGranted: actualAccessibility
+        )
+
+        if verification.hasMismatch {
+            AppLogger.system.warning(
+                "Permission state mismatch detected: \(verification.mismatchDescription ?? "unknown", privacy: .public)"
+            )
+        } else {
+            AppLogger.system.debug("Permission state verification passed - stored state matches actual")
+        }
+
+        return verification
+    }
 }
 
 /// Mock implementation for testing
@@ -837,5 +907,15 @@ class MockPermissionService: PermissionChecker {
         }
 
         isPolling = false
+    }
+
+    /// Verify stored permission state matches actual macOS permission state
+    func verifyPermissionStateConsistency(settings: UserSettings) async -> PermissionStateVerification {
+        PermissionStateVerification(
+            storedMicrophoneGranted: settings.onboarding.permissionsGranted.microphone,
+            actualMicrophoneGranted: microphoneGranted,
+            storedAccessibilityGranted: settings.onboarding.permissionsGranted.accessibility,
+            actualAccessibilityGranted: accessibilityGranted
+        )
     }
 }

@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotkeyService: HotkeyService?
     private var onboardingWindow: NSWindow?
     private let settingsService = SettingsService()
+    private let permissionService = PermissionService()
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var mainViewObserver: NSObjectProtocol?
@@ -54,6 +55,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check for app identity change (bundle ID / signing) and reset if needed
         // This handles the case where app is rebuilt with different signing, invalidating permissions
         checkAndHandleIdentityChange()
+
+        // Verify stored permission state matches actual macOS permissions
+        // This catches cases where stored config says "granted" but actual permissions are revoked
+        Task {
+            await verifyAndCorrectPermissionState()
+        }
 
         // Check if first launch - show welcome/onboarding (T040)
         // Skip if --skip-welcome/--skip-onboarding or reset if --reset-welcome/--reset-onboarding
@@ -472,6 +479,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 AppLogger.app.debug("Stored initial app identity for permission tracking")
             } catch {
                 AppLogger.app.error("Failed to save initial identity: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
+
+    // MARK: - Permission State Verification
+
+    /// Verify stored permission state matches actual macOS permissions and correct if needed
+    /// This handles cases where:
+    /// - User manually revoked permissions in System Settings
+    /// - Identity change detection failed to catch a rebuild
+    /// - Permissions were granted to a different app instance
+    @MainActor
+    private func verifyAndCorrectPermissionState() async {
+        var settings = settingsService.load()
+        let verification = await permissionService.verifyPermissionStateConsistency(settings: settings)
+
+        if verification.hasMismatch {
+            AppLogger.app.warning(
+                """
+                Permission state mismatch detected: \(verification.mismatchDescription ?? "unknown", privacy: .public). \
+                Correcting stored state.
+                """
+            )
+
+            // Correct stored state to match actual macOS state
+            // Only reset permissions that claim to be granted but aren't
+            if verification.storedMicrophoneGranted && !verification.actualMicrophoneGranted {
+                settings.onboarding.permissionsGranted.microphone = false
+            }
+            if verification.storedAccessibilityGranted && !verification.actualAccessibilityGranted {
+                settings.onboarding.permissionsGranted.accessibility = false
+            }
+
+            // If onboarding was marked complete but required permissions are now missing,
+            // reset onboarding to guide user through re-granting
+            // Microphone is required for core functionality
+            let requiredPermissionsMissing = !verification.actualMicrophoneGranted
+            if settings.onboarding.completed && requiredPermissionsMissing {
+                AppLogger.app.info("Required permissions missing despite completed onboarding - resetting onboarding state")
+                settings.onboarding.completed = false
+                settings.onboarding.currentStep = 0
+            }
+
+            do {
+                try settingsService.save(settings)
+                AppLogger.app.info("Permission state corrected - user will be re-prompted if needed")
+            } catch {
+                AppLogger.app.error("Failed to save corrected permission state: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
