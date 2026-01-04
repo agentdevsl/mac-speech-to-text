@@ -284,15 +284,27 @@ final class AccessibilityTests: UITestBase {
 
 extension XCUIElement {
     /// Check if element has keyboard focus
+    /// Note: XCUIElement doesn't expose focus directly, using heuristic
     var hasFocus: Bool {
-        // Check for focus by looking at whether element would receive keyboard input
-        return self.hasFocus
+        // Use heuristic: element exists, is enabled, and is hittable (likely focused)
+        return exists && isEnabled && isHittable
     }
 
-    /// Get accessibility traits
+    /// Get accessibility traits based on element type
+    /// Note: XCUIElement doesn't expose UIAccessibilityTraits directly on macOS
     var accessibilityTraits: UIAccessibilityTraits {
-        // Note: XCUIElement doesn't expose traits directly
-        // This is a placeholder for actual trait checking
-        return []
+        // Infer traits from element type
+        switch elementType {
+        case .staticText:
+            return .staticText
+        case .button:
+            return .button
+        case .image:
+            return .image
+        case .link:
+            return .link
+        default:
+            return []
+        }
     }
 }

@@ -36,7 +36,12 @@ set -euo pipefail
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR="."
-PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
+# When running as git hook, find project root via git; otherwise use parent of script dir
+if [[ "${SCRIPT_DIR}" == *".git/hooks"* ]]; then
+    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+else
+    PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
+fi
 REMOTE_HOST="${REMOTE_TEST_HOST:-macdev}"
 REMOTE_PATH="${REMOTE_TEST_PATH:-~/Developer/mac-speech-to-text}"
 UI_TEST_TIMEOUT="${UI_TEST_TIMEOUT:-600}"
@@ -152,9 +157,15 @@ run_unit_tests() {
     local end_time=$(date +%s)
     UNIT_TEST_DURATION=$((end_time - start_time))
 
-    # Extract exit code
+    # Extract exit code (portable - works on macOS and Linux)
     local exit_code
-    exit_code=$(echo "$output" | grep -oP 'EXIT_CODE:\K\d+' | tail -1)
+    exit_code=$(echo "$output" | grep -E 'EXIT_CODE:[0-9]+' | tail -1 | sed 's/.*EXIT_CODE://')
+
+    # Validate exit code was extracted
+    if [ -z "${exit_code}" ]; then
+        print_warning "Could not extract exit code from test output"
+        exit_code=1
+    fi
 
     # Remove exit code line from output
     output=$(echo "$output" | sed 's/EXIT_CODE:[0-9]*$//')
@@ -162,7 +173,7 @@ run_unit_tests() {
     # Display output
     echo "$output"
 
-    if [ "${exit_code:-1}" -eq 0 ]; then
+    if [ "${exit_code}" -eq 0 ]; then
         UNIT_TEST_PASSED=true
         print_success "Unit tests passed (${UNIT_TEST_DURATION}s)"
         return 0
@@ -181,15 +192,21 @@ run_ui_tests() {
 
     set +e
     local output
-    output=$(ssh "${REMOTE_HOST}" "cd ${REMOTE_PATH} && timeout ${UI_TEST_TIMEOUT} ./scripts/run-ui-tests.sh --verbose 2>&1; echo EXIT_CODE:\$?")
+    output=$(ssh -o ConnectTimeout=10 "${REMOTE_HOST}" "cd '${REMOTE_PATH}' && timeout ${UI_TEST_TIMEOUT} ./scripts/run-ui-tests.sh --verbose 2>&1; echo EXIT_CODE:\$?")
     set -e
 
     local end_time=$(date +%s)
     UI_TEST_DURATION=$((end_time - start_time))
 
-    # Extract exit code
+    # Extract exit code (portable - works on macOS and Linux)
     local exit_code
-    exit_code=$(echo "$output" | grep -oP 'EXIT_CODE:\K\d+' | tail -1)
+    exit_code=$(echo "$output" | grep -E 'EXIT_CODE:[0-9]+' | tail -1 | sed 's/.*EXIT_CODE://')
+
+    # Validate exit code was extracted
+    if [ -z "${exit_code}" ]; then
+        print_warning "Could not extract exit code from test output"
+        exit_code=1
+    fi
 
     # Remove exit code line from output
     output=$(echo "$output" | sed 's/EXIT_CODE:[0-9]*$//')
