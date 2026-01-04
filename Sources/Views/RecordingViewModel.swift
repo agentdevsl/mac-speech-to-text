@@ -200,8 +200,10 @@ final class RecordingViewModel {
         isRecording = true
 
         do {
+            // Ensure microphone permission before capture
+            try await ensureMicrophonePermission()
+
             // Start audio capture - callback is @Sendable and handles MainActor dispatch
-            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting audio capture...")
             try await audioService.startCapture { @Sendable [weak self] level in
                 Task { @MainActor in self?.audioLevel = level; self?.resetSilenceTimer() }
             }
@@ -449,44 +451,34 @@ final class RecordingViewModel {
         }
     }
 
-    /// Save statistics to database
-    private func saveStatistics(session: RecordingSession) async {
-        do {
-            try await statisticsService.recordSession(session)
-            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Statistics saved successfully")
-        } catch {
-            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Failed to save statistics: \(error.localizedDescription)")
-        }
+}
+
+// MARK: - Private Helpers
+extension RecordingViewModel {
+    fileprivate func ensureMicrophonePermission() async throws {
+        let svc = PermissionService()
+        if !(await svc.checkMicrophonePermission()) { try await svc.requestMicrophonePermission() }
+    }
+
+    fileprivate func saveStatistics(session: RecordingSession) async {
+        do { try await statisticsService.recordSession(session) } catch { AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Stats save failed: \(error)") }
     }
 }
 
 // MARK: - Recording Errors
-
 enum RecordingError: LocalizedError, Equatable, Sendable {
-    case alreadyRecording
-    case notRecording
-    case audioCaptureFailed(String)
-    case noAudioCaptured
-    case noActiveSession
-    case transcriptionFailed(String)
-    case textInsertionFailed(String)
+    case alreadyRecording, notRecording, audioCaptureFailed(String)
+    case noAudioCaptured, noActiveSession, transcriptionFailed(String), textInsertionFailed(String)
 
     var errorDescription: String? {
         switch self {
-        case .alreadyRecording:
-            return "Recording is already in progress"
-        case .notRecording:
-            return "No active recording to stop"
-        case .audioCaptureFailed(let message):
-            return "Audio capture failed: \(message)"
-        case .noAudioCaptured:
-            return "No audio was captured"
-        case .noActiveSession:
-            return "No active recording session"
-        case .transcriptionFailed(let message):
-            return "Transcription failed: \(message)"
-        case .textInsertionFailed(let message):
-            return "Text insertion failed: \(message)"
+        case .alreadyRecording: return "Recording is already in progress"
+        case .notRecording: return "No active recording to stop"
+        case .audioCaptureFailed(let msg): return "Audio capture failed: \(msg)"
+        case .noAudioCaptured: return "No audio was captured"
+        case .noActiveSession: return "No active recording session"
+        case .transcriptionFailed(let msg): return "Transcription failed: \(msg)"
+        case .textInsertionFailed(let msg): return "Text insertion failed: \(msg)"
         }
     }
 }
