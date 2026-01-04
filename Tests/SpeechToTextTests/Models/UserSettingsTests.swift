@@ -30,6 +30,8 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertFalse(general.launchAtLogin)
         XCTAssertTrue(general.autoInsertText)
         XCTAssertTrue(general.copyToClipboard)
+        XCTAssertFalse(general.accessibilityPromptDismissed)
+        XCTAssertFalse(general.clipboardOnlyMode)
     }
 
     func test_defaultSettings_language_hasCorrectDefaults() {
@@ -57,6 +59,9 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertTrue(ui.showConfidenceIndicator)
         XCTAssertTrue(ui.animationsEnabled)
         XCTAssertEqual(ui.menuBarIcon, .default)
+        XCTAssertTrue(ui.showFloatingWidget)
+        XCTAssertEqual(ui.widgetPosition, .bottomCenter)
+        XCTAssertEqual(ui.recordingMode, .holdToRecord)
     }
 
     func test_defaultSettings_privacy_hasCorrectDefaults() {
@@ -217,5 +222,58 @@ final class UserSettingsTests: XCTestCase {
 
         XCTAssertEqual(settings.audio.sensitivity, 0.8)
         XCTAssertEqual(settings.audio.silenceThreshold, 2.0)
+    }
+
+    func test_userSettings_generalCanBeModified() {
+        var settings = UserSettings.default
+        settings.general.accessibilityPromptDismissed = true
+        settings.general.clipboardOnlyMode = true
+
+        XCTAssertTrue(settings.general.accessibilityPromptDismissed)
+        XCTAssertTrue(settings.general.clipboardOnlyMode)
+    }
+
+    // MARK: - RecordingMode Tests
+
+    func test_recordingMode_displayName_returnsCorrectNames() {
+        XCTAssertEqual(RecordingMode.holdToRecord.displayName, "Hold to Record")
+        XCTAssertEqual(RecordingMode.toggle.displayName, "Toggle")
+    }
+
+    func test_recordingMode_allCases_hasTwoCases() {
+        XCTAssertEqual(RecordingMode.allCases.count, 2)
+    }
+
+    func test_recordingMode_codableRoundtrip() throws {
+        for mode in RecordingMode.allCases {
+            let data = try JSONEncoder().encode(mode)
+            let decoded = try JSONDecoder().decode(RecordingMode.self, from: data)
+            XCTAssertEqual(decoded, mode)
+        }
+    }
+
+    // MARK: - WidgetPosition Tests
+
+    func test_widgetPosition_displayName_returnsCorrectNames() {
+        XCTAssertEqual(WidgetPosition.bottomCenter.displayName, "Bottom Center")
+        XCTAssertEqual(WidgetPosition.bottomRight.displayName, "Bottom Right")
+    }
+
+    func test_widgetPosition_allCases_hasTwoCases() {
+        XCTAssertEqual(WidgetPosition.allCases.count, 2)
+    }
+
+    // MARK: - GeneralConfiguration New Fields Codable Tests
+
+    func test_generalConfiguration_newFieldsCodableRoundtrip() throws {
+        var general = UserSettings.default.general
+        general.accessibilityPromptDismissed = true
+        general.clipboardOnlyMode = true
+
+        let data = try JSONEncoder().encode(general)
+        let decoded = try JSONDecoder().decode(GeneralConfiguration.self, from: data)
+
+        XCTAssertEqual(decoded.accessibilityPromptDismissed, true)
+        XCTAssertEqual(decoded.clipboardOnlyMode, true)
     }
 }

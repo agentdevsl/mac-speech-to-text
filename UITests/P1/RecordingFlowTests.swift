@@ -1,512 +1,426 @@
-// swiftlint:disable file_length
 // RecordingFlowTests.swift
 // macOS Local Speech-to-Text Application
 //
 // End-to-end UI tests for the core recording workflow
-// Updated for hold-to-record mode with floating widget and overlay
+// Updated for hold-to-record mode with FloatingWidget and HoldToRecordOverlay
 // Part of User Story 1: Recording Flow Validation (P1)
 
 import XCTest
 
 /// Tests for the recording flow - the primary user interaction
 /// Tests verify:
-/// - Floating widget visibility
-/// - Hold-to-record overlay appearance
-/// - Recording states and transitions
-/// - Auto-paste behavior
+/// - FloatingWidget visibility and tap interaction
+/// - HoldToRecordOverlay appearance and states
+/// - Recording status text updates
+/// - Waveform and progress indicator visibility
+/// - Pulsing recording indicator
 final class RecordingFlowTests: UITestBase {
-    // MARK: - RF-001: Modal Appears on Trigger
+    // MARK: - Accessibility Identifiers
 
-    /// Test that recording modal appears when launched with --trigger-recording
-    func test_recording_modalAppearsOnTrigger() throws {
-        // Launch app with recording modal trigger
-        launchAppWithRecordingModal()
-
-        // Wait for recording modal to appear
-        // The modal should contain a recording status or microphone indicator
-        let recordingStatus = app.staticTexts["Recording"]
-        let microphoneIcon = app.images["mic.fill"]
-
-        // Either the status text or mic icon should appear
-        let modalAppeared = recordingStatus.waitForExistence(timeout: extendedTimeout)
-            || microphoneIcon.waitForExistence(timeout: 2)
-
-        // Also check for any window with recording-related content
-        let recordingWindow = app.windows.firstMatch
-
-        XCTAssertTrue(
-            modalAppeared || recordingWindow.exists,
-            "Recording modal should appear when launched with --trigger-recording"
-        )
-
-        // Capture screenshot for verification
-        captureScreenshot(named: "RF-001-Recording-Modal-Appeared")
+    /// New UI accessibility identifiers
+    private enum AccessibilityIDs {
+        static let floatingWidget = "floatingWidget"
+        static let holdToRecordOverlay = "holdToRecordOverlay"
+        static let holdToRecordStatus = "holdToRecordStatus"
+        static let compactWaveform = "compactWaveform"
+        static let progressIndicator = "progressIndicator"
+        static let recordingIndicator = "recordingIndicator"
     }
 
-    // MARK: - RF-002: Waveform Visibility
+    // MARK: - RF-001: Floating Widget Visibility
 
-    /// Test that waveform visualization element is visible during recording
-    func test_recording_waveformIsVisible() throws {
-        // Launch app with recording modal
-        launchAppWithRecordingModal()
-
-        // Wait for modal to appear
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            // If no "Recording" text, modal may not have appeared
-            captureScreenshot(named: "RF-002-No-Recording-Text")
-            XCTFail("Recording modal did not appear")
-            return
-        }
-
-        // Look for waveform view by accessibility identifier
-        // The WaveformView should have an accessibility identifier
-        // Use multiple query strategies for robustness
-        let waveform = app.otherElements["waveformView"]
-        let waveformExists = waveform.waitForExistence(timeout: 3)
-            || app.descendants(matching: .any).matching(
-                NSPredicate(format: "identifier == 'waveformView'")
-            ).firstMatch.exists
-
-        // If no specific identifier, look for any canvas or custom view
-        // that might be the waveform
-        if !waveformExists {
-            // The waveform is a SwiftUI view that may be represented differently
-            // Check for any visible non-button, non-text element
-            captureScreenshot(named: "RF-002-Looking-For-Waveform")
-        }
-
-        // At minimum, the modal window should exist
-        XCTAssertFalse(app.windows.allElementsBoundByIndex.isEmpty, "At least one window should exist")
-
-        captureScreenshot(named: "RF-002-Waveform-Visibility")
-    }
-
-    // MARK: - RF-003: Cancel Dismisses Modal
-
-    /// Test that Cancel button dismisses the recording modal
-    func test_recording_cancelDismissesModal() throws {
-        // Launch app with recording modal
-        launchAppWithRecordingModal()
-
-        // Wait for modal to appear
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-003-No-Recording-Modal")
-            XCTFail("Recording modal did not appear")
-            return
-        }
-
-        // Find and tap Cancel button
-        let cancelButton = app.buttons["Cancel"]
-        guard cancelButton.waitForExistence(timeout: 3) else {
-            captureScreenshot(named: "RF-003-No-Cancel-Button")
-            XCTFail("Cancel button not found")
-            return
-        }
-
-        cancelButton.tap()
-
-        // Verify modal is dismissed
-        let modalDismissed = waitForDisappearance(recordingStatus, timeout: 5)
-
-        XCTAssertTrue(
-            modalDismissed,
-            "Recording modal should be dismissed after tapping Cancel"
-        )
-
-        captureScreenshot(named: "RF-003-Modal-Dismissed")
-    }
-
-    // MARK: - RF-004: Stop Initiates Transcription
-
-    /// Test that Stop button transitions to transcribing state
-    func test_recording_stopInitiatesTranscription() throws {
-        // Launch app with recording modal
-        launchAppWithRecordingModal()
-
-        // Wait for modal to appear
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-004-No-Recording-Modal")
-            XCTFail("Recording modal did not appear")
-            return
-        }
-
-        // Find and tap Stop Recording button
-        let stopButton = app.buttons["Stop Recording"]
-        guard stopButton.waitForExistence(timeout: 3) else {
-            captureScreenshot(named: "RF-004-No-Stop-Button")
-            XCTFail("Stop Recording button not found")
-            return
-        }
-
-        captureScreenshot(named: "RF-004-Before-Stop")
-        stopButton.tap()
-
-        // After stopping, the modal should transition to transcribing or processing state
-        // Look for "Transcribing...", "Processing", or similar status
-        let transcribingStatus = app.staticTexts["Transcribing..."]
-        let processingStatus = app.staticTexts["Processing"]
-        let insertingStatus = app.staticTexts["Inserting text..."]
-        let completeStatus = app.staticTexts["Complete"]
-
-        // Wait for any of the expected states
-        let stateChanged = transcribingStatus.waitForExistence(timeout: 3)
-            || processingStatus.waitForExistence(timeout: 1)
-            || insertingStatus.waitForExistence(timeout: 1)
-            || completeStatus.waitForExistence(timeout: 1)
-
-        captureScreenshot(named: "RF-004-After-Stop")
-
-        // The recording status should change (either to transcribing or complete)
-        // Note: In test mode without actual audio, it may skip to complete quickly
-        XCTAssertTrue(
-            stateChanged || !recordingStatus.exists,
-            "State should change after stopping recording"
-        )
-    }
-
-    // MARK: - RF-005: Escape Key Dismisses Modal
-
-    /// Test that pressing Escape key dismisses the recording modal
-    func test_recording_escapeKeyDismisses() throws {
-        // Launch app with recording modal
-        launchAppWithRecordingModal()
-
-        // Wait for recording modal
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-005-No-Recording-Modal")
-            XCTFail("Recording modal did not appear")
-            return
-        }
-
-        // Try Escape key
-        UITestHelpers.pressEscape(in: app)
-
-        // If Escape didn't work, try Cancel button as fallback
-        if recordingStatus.waitForExistence(timeout: 2) {
-            let cancelButton = app.buttons["Cancel"]
-            if cancelButton.exists {
-                cancelButton.tap()
-            }
-        }
-
-        // Verify dismissed
-        XCTAssertTrue(
-            waitForDisappearance(recordingStatus),
-            "Recording modal should be dismissed after pressing Escape or Cancel"
-        )
-
-        captureScreenshot(named: "RF-005-Escape-Dismissed")
-    }
-
-    // MARK: - RF-006: Silence Auto-Stop (FR-026)
-
-    /// Test that recording auto-stops after prolonged silence
-    /// Note: This test is difficult to verify in UI testing without actual audio
-    /// We verify the UI behavior, not the actual silence detection
-    func test_recording_silenceAutoStop() throws {
-        // Launch app with recording modal
-        launchAppWithRecordingModal()
-
-        // Wait for modal to appear
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-006-No-Recording-Modal")
-            XCTFail("Recording modal did not appear")
-            return
-        }
-
-        // In a real scenario with no audio input, the app should auto-stop
-        // after the configured silence threshold (default 1.5 seconds)
-        // We wait for the state to change or modal to dismiss
-
-        // Wait for potential auto-stop (silence threshold + buffer)
-        // Default silence threshold is 1.5s, we wait a bit longer
-        let autoStopTimeout: TimeInterval = 5.0
-
-        // Look for state change or modal dismissal
-        let transcribingStatus = app.staticTexts["Transcribing..."]
-        let completeStatus = app.staticTexts["Complete"]
-
-        // Wait for either state change or status disappearance
-        let stateChanged = transcribingStatus.waitForExistence(timeout: autoStopTimeout)
-            || completeStatus.waitForExistence(timeout: 1)
-            || waitForDisappearance(recordingStatus, timeout: 3)
-
-        captureScreenshot(named: "RF-006-After-Silence-Wait")
-
-        // Note: This test may not trigger auto-stop in all environments
-        // because it depends on actual audio input being silent
-        // The test documents the expected behavior
-        if !stateChanged {
-            // If no change, the silence detection may not have triggered
-            // This is acceptable in test environments without audio
-            print("Note: Silence auto-stop may not trigger in test environment without audio input")
-        }
-    }
-
-    // MARK: - Additional Recording Tests
-
-    /// Test that multiple recording sessions can be started
-    func test_recording_multipleSessionsCanStart() throws {
-        // First session
-        launchAppWithRecordingModal()
-
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            XCTFail("First recording modal did not appear")
-            return
-        }
-
-        // Cancel first session
-        let cancelButton = app.buttons["Cancel"]
-        if cancelButton.waitForExistence(timeout: 2) {
-            cancelButton.tap()
-        } else {
-            UITestHelpers.pressEscape(in: app)
-        }
-
-        // Wait for modal to dismiss
-        _ = waitForDisappearance(recordingStatus, timeout: 5)
-
-        // Relaunch to start second session
-        // In actual app, this would be via hotkey or menu
-        // For testing, we terminate and relaunch
-        app.terminate()
-        launchAppWithRecordingModal()
-
-        // Verify second modal appears
-        XCTAssertTrue(
-            recordingStatus.waitForExistence(timeout: extendedTimeout),
-            "Second recording modal should appear"
-        )
-    }
-
-    // MARK: - Floating Widget Tests (RF-007 to RF-010)
-
-    // MARK: - RF-007: Floating Widget Visibility
-
-    /// Test that floating widget appears after app launch
-    func test_recording_floatingWidgetVisible() throws {
+    /// Test that floating widget appears when app launches
+    func test_floatingWidget_isVisible() throws {
+        // Launch app skipping onboarding
         launchAppSkippingOnboarding()
 
         // Wait for app to initialize
         sleep(2)
 
         // Look for floating widget by accessibility identifier
-        let floatingWidget = app.windows.matching(
-            NSPredicate(format: "identifier CONTAINS[c] 'floating' OR identifier CONTAINS[c] 'widget'")
-        ).firstMatch
+        let floatingWidget = app.otherElements[AccessibilityIDs.floatingWidget]
+        let widgetExists = floatingWidget.waitForExistence(timeout: extendedTimeout)
 
-        let widgetElement = app.otherElements.matching(
-            NSPredicate(format: "identifier CONTAINS[c] 'floating' OR identifier CONTAINS[c] 'widget'")
-        ).firstMatch
-
-        captureScreenshot(named: "RF-007-Floating-Widget")
-
-        // Floating widget may not be visible in all test modes
-        // This test documents expected behavior
-        if !floatingWidget.exists && !widgetElement.exists {
-            print("Note: Floating widget may not be visible in test mode or may be disabled by default")
-        }
-    }
-
-    // MARK: - RF-008: Widget Recording State
-
-    /// Test that widget shows recording state indicator
-    func test_recording_widgetShowsRecordingState() throws {
-        launchAppWithRecordingModal()
-
-        // Look for recording indicator on widget or in windows
-        let recordingIndicator = app.images.matching(
-            NSPredicate(format: "identifier CONTAINS[c] 'recording' OR identifier CONTAINS[c] 'mic'")
-        ).firstMatch
-
-        let recordingText = app.staticTexts["Recording"]
-        let recordingDot = app.otherElements.matching(
-            NSPredicate(format: "identifier CONTAINS[c] 'indicator' OR identifier CONTAINS[c] 'pulse'")
-        ).firstMatch
-
-        let hasRecordingState = recordingIndicator.waitForExistence(timeout: extendedTimeout)
-            || recordingText.waitForExistence(timeout: 3)
-            || recordingDot.waitForExistence(timeout: 2)
-
-        captureScreenshot(named: "RF-008-Recording-State")
+        captureScreenshot(named: "RF-001-Floating-Widget-Visible")
 
         XCTAssertTrue(
-            hasRecordingState || app.windows.firstMatch.exists,
-            "Recording state should be indicated in UI"
+            widgetExists,
+            "FloatingWidget should be visible after app launches"
         )
-    }
 
-    // MARK: - RF-009: Hold-to-Record Overlay
-
-    /// Test that hold-to-record overlay appears during recording
-    func test_recording_holdToRecordOverlay() throws {
-        launchAppWithRecordingModal()
-
-        // Wait for recording UI
-        let recordingStatus = app.staticTexts["Recording"]
-        let recordingIndicator = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] 'recording'")
-        ).firstMatch
-
-        let overlayAppeared = recordingStatus.waitForExistence(timeout: extendedTimeout)
-            || recordingIndicator.waitForExistence(timeout: 3)
-
-        captureScreenshot(named: "RF-009-Hold-To-Record-Overlay")
-
-        // The overlay should show minimal UI during recording
-        if overlayAppeared {
-            // Look for compact waveform or pulsing indicator
-            let waveform = app.otherElements.matching(
-                NSPredicate(format: "identifier CONTAINS[c] 'waveform' OR identifier CONTAINS[c] 'mini'")
-            ).firstMatch
-
-            let pulsingDot = app.otherElements.matching(
-                NSPredicate(format: "identifier CONTAINS[c] 'pulse' OR identifier CONTAINS[c] 'indicator'")
-            ).firstMatch
-
-            // Either element indicates recording UI
-            if waveform.exists || pulsingDot.exists {
-                captureScreenshot(named: "RF-009-Recording-Active")
-            }
+        // Verify widget is hittable (can be interacted with)
+        if widgetExists {
+            XCTAssertTrue(
+                floatingWidget.isHittable,
+                "FloatingWidget should be interactable"
+            )
         }
     }
 
-    // MARK: - RF-010: Transcription State Transition
+    // MARK: - RF-002: Floating Widget Tap Starts Recording
 
-    /// Test that UI shows transcription state after recording stops
-    func test_recording_transcriptionStateTransition() throws {
-        launchAppWithRecordingModal()
+    /// Test that tapping the floating widget toggles recording
+    func test_floatingWidget_tapStartsRecording() throws {
+        // Launch app skipping onboarding
+        launchAppSkippingOnboarding()
 
-        // Wait for recording
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-010-No-Recording")
-            XCTFail("Recording did not start")
+        // Wait for app to initialize
+        sleep(2)
+
+        // Find and tap the floating widget
+        let floatingWidget = app.otherElements[AccessibilityIDs.floatingWidget]
+        guard floatingWidget.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-002-No-Widget")
+            XCTFail("FloatingWidget not found")
             return
         }
 
-        captureScreenshot(named: "RF-010-Recording-Active")
+        captureScreenshot(named: "RF-002-Before-Tap")
+        floatingWidget.tap()
 
-        // Stop recording via button or keyboard
-        let stopButton = app.buttons["Stop Recording"]
-        if stopButton.waitForExistence(timeout: 2) {
-            stopButton.tap()
-        } else {
-            // Try Return key as alternative
-            UITestHelpers.pressReturn(in: app)
-        }
+        // After tap, recording should start and overlay should appear
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        let overlayAppeared = overlay.waitForExistence(timeout: extendedTimeout)
 
-        // Check for transcription state
-        let transcribingText = app.staticTexts["Transcribing..."]
-        let processingText = app.staticTexts["Processing"]
-        let pastingText = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] 'pasting' OR label CONTAINS[c] 'inserting'")
-        ).firstMatch
-
-        let inTranscriptionState = transcribingText.waitForExistence(timeout: 5)
-            || processingText.waitForExistence(timeout: 2)
-            || pastingText.waitForExistence(timeout: 2)
-            || !recordingStatus.exists
-
-        captureScreenshot(named: "RF-010-Transcription-State")
+        captureScreenshot(named: "RF-002-After-Tap")
 
         XCTAssertTrue(
-            inTranscriptionState,
-            "UI should transition to transcription state after recording stops"
+            overlayAppeared,
+            "HoldToRecordOverlay should appear after tapping FloatingWidget"
         )
     }
 
-    // MARK: - RF-011: Recording Complete State
+    // MARK: - RF-003: HoldToRecordOverlay Appears When Recording
 
-    /// Test that UI shows complete state after transcription
-    func test_recording_completeState() throws {
+    /// Test that HoldToRecordOverlay appears during recording
+    func test_holdToRecordOverlay_appearsWhenRecording() throws {
+        // Launch app with recording triggered
         launchAppWithRecordingModal()
 
-        // Wait for recording
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            XCTFail("Recording did not start")
+        // Wait for the overlay to appear
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        let overlayExists = overlay.waitForExistence(timeout: extendedTimeout)
+
+        captureScreenshot(named: "RF-003-Overlay-Appeared")
+
+        XCTAssertTrue(
+            overlayExists,
+            "HoldToRecordOverlay should appear when recording is triggered"
+        )
+
+        // Verify overlay has expected size (approximately 200x80)
+        if overlayExists {
+            let frame = overlay.frame
+            XCTAssertGreaterThan(
+                frame.width,
+                100,
+                "Overlay width should be substantial"
+            )
+            XCTAssertGreaterThan(
+                frame.height,
+                40,
+                "Overlay height should be substantial"
+            )
+        }
+    }
+
+    // MARK: - RF-004: HoldToRecordOverlay Shows Status
+
+    /// Test that HoldToRecordOverlay shows status text updates
+    func test_holdToRecordOverlay_showsStatus() throws {
+        // Launch app with recording triggered
+        launchAppWithRecordingModal()
+
+        // Wait for overlay
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-004-No-Overlay")
+            XCTFail("HoldToRecordOverlay not found")
+            return
+        }
+
+        // Look for status text with accessibility identifier
+        let statusText = app.staticTexts[AccessibilityIDs.holdToRecordStatus]
+        let statusExists = statusText.waitForExistence(timeout: defaultTimeout)
+
+        captureScreenshot(named: "RF-004-Status-Text")
+
+        XCTAssertTrue(
+            statusExists,
+            "Status text should be visible in overlay"
+        )
+
+        // Verify status shows expected recording state
+        if statusExists {
+            let label = statusText.label
+            let isValidStatus = label.contains("Recording")
+                || label.contains("Transcribing")
+                || label.contains("Pasting")
+            XCTAssertTrue(
+                isValidStatus,
+                "Status should show 'Recording...', 'Transcribing...', or 'Pasting...'"
+            )
+        }
+    }
+
+    // MARK: - RF-005: HoldToRecordOverlay Shows Waveform
+
+    /// Test that waveform is visible during recording
+    func test_holdToRecordOverlay_showsWaveform() throws {
+        // Launch app with recording triggered
+        launchAppWithRecordingModal()
+
+        // Wait for overlay
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-005-No-Overlay")
+            XCTFail("HoldToRecordOverlay not found")
+            return
+        }
+
+        // Look for compact waveform
+        let waveform = app.otherElements[AccessibilityIDs.compactWaveform]
+        let waveformExists = waveform.waitForExistence(timeout: defaultTimeout)
+
+        captureScreenshot(named: "RF-005-Waveform")
+
+        XCTAssertTrue(
+            waveformExists,
+            "Compact waveform should be visible during recording"
+        )
+    }
+
+    // MARK: - RF-006: Recording Indicator Visible
+
+    /// Test that pulsing recording indicator is visible during recording
+    func test_holdToRecordOverlay_showsRecordingIndicator() throws {
+        // Launch app with recording triggered
+        launchAppWithRecordingModal()
+
+        // Wait for overlay
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-006-No-Overlay")
+            XCTFail("HoldToRecordOverlay not found")
+            return
+        }
+
+        // Look for pulsing amber recording indicator dot
+        let recordingIndicator = app.otherElements[AccessibilityIDs.recordingIndicator]
+        let indicatorExists = recordingIndicator.waitForExistence(timeout: defaultTimeout)
+
+        captureScreenshot(named: "RF-006-Recording-Indicator")
+
+        XCTAssertTrue(
+            indicatorExists,
+            "Pulsing recording indicator should be visible during recording"
+        )
+    }
+
+    // MARK: - RF-007: Progress Indicator During Transcription
+
+    /// Test that progress indicator appears during transcription
+    func test_holdToRecordOverlay_showsProgressIndicator() throws {
+        // Launch app with recording triggered
+        launchAppWithRecordingModal()
+
+        // Wait for recording to start
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-007-No-Overlay")
+            XCTFail("HoldToRecordOverlay not found")
+            return
+        }
+
+        captureScreenshot(named: "RF-007-Recording-Active")
+
+        // Press Escape to stop recording and trigger transcription
+        UITestHelpers.pressEscape(in: app)
+
+        // Wait for transcription state - progress indicator should appear
+        let progressIndicator = app.otherElements[AccessibilityIDs.progressIndicator]
+        let statusText = app.staticTexts[AccessibilityIDs.holdToRecordStatus]
+
+        // Either progress indicator or status showing "Transcribing..."
+        let inTranscriptionState = progressIndicator.waitForExistence(timeout: defaultTimeout)
+            || (statusText.exists && statusText.label.contains("Transcribing"))
+
+        captureScreenshot(named: "RF-007-Transcription-State")
+
+        // Note: Transcription may be very fast in test mode
+        // We verify the UI can show these states
+        if !inTranscriptionState {
+            print("Note: Transcription may have completed too quickly to capture progress state")
+        }
+    }
+
+    // MARK: - RF-008: Overlay Dismisses After Completion
+
+    /// Test that overlay dismisses after transcription and paste completes
+    func test_holdToRecordOverlay_dismissesAfterCompletion() throws {
+        // Launch app with recording triggered
+        launchAppWithRecordingModal()
+
+        // Wait for recording to start
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-008-No-Overlay")
+            XCTFail("HoldToRecordOverlay not found")
+            return
+        }
+
+        captureScreenshot(named: "RF-008-Recording-Active")
+
+        // Stop recording by pressing Escape
+        UITestHelpers.pressEscape(in: app)
+
+        // Wait for overlay to dismiss after transcription completes
+        // In test mode without actual audio, this should be quick
+        let overlayDismissed = waitForDisappearance(overlay, timeout: extendedTimeout)
+
+        captureScreenshot(named: "RF-008-After-Completion")
+
+        XCTAssertTrue(
+            overlayDismissed,
+            "Overlay should dismiss after recording flow completes"
+        )
+    }
+
+    // MARK: - RF-009: Multiple Recording Sessions
+
+    /// Test that multiple recording sessions can be started
+    func test_recording_multipleSessionsCanStart() throws {
+        // First session
+        launchAppWithRecordingModal()
+
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            XCTFail("First recording overlay did not appear")
+            return
+        }
+
+        captureScreenshot(named: "RF-009-First-Session")
+
+        // Stop first session
+        UITestHelpers.pressEscape(in: app)
+
+        // Wait for overlay to dismiss
+        _ = waitForDisappearance(overlay, timeout: extendedTimeout)
+
+        // Start second session by tapping widget
+        let floatingWidget = app.otherElements[AccessibilityIDs.floatingWidget]
+        if floatingWidget.waitForExistence(timeout: defaultTimeout) {
+            floatingWidget.tap()
+
+            // Verify second session started
+            let secondOverlay = overlay.waitForExistence(timeout: extendedTimeout)
+
+            captureScreenshot(named: "RF-009-Second-Session")
+
+            XCTAssertTrue(
+                secondOverlay,
+                "Second recording session should start"
+            )
+        }
+    }
+
+    // MARK: - RF-010: Widget Visibility After Recording
+
+    /// Test that floating widget is still visible after recording completes
+    func test_floatingWidget_visibleAfterRecording() throws {
+        // Launch and trigger recording
+        launchAppWithRecordingModal()
+
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            XCTFail("Recording overlay did not appear")
             return
         }
 
         // Stop recording
-        let stopButton = app.buttons["Stop Recording"]
-        if stopButton.waitForExistence(timeout: 2) {
-            stopButton.tap()
-        }
+        UITestHelpers.pressEscape(in: app)
 
-        // Wait for transcription to complete (may be quick in test mode)
-        sleep(3)
+        // Wait for overlay to dismiss
+        _ = waitForDisappearance(overlay, timeout: extendedTimeout)
 
-        // Check for complete/dismissed state
-        let completeText = app.staticTexts["Complete"]
-        let dismissedRecording = !recordingStatus.exists
+        // Verify widget is still visible
+        let floatingWidget = app.otherElements[AccessibilityIDs.floatingWidget]
+        let widgetVisible = floatingWidget.waitForExistence(timeout: defaultTimeout)
 
-        captureScreenshot(named: "RF-011-Complete-State")
+        captureScreenshot(named: "RF-010-Widget-After-Recording")
 
-        // Either shows "Complete" or modal is dismissed
         XCTAssertTrue(
-            completeText.exists || dismissedRecording,
-            "Recording flow should complete or dismiss after transcription"
+            widgetVisible,
+            "FloatingWidget should remain visible after recording completes"
         )
     }
 
-    // MARK: - RF-012: Inline Accessibility Prompt
+    // MARK: - RF-011: Recording State in Widget
 
-    /// Test that accessibility prompt appears when needed
-    func test_recording_accessibilityPromptAppears() throws {
-        // Launch without accessibility permission mocked
-        launchApp(arguments: [
-            LaunchArguments.skipOnboarding,
-            "--mock-permissions=denied"
-        ])
+    /// Test that widget shows recording state when overlay is visible
+    func test_floatingWidget_showsRecordingState() throws {
+        // Launch with recording
+        launchAppWithRecordingModal()
 
-        // Trigger recording
-        app.typeKey(" ", modifierFlags: [.command, .control])
-
-        // Wait for recording UI
-        let recordingStatus = app.staticTexts["Recording"]
-        guard recordingStatus.waitForExistence(timeout: extendedTimeout) else {
-            captureScreenshot(named: "RF-012-No-Recording")
-            print("Note: Recording may not start without permissions")
+        // Wait for overlay
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-011-No-Overlay")
+            XCTFail("Recording overlay did not appear")
             return
         }
 
-        // Stop to trigger transcription
-        let stopButton = app.buttons["Stop Recording"]
-        if stopButton.waitForExistence(timeout: 2) {
-            stopButton.tap()
+        // Check if widget still exists and shows recording state
+        // The widget may hide or change appearance during recording
+        let floatingWidget = app.otherElements[AccessibilityIDs.floatingWidget]
+
+        captureScreenshot(named: "RF-011-During-Recording")
+
+        // Widget behavior during recording may vary - document what we see
+        if floatingWidget.exists {
+            print("FloatingWidget is visible during recording")
+        } else {
+            print("FloatingWidget hides during recording (expected for overlay mode)")
         }
 
-        // Wait for transcription to attempt paste
-        sleep(3)
-
-        // Look for accessibility prompt
-        let accessibilityPrompt = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] 'accessibility' OR label CONTAINS[c] 'auto-paste'")
-        ).firstMatch
-
-        let enableButton = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] 'enable' OR label CONTAINS[c] 'grant'")
-        ).firstMatch
-
-        let clipboardOnlyButton = app.buttons.matching(
-            NSPredicate(format: "label CONTAINS[c] 'clipboard' OR label CONTAINS[c] 'copy'")
-        ).firstMatch
-
-        captureScreenshot(named: "RF-012-Accessibility-Prompt")
-
-        // Prompt may or may not appear depending on test environment
-        if !accessibilityPrompt.exists && !enableButton.exists && !clipboardOnlyButton.exists {
-            print("Note: Accessibility prompt may not appear if permission is already granted or mocked")
+        // The overlay should definitely be showing recording state
+        let statusText = app.staticTexts[AccessibilityIDs.holdToRecordStatus]
+        if statusText.exists {
+            XCTAssertTrue(
+                statusText.label.contains("Recording") || statusText.label.contains("Transcribing"),
+                "Status should indicate recording or transcribing state"
+            )
         }
     }
-}
 
-// swiftlint:enable file_length
+    // MARK: - RF-012: Escape Key Cancels Recording
+
+    /// Test that Escape key cancels recording (new behavior - no buttons)
+    func test_recording_escapeKeyCancels() throws {
+        // Launch with recording
+        launchAppWithRecordingModal()
+
+        // Wait for overlay
+        let overlay = app.otherElements[AccessibilityIDs.holdToRecordOverlay]
+        guard overlay.waitForExistence(timeout: extendedTimeout) else {
+            captureScreenshot(named: "RF-012-No-Overlay")
+            XCTFail("Recording overlay did not appear")
+            return
+        }
+
+        captureScreenshot(named: "RF-012-Before-Escape")
+
+        // Press Escape to cancel/stop
+        UITestHelpers.pressEscape(in: app)
+
+        // Overlay should dismiss (either immediately for cancel, or after transcription)
+        let overlayDismissed = waitForDisappearance(overlay, timeout: extendedTimeout)
+
+        captureScreenshot(named: "RF-012-After-Escape")
+
+        XCTAssertTrue(
+            overlayDismissed,
+            "Overlay should dismiss after pressing Escape"
+        )
+    }
+}

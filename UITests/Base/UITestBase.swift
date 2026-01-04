@@ -83,12 +83,32 @@ class UITestBase: XCTestCase {
         app.launch()
     }
 
-    /// Launch the app with onboarding skipped (most common case)
+    /// Launch the app with welcome skipped (most common case)
+    /// - Parameters:
+    ///   - arguments: Additional launch arguments
+    func launchAppSkippingWelcome(arguments: [String] = []) {
+        var allArguments = [
+            LaunchArguments.skipWelcome,
+            LaunchArguments.skipPermissionChecks
+        ]
+        allArguments.append(contentsOf: arguments)
+        launchApp(arguments: allArguments)
+    }
+
+    /// Launch the app with onboarding skipped (alias for launchAppSkippingWelcome)
     /// - Parameters:
     ///   - arguments: Additional launch arguments
     func launchAppSkippingOnboarding(arguments: [String] = []) {
+        launchAppSkippingWelcome(arguments: arguments)
+    }
+
+    /// Launch the app with fresh welcome state
+    /// Shows the single-screen WelcomeView
+    /// - Parameters:
+    ///   - arguments: Additional launch arguments
+    func launchAppWithFreshWelcome(arguments: [String] = []) {
         var allArguments = [
-            LaunchArguments.skipOnboarding,
+            LaunchArguments.resetWelcome,
             LaunchArguments.skipPermissionChecks
         ]
         allArguments.append(contentsOf: arguments)
@@ -96,24 +116,11 @@ class UITestBase: XCTestCase {
     }
 
     /// Launch the app with fresh onboarding state
-    /// Shows the single-screen WelcomeView
+    /// Alias for launchAppWithFreshWelcome for clarity
     /// - Parameters:
     ///   - arguments: Additional launch arguments
     func launchAppWithFreshOnboarding(arguments: [String] = []) {
-        var allArguments = [
-            LaunchArguments.resetOnboarding,
-            LaunchArguments.skipPermissionChecks
-        ]
-        allArguments.append(contentsOf: arguments)
-        launchApp(arguments: allArguments)
-    }
-
-    /// Launch the app with fresh welcome flow
-    /// Alias for launchAppWithFreshOnboarding for clarity
-    /// - Parameters:
-    ///   - arguments: Additional launch arguments
-    func launchAppWithFreshWelcome(arguments: [String] = []) {
-        launchAppWithFreshOnboarding(arguments: arguments)
+        launchAppWithFreshWelcome(arguments: arguments)
     }
 
     /// Launch the app and trigger recording modal immediately
@@ -121,7 +128,7 @@ class UITestBase: XCTestCase {
     ///   - arguments: Additional launch arguments
     func launchAppWithRecordingModal(arguments: [String] = []) {
         var allArguments = [
-            LaunchArguments.skipOnboarding,
+            LaunchArguments.skipWelcome,
             LaunchArguments.skipPermissionChecks,
             LaunchArguments.triggerRecording
         ]
@@ -279,16 +286,53 @@ class UITestBase: XCTestCase {
     }
 }
 
-// MARK: - Onboarding Navigation Helpers
+// MARK: - Welcome Flow Helpers
 
 extension UITestBase {
+    /// Wait for the welcome view to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if welcome view appears within timeout
+    @discardableResult
+    func waitForWelcomeView(timeout: TimeInterval? = nil) -> Bool {
+        let welcomeView = app.otherElements["welcomeView"]
+        return welcomeView.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Dismiss the welcome screen by tapping "Get Started"
+    /// - Returns: true if dismissal succeeded
+    @discardableResult
+    func dismissWelcome() -> Bool {
+        let getStartedButton = app.buttons["getStartedButton"]
+        if getStartedButton.waitForExistence(timeout: defaultTimeout) && getStartedButton.isEnabled {
+            getStartedButton.tap()
+            return true
+        }
+        return false
+    }
+
+    /// Get the welcome view element
+    func getWelcomeView() -> XCUIElement? {
+        let welcomeView = app.otherElements["welcomeView"]
+        if welcomeView.waitForExistence(timeout: extendedTimeout) {
+            return welcomeView
+        }
+        return nil
+    }
+
     /// Navigate through onboarding steps by clicking Next/Continue buttons
     /// - Parameters:
     ///   - stepsToAdvance: Number of steps to advance (default: navigate to completion)
     ///   - checkForGetStarted: Whether to stop and click "Get Started" button
     /// - Returns: true if navigation succeeded
+    /// - Note: Deprecated - use dismissWelcome() for new single-screen welcome flow
     @discardableResult
     func navigateOnboardingSteps(count stepsToAdvance: Int = 5, clickGetStarted: Bool = true) -> Bool {
+        // For new welcome flow, just dismiss directly
+        if waitForWelcomeView(timeout: 2) {
+            return dismissWelcome()
+        }
+
+        // Legacy multi-step onboarding flow
         for step in 0..<stepsToAdvance {
             // Check if we've reached the completion step
             let getStartedButton = app.buttons["Get Started"]
@@ -327,7 +371,15 @@ extension UITestBase {
     }
 
     /// Get the onboarding window (checks both identifier and title)
+    /// - Note: Deprecated - use getWelcomeView() for new single-screen welcome flow
     func getOnboardingWindow() -> XCUIElement? {
+        // Try new welcome view first
+        let welcomeView = app.otherElements["welcomeView"]
+        if welcomeView.waitForExistence(timeout: 3) {
+            return welcomeView
+        }
+
+        // Legacy onboarding window
         let windowById = app.windows.matching(
             NSPredicate(format: "identifier == 'onboardingWindow'")
         ).firstMatch

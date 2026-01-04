@@ -11,13 +11,13 @@ public struct UITestConfiguration: Sendable {
     /// Whether the app is running in UI test mode
     public let isUITesting: Bool
 
-    /// Whether onboarding should be reset
+    /// Whether onboarding should be reset (legacy, use resetWelcome)
     public let resetOnboarding: Bool
 
     /// Whether to skip permission checks
     public let skipPermissionChecks: Bool
 
-    /// Whether to skip the onboarding flow
+    /// Whether to skip the onboarding flow (legacy, use skipWelcome)
     public let skipOnboarding: Bool
 
     /// Whether to trigger recording modal on launch
@@ -35,6 +35,12 @@ public struct UITestConfiguration: Sendable {
     /// Simulated error type for error testing
     public let simulatedError: SimulatedErrorType?
 
+    /// Whether to skip the welcome flow (new single-screen welcome)
+    public let skipWelcome: Bool
+
+    /// Whether to reset welcome flow state
+    public let resetWelcome: Bool
+
     /// Default configuration (no test flags)
     public static let `default` = UITestConfiguration(
         isUITesting: false,
@@ -45,7 +51,9 @@ public struct UITestConfiguration: Sendable {
         mockPermissionState: nil,
         initialLanguage: nil,
         accessibilityTestingEnabled: false,
-        simulatedError: nil
+        simulatedError: nil,
+        skipWelcome: false,
+        resetWelcome: false
     )
 
     /// Initialize with all values
@@ -58,7 +66,9 @@ public struct UITestConfiguration: Sendable {
         mockPermissionState: MockPermissionState?,
         initialLanguage: String?,
         accessibilityTestingEnabled: Bool,
-        simulatedError: SimulatedErrorType?
+        simulatedError: SimulatedErrorType?,
+        skipWelcome: Bool = false,
+        resetWelcome: Bool = false
     ) {
         self.isUITesting = isUITesting
         self.resetOnboarding = resetOnboarding
@@ -69,6 +79,20 @@ public struct UITestConfiguration: Sendable {
         self.initialLanguage = initialLanguage
         self.accessibilityTestingEnabled = accessibilityTestingEnabled
         self.simulatedError = simulatedError
+        self.skipWelcome = skipWelcome
+        self.resetWelcome = resetWelcome
+    }
+
+    /// Computed property: whether to effectively skip onboarding/welcome
+    /// Returns true if either skipOnboarding or skipWelcome is set
+    public var shouldSkipWelcome: Bool {
+        skipOnboarding || skipWelcome
+    }
+
+    /// Computed property: whether to effectively reset onboarding/welcome
+    /// Returns true if either resetOnboarding or resetWelcome is set
+    public var shouldResetWelcome: Bool {
+        resetOnboarding || resetWelcome
     }
 
     /// Parse from ProcessInfo (convenience)
@@ -81,7 +105,7 @@ public struct UITestConfiguration: Sendable {
         isUITesting || resetOnboarding || skipPermissionChecks ||
             skipOnboarding || triggerRecordingOnLaunch ||
             mockPermissionState != nil || accessibilityTestingEnabled ||
-            simulatedError != nil
+            simulatedError != nil || skipWelcome || resetWelcome
     }
 }
 
@@ -99,6 +123,8 @@ public struct LaunchArgumentParser {
         let skipOnboarding = arguments.contains(LaunchArguments.skipOnboarding)
         let triggerRecordingOnLaunch = arguments.contains(LaunchArguments.triggerRecording)
         let accessibilityTestingEnabled = arguments.contains(LaunchArguments.accessibilityTesting)
+        let skipWelcome = arguments.contains(LaunchArguments.skipWelcome)
+        let resetWelcome = arguments.contains(LaunchArguments.resetWelcome)
 
         let mockPermissionState = extractMockPermissionState(from: arguments)
         let initialLanguage = extractValue(prefix: LaunchArguments.initialLanguagePrefix, from: arguments)
@@ -113,7 +139,9 @@ public struct LaunchArgumentParser {
             mockPermissionState: mockPermissionState,
             initialLanguage: initialLanguage,
             accessibilityTestingEnabled: accessibilityTestingEnabled,
-            simulatedError: simulatedError
+            simulatedError: simulatedError,
+            skipWelcome: skipWelcome,
+            resetWelcome: resetWelcome
         )
     }
 

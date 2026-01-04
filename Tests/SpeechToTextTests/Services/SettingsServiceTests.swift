@@ -181,7 +181,10 @@ final class SettingsServiceTests: XCTestCase {
             showWaveform: false,
             showConfidenceIndicator: false,
             animationsEnabled: false,
-            menuBarIcon: .minimal
+            menuBarIcon: .minimal,
+            showFloatingWidget: true,
+            widgetPosition: .bottomCenter,
+            recordingMode: .holdToRecord
         )
 
         // When

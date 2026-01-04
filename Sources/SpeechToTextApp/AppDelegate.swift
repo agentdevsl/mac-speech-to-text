@@ -51,16 +51,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await setupGlobalHotkey()
         }
 
-        // Check if first launch - show onboarding (T040)
-        // Skip if --skip-onboarding or reset if --reset-onboarding
-        if testConfig.skipOnboarding {
-            AppLogger.app.debug("Skipping onboarding (--skip-onboarding)")
+        // Check if first launch - show welcome/onboarding (T040)
+        // Skip if --skip-welcome/--skip-onboarding or reset if --reset-welcome/--reset-onboarding
+        if testConfig.shouldSkipWelcome {
+            AppLogger.app.debug("Skipping welcome (--skip-welcome or --skip-onboarding)")
             // Mark onboarding as completed
             var settings = settingsService.load()
             settings.onboarding.completed = true
             try? settingsService.save(settings)
-        } else if testConfig.resetOnboarding {
-            AppLogger.app.debug("Resetting onboarding state (--reset-onboarding)")
+        } else if testConfig.shouldResetWelcome {
+            AppLogger.app.debug("Resetting welcome state (--reset-welcome or --reset-onboarding)")
             var settings = settingsService.load()
             settings.onboarding.completed = false
             try? settingsService.save(settings)
@@ -110,6 +110,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             - skipPermissionChecks: \(self.testConfig.skipPermissionChecks)
             - skipOnboarding: \(self.testConfig.skipOnboarding)
             - resetOnboarding: \(self.testConfig.resetOnboarding)
+            - skipWelcome: \(self.testConfig.skipWelcome)
+            - resetWelcome: \(self.testConfig.resetWelcome)
+            - shouldSkipWelcome: \(self.testConfig.shouldSkipWelcome)
+            - shouldResetWelcome: \(self.testConfig.shouldResetWelcome)
             - triggerRecordingOnLaunch: \(self.testConfig.triggerRecordingOnLaunch)
             - mockPermissionState: \(String(describing: self.testConfig.mockPermissionState))
             - simulatedError: \(String(describing: self.testConfig.simulatedError))

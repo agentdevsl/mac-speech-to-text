@@ -32,11 +32,13 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(text)
             // If we get here, accessibility permission was granted
             // or fallback to clipboard was used
-        } catch let error as PermissionError {
-            XCTAssertEqual(error, .accessibilityDenied)
         } catch {
-            // May also succeed silently if fallback is used
-            XCTFail("Unexpected error: \(error)")
+            // Expected in CI: PermissionError.accessibilityDenied or TextInsertionError variants
+            // All are valid outcomes when accessibility/display not available
+            XCTAssertTrue(
+                error is PermissionError || error is TextInsertionError,
+                "Expected PermissionError or TextInsertionError, got \(error)"
+            )
         }
     }
 
@@ -49,8 +51,8 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(text)
             // Should handle empty string without errors
         } catch {
-            // May throw if permissions are not granted
-            XCTAssertTrue(error is PermissionError)
+            // May throw if permissions are not granted or display unavailable
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -63,8 +65,8 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(longText)
             // Should handle long text without errors
         } catch {
-            // May throw if permissions are not granted
-            XCTAssertTrue(error is PermissionError)
+            // May throw if permissions are not granted or display unavailable
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -77,8 +79,8 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(specialText)
             // Should handle special characters
         } catch {
-            // May throw if permissions are not granted
-            XCTAssertTrue(error is PermissionError)
+            // May throw if permissions are not granted or display unavailable
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -91,8 +93,8 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(multilineText)
             // Should handle newlines correctly
         } catch {
-            // May throw if permissions are not granted
-            XCTAssertTrue(error is PermissionError)
+            // May throw if permissions are not granted or display unavailable
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -108,7 +110,7 @@ final class TextInsertionServiceTests: XCTestCase {
             // May fall back to clipboard if no focused app
         } catch {
             // May throw permission error
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -159,7 +161,7 @@ final class TextInsertionServiceTests: XCTestCase {
                 try await service.insertText(text)
             } catch {
                 // Expected to fail without accessibility permission
-                XCTAssertTrue(error is PermissionError)
+                XCTAssertTrue(error is PermissionError || error is TextInsertionError)
                 break
             }
         }
@@ -196,7 +198,9 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(whitespaceText)
             // Should handle whitespace-only text
         } catch {
-            XCTAssertTrue(error is PermissionError)
+            // May throw PermissionError if accessibility denied,
+            // or TextInsertionError if paste simulation fails (e.g., in CI without display)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -209,7 +213,7 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(veryLongLine)
             // Should handle very long single line
         } catch {
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -222,7 +226,7 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service.insertText(emojiText)
             // Should handle emojis correctly
         } catch {
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -262,7 +266,7 @@ final class TextInsertionServiceTests: XCTestCase {
             // If accessibility is denied, it should fall back to clipboard
         } catch {
             // Expected without permissions
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -285,7 +289,7 @@ final class TextInsertionServiceTests: XCTestCase {
             XCTAssertLessThan(duration, 1.0)
         } catch {
             // Expected without permissions
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
     }
 
@@ -315,7 +319,189 @@ final class TextInsertionServiceTests: XCTestCase {
             try await service2.insertText("Text2")
         } catch {
             // Expected without permissions
-            XCTAssertTrue(error is PermissionError)
+            XCTAssertTrue(error is PermissionError || error is TextInsertionError)
         }
+    }
+
+    // MARK: - insertTextWithFallback Tests
+
+    func test_insertTextWithFallback_returnsResult() async {
+        // Given
+        let text = "Test text"
+
+        // When
+        let result = await service.insertTextWithFallback(text)
+
+        // Then - should return one of the valid result types
+        switch result {
+        case .insertedViaAccessibility:
+            XCTAssertTrue(true) // Success via accessibility
+        case .copiedToClipboardOnly:
+            XCTAssertTrue(true) // Fallback to clipboard
+        case .requiresAccessibilityPermission:
+            XCTAssertTrue(true) // Need permission
+        }
+    }
+
+    func test_insertTextWithFallback_handlesEmptyText() async {
+        // Given
+        let text = ""
+
+        // When
+        let result = await service.insertTextWithFallback(text)
+
+        // Then - should complete without crash
+        XCTAssertNotNil(result)
+    }
+
+    func test_insertTextWithFallback_handlesLongText() async {
+        // Given
+        let longText = String(repeating: "Lorem ipsum dolor sit amet. ", count: 100)
+
+        // When
+        let result = await service.insertTextWithFallback(longText)
+
+        // Then - should complete without crash
+        XCTAssertNotNil(result)
+    }
+
+    func test_insertTextWithFallback_handlesSpecialCharacters() async {
+        // Given
+        let specialText = "Hello! @#$%^&*() 你好 مرحبا 👋"
+
+        // When
+        let result = await service.insertTextWithFallback(specialText)
+
+        // Then - should complete without crash
+        XCTAssertNotNil(result)
+    }
+
+    // MARK: - TextInsertionResult Tests
+
+    func test_textInsertionResult_insertedViaAccessibility_isEquatable() {
+        // Given
+        let result1 = TextInsertionResult.insertedViaAccessibility
+        let result2 = TextInsertionResult.insertedViaAccessibility
+
+        // Then
+        XCTAssertEqual(result1, result2)
+    }
+
+    func test_textInsertionResult_copiedToClipboardOnly_preservesReason() {
+        // Given
+        let result = TextInsertionResult.copiedToClipboardOnly(reason: .userPreference)
+
+        // Then
+        if case .copiedToClipboardOnly(let reason) = result {
+            XCTAssertEqual(reason, .userPreference)
+        } else {
+            XCTFail("Expected copiedToClipboardOnly result")
+        }
+    }
+
+    func test_textInsertionResult_requiresAccessibilityPermission_isEquatable() {
+        // Given
+        let result1 = TextInsertionResult.requiresAccessibilityPermission
+        let result2 = TextInsertionResult.requiresAccessibilityPermission
+
+        // Then
+        XCTAssertEqual(result1, result2)
+    }
+
+    // MARK: - ClipboardFallbackReason Tests
+
+    func test_clipboardFallbackReason_accessibilityNotGranted_isEquatable() {
+        // Given
+        let reason1 = ClipboardFallbackReason.accessibilityNotGranted
+        let reason2 = ClipboardFallbackReason.accessibilityNotGranted
+
+        // Then
+        XCTAssertEqual(reason1, reason2)
+    }
+
+    func test_clipboardFallbackReason_insertionFailed_preservesMessage() {
+        // Given
+        let reason = ClipboardFallbackReason.insertionFailed("Test error")
+
+        // Then
+        if case .insertionFailed(let message) = reason {
+            XCTAssertEqual(message, "Test error")
+        } else {
+            XCTFail("Expected insertionFailed reason")
+        }
+    }
+
+    func test_clipboardFallbackReason_userPreference_isEquatable() {
+        // Given
+        let reason1 = ClipboardFallbackReason.userPreference
+        let reason2 = ClipboardFallbackReason.userPreference
+
+        // Then
+        XCTAssertEqual(reason1, reason2)
+    }
+
+    // MARK: - copyToClipboardPublic Tests
+
+    func test_copyToClipboardPublic_copiesToClipboard() async throws {
+        // Given
+        let text = "Test clipboard text"
+
+        // When
+        try await service.copyToClipboardPublic(text)
+
+        // Then - verify clipboard contains the text
+        let pasteboard = NSPasteboard.general
+        let clipboardText = pasteboard.string(forType: .string)
+        XCTAssertEqual(clipboardText, text)
+    }
+
+    func test_copyToClipboardPublic_handlesEmptyText() async throws {
+        // Given
+        let text = ""
+
+        // When
+        try await service.copyToClipboardPublic(text)
+
+        // Then - should complete without crash
+        let pasteboard = NSPasteboard.general
+        let clipboardText = pasteboard.string(forType: .string)
+        XCTAssertEqual(clipboardText, text)
+    }
+
+    func test_copyToClipboardPublic_handlesSpecialCharacters() async throws {
+        // Given
+        let text = "Test 👋 你好 مرحبا"
+
+        // When
+        try await service.copyToClipboardPublic(text)
+
+        // Then
+        let pasteboard = NSPasteboard.general
+        let clipboardText = pasteboard.string(forType: .string)
+        XCTAssertEqual(clipboardText, text)
+    }
+
+    // MARK: - TextInsertionError Additional Tests
+
+    func test_textInsertionError_eventSourceCreationFailed_hasCorrectDescription() {
+        // Given
+        let error = TextInsertionError.eventSourceCreationFailed
+
+        // When
+        let description = error.errorDescription
+
+        // Then
+        XCTAssertEqual(description, "Failed to create CGEventSource for keyboard simulation")
+    }
+
+    func test_textInsertionError_keyEventCreationFailed_hasCorrectDescription() {
+        // Given
+        let error = TextInsertionError.keyEventCreationFailed("V key down")
+
+        // When
+        let description = error.errorDescription
+
+        // Then
+        XCTAssertEqual(description, "Failed to create keyboard event for V key down")
     }
 }
