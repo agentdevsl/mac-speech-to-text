@@ -131,16 +131,10 @@ class AudioCaptureService {
     }
 
     /// Internal capture implementation
+    /// Note: Caller must ensure microphone permission is granted before calling this method
     private func performCapture(levelCallback: @escaping @Sendable (Double) -> Void) async throws {
         let buffer = StreamingAudioBuffer()
         streamingBuffer = buffer
-
-        // Check microphone permission
-        let microphonePermission = await PermissionService().checkMicrophonePermission()
-        guard microphonePermission else {
-            AppLogger.error(AppLogger.audio, "[\(serviceId)] Microphone permission denied")
-            throw PermissionError.microphoneDenied
-        }
 
         // Use the input node's native format to avoid hardware incompatibility issues
         let nativeFormat = inputNode.outputFormat(forBus: 0)
