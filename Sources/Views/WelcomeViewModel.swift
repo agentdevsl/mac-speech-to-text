@@ -4,6 +4,7 @@
 // Phase 2.2: Single-screen WelcomeView replacing multi-step onboarding
 // ViewModel managing microphone permission and audio testing
 
+import AppKit
 import AVFoundation
 import Foundation
 import Observation
@@ -64,6 +65,9 @@ final class WelcomeViewModel {
     @ObservationIgnored private nonisolated(unsafe) var deinitPhraseTimer: Timer?
     @ObservationIgnored private nonisolated(unsafe) var deinitTypingTimer: Timer?
 
+    /// Task for polling permission changes after user is directed to System Settings
+    @ObservationIgnored private var permissionPollingTask: Task<Void, Never>?
+
     /// Unique ID for logging
     @ObservationIgnored private let viewModelId: String
 
@@ -88,6 +92,7 @@ final class WelcomeViewModel {
         AppLogger.trace(AppLogger.viewModel, "WelcomeViewModel[\(viewModelId)] deallocating")
         deinitPhraseTimer?.invalidate()
         deinitTypingTimer?.invalidate()
+        permissionPollingTask?.cancel()
     }
 
     // MARK: - Public Methods
@@ -105,9 +110,65 @@ final class WelcomeViewModel {
             try await permissionService.requestMicrophonePermission()
             isPermissionGranted = await permissionService.checkMicrophonePermission()
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Microphone permission granted: \(isPermissionGranted)")
+
+            // If permission was granted, update settings
+            if isPermissionGranted {
+                updateMicrophonePermissionInSettings(granted: true)
+            }
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Microphone permission error: \(error.localizedDescription)")
             errorMessage = "Microphone access was denied. Please grant access in System Settings > Privacy & Security > Microphone."
+
+            // Start polling for permission changes after user is directed to System Settings
+            startPermissionPolling()
+        }
+    }
+
+    /// Start polling for microphone permission changes
+    /// Called after permission is denied and user is directed to System Settings
+    func startPermissionPolling() {
+        // Cancel any existing polling task
+        stopPermissionPolling()
+
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Starting permission polling")
+
+        permissionPollingTask = Task { [weak self] in
+            guard let self = self else { return }
+
+            await self.permissionService.pollForMicrophonePermission(
+                interval: 1.0,
+                maxDuration: 60.0
+            ) { [weak self] in
+                guard let self = self else { return }
+
+                AppLogger.info(AppLogger.viewModel, "[\(self.viewModelId)] Permission granted via polling")
+
+                // Update state
+                self.isPermissionGranted = true
+                self.errorMessage = nil
+
+                // Update settings
+                self.updateMicrophonePermissionInSettings(granted: true)
+            }
+        }
+    }
+
+    /// Stop polling for permission changes
+    func stopPermissionPolling() {
+        permissionPollingTask?.cancel()
+        permissionPollingTask = nil
+        permissionService.stopPolling()
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Permission polling stopped")
+    }
+
+    /// Open System Settings to Microphone preferences
+    func openMicrophoneSettings() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Opening microphone settings")
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            let opened = NSWorkspace.shared.open(url)
+            if !opened {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to open System Settings")
+            }
         }
     }
 
@@ -203,6 +264,9 @@ final class WelcomeViewModel {
     func complete() {
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Welcome flow completed")
 
+        // Stop permission polling
+        stopPermissionPolling()
+
         // Save onboarding state
         var settings = settingsService.load()
         settings.onboarding.completed = true
@@ -227,6 +291,19 @@ final class WelcomeViewModel {
     }
 
     // MARK: - Private Methods
+
+    /// Update microphone permission status in settings
+    private func updateMicrophonePermissionInSettings(granted: Bool) {
+        var settings = settingsService.load()
+        settings.onboarding.permissionsGranted.microphone = granted
+
+        do {
+            try settingsService.save(settings)
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Updated microphone permission in settings: \(granted)")
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to save microphone permission: \(error.localizedDescription)")
+        }
+    }
 
     /// Advance to next sample phrase
     private func advanceToNextPhrase() {

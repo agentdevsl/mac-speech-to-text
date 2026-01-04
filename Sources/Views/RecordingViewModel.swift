@@ -56,6 +56,9 @@ final class RecordingViewModel {
     /// Whether to show the inline accessibility permission prompt
     var showAccessibilityPrompt: Bool = false
 
+    /// Whether to show the inline microphone permission prompt
+    var showMicrophonePrompt: Bool = false
+
     /// Whether the last transcription was copied to clipboard (not inserted)
     var lastTranscriptionCopiedToClipboard: Bool = false
 
@@ -76,6 +79,7 @@ final class RecordingViewModel {
     @ObservationIgnored private var inactivityTimer: Timer?
     @ObservationIgnored private var lastTalkingTime: Date?
     @ObservationIgnored private var isAudioCaptureActive: Bool = false
+    @ObservationIgnored private var microphonePermissionPollingTask: Task<Void, Never>?
     // nonisolated copies for deinit access (deinit cannot access MainActor-isolated state)
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
     @ObservationIgnored private nonisolated(unsafe) var deinitInactivityTimer: Timer?
@@ -109,6 +113,7 @@ final class RecordingViewModel {
         AppLogger.trace(AppLogger.viewModel, "RecordingViewModel[\(viewModelId)] deallocating")
         if let observer = deinitLanguageSwitchObserver { NotificationCenter.default.removeObserver(observer) }
         deinitInactivityTimer?.invalidate()
+        microphonePermissionPollingTask?.cancel()
     }
 
     // MARK: - Language Switch Observer
@@ -202,6 +207,12 @@ final class RecordingViewModel {
             lastTalkingTime = Date()
             startInactivityTimer()
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture started successfully")
+        } catch PermissionError.microphoneDenied {
+            // Microphone permission denied - keep isRecording=true and show prompt
+            // The user can grant permission in System Settings and polling will auto-continue
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Microphone permission denied, waiting for user action")
+            // Don't reset state - showMicrophonePrompt is already set by ensureMicrophonePermission
+            // Don't throw - we're waiting for permission
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed: \(error.localizedDescription)")
             isRecording = false
@@ -274,6 +285,8 @@ final class RecordingViewModel {
         inactivityTimer?.invalidate()
         inactivityTimer = nil
         deinitInactivityTimer = nil
+        microphonePermissionPollingTask?.cancel()
+        microphonePermissionPollingTask = nil
 
         // Stop audio capture only if active (prevents double-stop)
         if isAudioCaptureActive {
@@ -301,6 +314,7 @@ final class RecordingViewModel {
         confidence = 0.0
         errorMessage = nil
         showAccessibilityPrompt = false
+        showMicrophonePrompt = false
         lastTranscriptionCopiedToClipboard = false
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Recording cancelled and state reset")
     }
@@ -380,6 +394,23 @@ final class RecordingViewModel {
         }
     }
 
+    /// Set clipboard-only mode preference (user chose "Use Clipboard Only")
+    func setClipboardOnlyMode() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] setClipboardOnlyMode() called")
+        showAccessibilityPrompt = false
+
+        // Save clipboard-only mode preference
+        do {
+            var settings = settingsService.load()
+            settings.general.clipboardOnlyMode = true
+            settings.general.accessibilityPromptDismissed = true
+            try settingsService.save(settings)
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saved clipboardOnlyMode=true, accessibilityPromptDismissed=true")
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to save settings: \(error.localizedDescription)")
+        }
+    }
+
     /// Open System Settings to accessibility preferences
     func openAccessibilitySettings() {
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] openAccessibilitySettings() called")
@@ -388,6 +419,56 @@ final class RecordingViewModel {
             if !opened {
                 AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to open System Settings")
             }
+        }
+    }
+
+    /// Open System Settings to microphone preferences
+    func openMicrophoneSettings() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] openMicrophoneSettings() called")
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+            let opened = NSWorkspace.shared.open(url)
+            if !opened {
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to open System Settings for Microphone")
+            }
+        }
+    }
+
+    /// Dismiss the microphone permission prompt and cancel recording
+    func dismissMicrophonePrompt() {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] dismissMicrophonePrompt() called")
+        showMicrophonePrompt = false
+        microphonePermissionPollingTask?.cancel()
+        microphonePermissionPollingTask = nil
+
+        // Reset recording state since we can't proceed without microphone
+        isRecording = false
+        currentSession = nil
+        errorMessage = nil
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Microphone prompt dismissed, recording cancelled")
+    }
+
+    /// Called when microphone permission is granted (either by polling or manually)
+    func onMicrophonePermissionGranted() async {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] onMicrophonePermissionGranted() called")
+        showMicrophonePrompt = false
+        microphonePermissionPollingTask?.cancel()
+        microphonePermissionPollingTask = nil
+
+        // Continue with audio capture now that permission is granted
+        do {
+            try await audioService.startCapture { @Sendable [weak self] level in
+                Task { @MainActor in self?.handleAudioLevel(level) }
+            }
+            isAudioCaptureActive = true
+            // Initialize talking time and start inactivity timer
+            lastTalkingTime = Date()
+            startInactivityTimer()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture started after permission granted")
+        } catch {
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed after permission: \(error.localizedDescription)")
+            isRecording = false
+            currentSession = nil
+            errorMessage = "Audio capture failed: \(error.localizedDescription)"
         }
     }
 
@@ -663,13 +744,71 @@ final class RecordingViewModel {
 
 // MARK: - Private Helpers
 extension RecordingViewModel {
+    /// Check microphone permission and show prompt if not granted
+    /// Returns true if permission is granted, false if prompt is shown
     fileprivate func ensureMicrophonePermission() async throws {
         let svc = PermissionService()
-        if !(await svc.checkMicrophonePermission()) { try await svc.requestMicrophonePermission() }
+
+        // Check if already granted
+        if await svc.checkMicrophonePermission() {
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Microphone permission already granted")
+            return
+        }
+
+        // Try requesting permission (shows system dialog if not determined)
+        do {
+            try await svc.requestMicrophonePermission()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Microphone permission granted via system dialog")
+            return
+        } catch PermissionError.microphoneDenied {
+            // Permission was denied - show inline prompt and start polling
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Microphone permission denied, showing inline prompt")
+            showMicrophonePrompt = true
+            startMicrophonePermissionPolling()
+            throw PermissionError.microphoneDenied
+        }
+    }
+
+    /// Start polling for microphone permission status
+    fileprivate func startMicrophonePermissionPolling() {
+        // Cancel any existing polling task
+        microphonePermissionPollingTask?.cancel()
+
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting microphone permission polling")
+
+        microphonePermissionPollingTask = Task { [weak self] in
+            let svc = PermissionService()
+
+            while !Task.isCancelled {
+                // Wait 1 second between polls
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+
+                guard !Task.isCancelled else { break }
+
+                // Check if permission is now granted
+                if await svc.checkMicrophonePermission() {
+                    AppLogger.info(
+                        AppLogger.viewModel,
+                        "[\(self?.viewModelId ?? "??")] Microphone permission granted via polling"
+                    )
+                    await self?.onMicrophonePermissionGranted()
+                    break
+                }
+            }
+
+            AppLogger.debug(
+                AppLogger.viewModel,
+                "[\(self?.viewModelId ?? "??")] Microphone permission polling stopped"
+            )
+        }
     }
 
     fileprivate func saveStatistics(session: RecordingSession) async {
-        do { try await statisticsService.recordSession(session) } catch { AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Stats save failed: \(error)") }
+        do {
+            try await statisticsService.recordSession(session)
+        } catch {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Stats save failed: \(error)")
+        }
     }
 }
 

@@ -1,16 +1,16 @@
 // SpeechToTextUITests.swift
 // macOS Local Speech-to-Text Application
 //
-// Updated for simplified UI: single-screen WelcomeView, FloatingWidget, inline MenuBar settings
+// Updated for unified MainView with NavigationSplitView and GlassRecordingOverlay
 // New tests should be added to P1/, P2/, or P3/ directories
 // See UITests/Base/UITestBase.swift for the new base class
 
 import XCTest
 
-/// UI Tests for the simplified Speech-to-Text app
-/// Tests the new single-screen WelcomeView, FloatingWidget, and inline MenuBar settings
-/// @see WelcomeFlowTests for comprehensive welcome tests
-/// @see RecordingFlowTests for recording tests
+/// UI Tests for the unified Speech-to-Text app
+/// Tests the MainView with NavigationSplitView sidebar and GlassRecordingOverlay
+/// @see WelcomeFlowTests for comprehensive welcome/home tests
+/// @see RecordingFlowTests for recording overlay tests
 final class SpeechToTextUITests: XCTestCase {
     var app: XCUIApplication!
 
@@ -170,34 +170,32 @@ final class SpeechToTextUITests: XCTestCase {
         XCTAssertTrue(app.exists)
     }
 
-    // MARK: - Floating Widget Tests
+    // MARK: - Glass Recording Overlay Tests
     // @see RecordingFlowTests for comprehensive tests
 
-    /// Test floating widget can be triggered (replaces recording modal)
+    /// Test glass recording overlay can be triggered
     func testRecordingModalOpens() throws {
         app.launchArguments.append("--skip-onboarding")
         app.launch()
 
         sleep(2)
 
-        // Trigger hotkey (Cmd+Ctrl+Space)
-        app.typeKey(" ", modifierFlags: [.command, .control])
+        // Trigger hotkey (Ctrl+Shift+Space - the new default)
+        app.typeKey(" ", modifierFlags: [.control, .shift])
 
         sleep(1)
 
-        // Look for floating widget or hold-to-record overlay
-        let floatingWidget = app.otherElements["floatingWidget"]
-        let holdToRecordOverlay = app.otherElements["holdToRecordOverlay"]
-        let holdToRecordStatus = app.staticTexts["holdToRecordStatus"]
+        // Look for glass recording overlay
+        let glassOverlay = app.otherElements["glassRecordingOverlay"]
+        let overlayStatus = app.staticTexts["overlayStatusText"]
 
-        let recordingUIVisible = floatingWidget.waitForExistence(timeout: 3)
-            || holdToRecordOverlay.waitForExistence(timeout: 2)
-            || holdToRecordStatus.waitForExistence(timeout: 2)
+        let recordingUIVisible = glassOverlay.waitForExistence(timeout: 3)
+            || overlayStatus.waitForExistence(timeout: 2)
 
         // App should still exist even if specific elements aren't found
         XCTAssertTrue(
             recordingUIVisible || app.exists,
-            "Recording UI (floating widget or overlay) should appear after hotkey"
+            "Recording UI (glass overlay) should appear after hotkey"
         )
     }
 

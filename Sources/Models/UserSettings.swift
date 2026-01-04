@@ -29,7 +29,7 @@ struct UserSettings: Codable, Sendable {
         hotkey: HotkeyConfiguration(
             enabled: true,
             keyCode: 49, // Space key
-            modifiers: [.command, .control],
+            modifiers: [.control, .shift], // ⌃⇧Space - avoids conflict with macOS emoji picker (⌘⌃Space)
             conflictDetected: false
         ),
         language: LanguageConfiguration(

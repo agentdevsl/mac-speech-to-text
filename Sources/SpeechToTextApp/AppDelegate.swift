@@ -1,4 +1,3 @@
-// swiftlint:disable file_length type_body_length
 import Cocoa
 import OSLog
 import SwiftUI
@@ -10,19 +9,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let settingsService = SettingsService()
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
+    private var mainViewObserver: NSObjectProtocol?
 
-    // MARK: - Floating Widget Window
+    // MARK: - Glass Overlay
 
-    /// Window for the floating widget (always-visible compact recording UI)
-    private var floatingWidgetWindow: NSWindow?
+    /// Controller for the glass recording overlay (appears during hold-to-record)
+    /// Uses singleton pattern for easy access from hotkey callbacks
+    private var glassOverlayController: GlassOverlayWindowController {
+        GlassOverlayWindowController.shared
+    }
 
-    /// ViewModel shared between floating widget and hold-to-record overlay
-    private var floatingWidgetViewModel: FloatingWidgetViewModel?
-
-    // MARK: - Hold-to-Record Overlay
-
-    /// Window for the hold-to-record overlay (appears during hold-to-record mode)
-    private var holdToRecordWindow: NSWindow?
+    /// Controller for the main unified view (Welcome + Settings combined)
+    private var mainWindowController: MainWindowController {
+        MainWindowController.shared
+    }
 
     /// UI test configuration parsed from launch arguments
     private lazy var testConfig: UITestConfiguration = {
@@ -53,23 +53,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Check if first launch - show welcome/onboarding (T040)
         // Skip if --skip-welcome/--skip-onboarding or reset if --reset-welcome/--reset-onboarding
+        let settings = settingsService.load()
+
         if testConfig.shouldSkipWelcome {
             AppLogger.app.debug("Skipping welcome (--skip-welcome or --skip-onboarding)")
             // Mark onboarding as completed
-            var settings = settingsService.load()
-            settings.onboarding.completed = true
-            try? settingsService.save(settings)
+            var updatedSettings = settings
+            updatedSettings.onboarding.completed = true
+            try? settingsService.save(updatedSettings)
+            // Show floating widget for returning users
+            showFloatingWidgetIfEnabled()
         } else if testConfig.shouldResetWelcome {
             AppLogger.app.debug("Resetting welcome state (--reset-welcome or --reset-onboarding)")
-            var settings = settingsService.load()
-            settings.onboarding.completed = false
-            try? settingsService.save(settings)
+            var updatedSettings = settings
+            updatedSettings.onboarding.completed = false
+            try? settingsService.save(updatedSettings)
+            showOnboarding()
+        } else if !settings.onboarding.completed {
+            // First time user - show welcome
             showOnboarding()
         } else {
-            let settings = settingsService.load()
-            if !settings.onboarding.completed {
-                showOnboarding()
-            }
+            // Returning user with completed onboarding - show floating widget
+            showFloatingWidgetIfEnabled()
         }
 
         // Trigger recording modal if requested (for UI tests)
@@ -81,6 +86,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.showRecordingModal()
             }
         }
+    }
+
+    /// Previously showed floating widget - now a no-op since glass overlay only appears during recording
+    /// The app now uses a clean desktop with overlay only during hold-to-record
+    private func showFloatingWidgetIfEnabled() {
+        // Glass overlay only shows during active recording - no persistent widget
+        AppLogger.app.debug("Floating widget deprecated - glass overlay shows only during recording")
     }
 
     // MARK: - UI Test Configuration
@@ -121,6 +133,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Stop and cleanup audio level simulation timer
+        audioLevelTimer?.invalidate()
+        audioLevelTimer = nil
+
+        // Close and cleanup recording window
+        recordingWindow?.close()
+        recordingWindow = nil
+
         // Cleanup NotificationCenter observers
         if let observer = recordingModalObserver {
             NotificationCenter.default.removeObserver(observer)
@@ -130,8 +150,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(observer)
             settingsObserver = nil
         }
-        // Cleanup hotkey service
+        if let observer = mainViewObserver {
+            NotificationCenter.default.removeObserver(observer)
+            mainViewObserver = nil
+        }
+
+        // Cleanup hotkey service (unregisters Carbon hotkeys on deinit)
         hotkeyService = nil
+
+        // Cleanup singleton window controllers
+        GlassOverlayWindowController.shared.hideOverlay()
+        MainWindowController.shared.closeWindow()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -166,6 +195,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.showSettingsWindow()
             }
         }
+
+        // Observer for "Open Main View" action (from ultra-minimal menu bar)
+        mainViewObserver = NotificationCenter.default.addObserver(
+            forName: .showMainView,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.showMainView()
+            }
+        }
     }
 
     // MARK: - Main Menu Setup
@@ -183,14 +223,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
 
-        // Add Settings item with Cmd+, shortcut
-        let settingsItem = NSMenuItem(
-            title: "Settings…",
-            action: #selector(openSettingsFromMenu),
+        // Add Open Speech to Text item with Cmd+, shortcut
+        let openItem = NSMenuItem(
+            title: "Open Speech to Text",
+            action: #selector(openMainViewFromMenu),
             keyEquivalent: ","
         )
-        settingsItem.keyEquivalentModifierMask = .command
-        appMenu.addItem(settingsItem)
+        openItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(openItem)
 
         // Add separator
         appMenu.addItem(NSMenuItem.separator())
@@ -208,9 +248,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = mainMenu
     }
 
-    /// Action for Settings menu item
-    @objc private func openSettingsFromMenu() {
-        showSettingsWindow()
+    /// Action for Open Speech to Text menu item
+    @objc private func openMainViewFromMenu() {
+        showMainView()
     }
 
     // MARK: - Global Hotkey Setup
@@ -277,63 +317,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startHoldToRecordSession() async {
         AppLogger.app.debug("Starting hold-to-record session")
 
-        // Create or reuse ViewModel
-        if floatingWidgetViewModel == nil {
-            floatingWidgetViewModel = FloatingWidgetViewModel()
-        }
+        // Show glass overlay in recording state
+        glassOverlayController.showRecording()
 
-        // Show hold-to-record overlay
-        showHoldToRecordOverlay()
-
-        // Start recording
-        await floatingWidgetViewModel?.startRecording()
+        // NOTE: Integrate with actual audio recording service in future
+        // Currently simulating audio levels for visual feedback
+        startAudioLevelSimulation()
     }
 
     /// Stop hold-to-record session and process audio
     private func stopHoldToRecordSession(holdDuration: TimeInterval) async {
         AppLogger.app.debug("Stopping hold-to-record session (duration: \(holdDuration)s)")
 
-        // Stop recording (this triggers transcription and paste)
-        await floatingWidgetViewModel?.stopRecording()
+        // Stop audio simulation
+        stopAudioLevelSimulation()
 
-        // Hide overlay after a short delay to show pasting state
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second delay
-            self.hideHoldToRecordOverlay()
+        // Transition to transcribing state
+        glassOverlayController.showTranscribing()
+
+        // NOTE: Integrate with actual transcription service in future
+        // Currently simulating brief transcription delay
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+
+        // Hide overlay after transcription completes
+        glassOverlayController.hideOverlay()
+    }
+
+    // MARK: - Audio Level Simulation (Temporary)
+
+    private var audioLevelTimer: Timer?
+
+    /// Simulate audio levels for waveform visualization (temporary until real audio integration)
+    private func startAudioLevelSimulation() {
+        audioLevelTimer?.invalidate()
+        audioLevelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                // Simulate varying audio levels
+                let level = Float.random(in: 0.1...0.8)
+                self?.glassOverlayController.updateAudioLevel(level)
+            }
         }
+    }
+
+    /// Stop audio level simulation
+    private func stopAudioLevelSimulation() {
+        audioLevelTimer?.invalidate()
+        audioLevelTimer = nil
     }
 
     // MARK: - Welcome / Onboarding
 
     @MainActor
     private func showOnboarding() {
-        // Use the new single-screen WelcomeView instead of multi-step wizard
-        let contentView = WelcomeView()
-            .onDisappear { [weak self] in
-                guard let self else { return }
-                self.onboardingWindow?.close()
-                self.onboardingWindow = nil
-                // Observers and hotkey are already set up in applicationDidFinishLaunching
-            }
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-
-        window.title = "Welcome"
-        window.identifier = NSUserInterfaceItemIdentifier("welcomeWindow")
-        window.contentView = NSHostingView(rootView: contentView)
-        window.center()
-
-        // Ensure app is active and window is visible
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        window.orderFrontRegardless()
-
-        onboardingWindow = window
+        // Use the unified MainView for first launch (Welcome = Settings)
+        // The Home section serves as the welcome screen with permission status
+        mainWindowController.showSection(.home)
+        AppLogger.app.info("Showing MainView for first-time onboarding")
     }
 
     // MARK: - Recording Modal
@@ -378,177 +417,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         recordingWindow = window
     }
 
-    // MARK: - Floating Widget
+    // MARK: - Main View Window
 
-    /// Show the floating widget (compact always-visible recording UI)
+    /// Show the main application view (unified Welcome + Settings)
     @MainActor
-    func showFloatingWidget() {
-        // Don't create duplicate windows
-        guard floatingWidgetWindow == nil else {
-            floatingWidgetWindow?.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        // Create or reuse ViewModel
-        if floatingWidgetViewModel == nil {
-            floatingWidgetViewModel = FloatingWidgetViewModel()
-        }
-
-        guard let viewModel = floatingWidgetViewModel else { return }
-
-        // Create FloatingWidget view
-        let contentView = FloatingWidget(viewModel: viewModel)
-
-        // Create borderless, transparent window
-        // Use 200x60 to accommodate expanded recording state
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 60),
-            styleMask: [.borderless, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-
-        window.contentView = NSHostingView(rootView: contentView)
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.level = .floating
-        window.hasShadow = true
-        window.isMovableByWindowBackground = true
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary]
-
-        // Position: centered horizontally, 100px from bottom
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let windowWidth: CGFloat = 200
-            let windowHeight: CGFloat = 60
-            let xPosition = (screenFrame.width - windowWidth) / 2 + screenFrame.origin.x
-            let yPosition = screenFrame.origin.y + 100
-            window.setFrame(NSRect(x: xPosition, y: yPosition, width: windowWidth, height: windowHeight), display: true)
-        }
-
-        window.makeKeyAndOrderFront(nil)
-        floatingWidgetWindow = window
-
-        AppLogger.app.info("Floating widget window displayed")
+    private func showMainView() {
+        mainWindowController.showWindow()
     }
 
-    /// Hide the floating widget
-    @MainActor
-    func hideFloatingWidget() {
-        floatingWidgetWindow?.close()
-        floatingWidgetWindow = nil
-        AppLogger.app.debug("Floating widget window hidden")
-    }
+    // MARK: - Settings Window
 
-    // MARK: - Hold-to-Record Overlay
-
-    /// Show the hold-to-record overlay during active recording
-    @MainActor
-    private func showHoldToRecordOverlay() {
-        // Don't create duplicate windows
-        guard holdToRecordWindow == nil else {
-            holdToRecordWindow?.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        // Determine current recording status
-        let status: HoldToRecordOverlay.RecordingStatus = .recording
-        let audioLevel: Float = floatingWidgetViewModel?.audioLevel ?? 0.0
-
-        // Create overlay view
-        let contentView = HoldToRecordOverlay(status: status, audioLevel: audioLevel)
-
-        // Create borderless, transparent window
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 200, height: 80),
-            styleMask: [.borderless, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-
-        window.contentView = NSHostingView(rootView: contentView)
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.level = .floating
-        window.hasShadow = true
-        window.ignoresMouseEvents = true // Overlay is non-interactive
-        window.collectionBehavior = [.canJoinAllSpaces, .stationary]
-
-        // Position: centered horizontally, 100px from bottom (same as floating widget)
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let windowWidth: CGFloat = 200
-            let windowHeight: CGFloat = 80
-            let xPosition = (screenFrame.width - windowWidth) / 2 + screenFrame.origin.x
-            let yPosition = screenFrame.origin.y + 100
-            window.setFrame(NSRect(x: xPosition, y: yPosition, width: windowWidth, height: windowHeight), display: true)
-        }
-
-        window.orderFront(nil)
-        holdToRecordWindow = window
-
-        AppLogger.app.debug("Hold-to-record overlay displayed")
-    }
-
-    /// Hide the hold-to-record overlay
-    @MainActor
-    private func hideHoldToRecordOverlay() {
-        holdToRecordWindow?.close()
-        holdToRecordWindow = nil
-        AppLogger.app.debug("Hold-to-record overlay hidden")
-    }
-
-    // MARK: - Settings Window (Deprecated)
-
-    private var settingsWindow: NSWindow?
-
+    /// Show the settings view (General section of unified MainView)
     @MainActor
     private func showSettingsWindow() {
-        // Settings are now in the menu bar dropdown
-        // Show a brief tooltip/message directing users there
-        if let existingWindow = settingsWindow {
-            existingWindow.makeKeyAndOrderFront(nil)
-            return
-        }
-
-        // Create a simple redirect message view
-        let contentView = VStack(spacing: 24) {
-            Image(systemName: "menubar.arrow.down.rectangle")
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-
-            Text("Settings Moved")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Settings are now in the menu bar.\nClick the Speech-to-Text icon to access them.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            Button("Got it") {
-                NSApp.keyWindow?.close()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-        .padding(32)
-        .frame(width: 320, height: 260)
-        .background(.ultraThinMaterial)
-
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 320, height: 260),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-
-        window.title = "Settings"
-        window.contentView = NSHostingView(rootView: contentView)
-        window.center()
-        window.makeKeyAndOrderFront(nil)
-
-        settingsWindow = window
+        // Settings are now in the unified MainView under General section
+        mainWindowController.showSettings()
     }
 }
-
-// swiftlint:enable file_length type_body_length

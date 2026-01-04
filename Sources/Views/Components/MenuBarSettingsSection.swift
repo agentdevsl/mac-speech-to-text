@@ -96,6 +96,8 @@ struct SettingsSliderRow: View {
     let format: String
     var lowLabel: String = ""
     var highLabel: String = ""
+    /// Multiplier for display value (e.g., 100 for percentage)
+    var displayMultiplier: Double = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -103,7 +105,7 @@ struct SettingsSliderRow: View {
                 Text(title)
                     .font(.callout)
                 Spacer()
-                Text(String(format: format, value))
+                Text(String(format: format, value * displayMultiplier))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
@@ -125,6 +127,33 @@ struct SettingsSliderRow: View {
                         .foregroundStyle(.tertiary)
                 }
             }
+        }
+    }
+}
+
+/// Picker row for settings sections with enum selection
+struct SettingsPickerRow<T: Hashable>: View {
+    let title: String
+    @Binding var selection: T
+    let options: [T]
+    let displayName: (T) -> String
+    var help: String?
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.callout)
+            Spacer()
+            Picker("", selection: $selection) {
+                ForEach(options, id: \.self) { option in
+                    Text(displayName(option))
+                        .tag(option)
+                }
+            }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .controlSize(.small)
+            .help(help ?? "")
         }
     }
 }

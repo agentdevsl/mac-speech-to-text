@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Foundation
 import OSLog
 
@@ -6,17 +7,22 @@ import OSLog
 enum HoldState: Sendable {
     case idle
     case keyDown(startTime: Date)
-    case recording
+    case recording(startTime: Date)
     case releasing
 }
 
-/// Service for managing global hotkey registration using NSEvent global monitoring
-/// Note: Requires Accessibility permission (not Input Monitoring) to work
+/// Service for managing global hotkey registration using Carbon APIs
+/// Note: Carbon RegisterEventHotKey does NOT require Input Monitoring permission
 @MainActor
 class HotkeyService {
-    /// Global event monitor for key events
-    /// Mark as nonisolated(unsafe) to allow cleanup in deinit
-    private nonisolated(unsafe) var eventMonitor: Any?
+    /// Carbon event handler reference
+    private var eventHandlerRef: EventHandlerRef?
+
+    /// Registered hotkey reference
+    private var hotkeyRef: EventHotKeyRef?
+
+    /// Hotkey ID for Carbon
+    private var hotkeyID: EventHotKeyID
 
     /// Registered hotkey configuration
     private var registeredKeyCode: Int?
@@ -38,15 +44,31 @@ class HotkeyService {
     /// Whether using hold-to-record mode
     private var isHoldMode: Bool = false
 
-    deinit {
-        // Clean up event monitor - safe due to nonisolated(unsafe)
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
+    /// Singleton instance for Carbon callback access (fileprivate for callback, nonisolated for deinit)
+    fileprivate nonisolated(unsafe) static var sharedInstance: HotkeyService?
+
+    /// Copies of Carbon refs for nonisolated deinit cleanup
+    private nonisolated(unsafe) var deinitHotkeyRef: EventHotKeyRef?
+    private nonisolated(unsafe) var deinitEventHandlerRef: EventHandlerRef?
+
+    init() {
+        // Create a unique hotkey ID
+        hotkeyID = EventHotKeyID(signature: OSType(0x5354_5854), id: 1) // "STXT"
+        HotkeyService.sharedInstance = self
     }
 
-    /// Register a global hotkey
+    deinit {
+        // Clean up Carbon resources from nonisolated context
+        if let hotkey = deinitHotkeyRef {
+            UnregisterEventHotKey(hotkey)
+        }
+        if let handler = deinitEventHandlerRef {
+            RemoveEventHandler(handler)
+        }
+        HotkeyService.sharedInstance = nil
+    }
+
+    /// Register a global hotkey (toggle mode)
     /// - Parameters:
     ///   - keyCode: The virtual key code (e.g., 49 for Space)
     ///   - modifiers: Array of modifier keys (e.g., [.command, .control])
@@ -61,34 +83,9 @@ class HotkeyService {
         self.callback = callback
         self.registeredKeyCode = keyCode
         self.registeredModifiers = Set(modifiers)
+        self.isHoldMode = false
 
-        // Convert our modifiers to NSEvent.ModifierFlags for comparison
-        let requiredFlags = convertToNSEventModifiers(modifiers)
-
-        // Install global monitor for key down events
-        // Note: This requires Accessibility permission, NOT Input Monitoring
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self = self else { return }
-
-            // Check if the pressed key matches our registered hotkey
-            let eventKeyCode = Int(event.keyCode)
-
-            // Check modifiers - we need to match exactly the required modifiers
-            // Use intersection to only compare the modifier keys we care about
-            let relevantFlags: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
-            let eventModifiers = event.modifierFlags.intersection(relevantFlags)
-
-            if eventKeyCode == keyCode && eventModifiers == requiredFlags {
-                // Dispatch callback to MainActor
-                Task { @MainActor in
-                    self.callback?()
-                }
-            }
-        }
-
-        guard eventMonitor != nil else {
-            throw HotkeyError.installationFailed("Failed to install global event monitor. Ensure Accessibility permission is granted.")
-        }
+        try registerCarbonHotkey(keyCode: keyCode, modifiers: modifiers)
 
         AppLogger.service.info("Registered global hotkey: keyCode=\(keyCode), modifiers=\(modifiers.map { $0.rawValue })")
     }
@@ -114,180 +111,88 @@ class HotkeyService {
         self.registeredModifiers = Set(modifiers)
         self.holdState = .idle
 
-        let requiredFlags = convertToNSEventModifiers(modifiers)
-        let relevantFlags: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
-
-        // Monitor keyDown, keyUp, and flagsChanged events for hold detection
-        eventMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.keyDown, .keyUp, .flagsChanged]
-        ) { [weak self] event in
-            guard let self = self else { return }
-
-            let eventKeyCode = Int(event.keyCode)
-            let eventModifiers = event.modifierFlags.intersection(relevantFlags)
-            let modifiersMatch = eventModifiers == requiredFlags
-
-            Task { @MainActor in
-                self.handleHoldEvent(
-                    event: event,
-                    eventKeyCode: eventKeyCode,
-                    targetKeyCode: keyCode,
-                    modifiersMatch: modifiersMatch,
-                    requiredFlags: requiredFlags
-                )
-            }
-        }
-
-        guard eventMonitor != nil else {
-            throw HotkeyError.installationFailed(
-                "Failed to install global event monitor for hold-to-record. Ensure Accessibility permission is granted."
-            )
-        }
+        try registerCarbonHotkey(keyCode: keyCode, modifiers: modifiers)
 
         AppLogger.service.info(
             "Registered hold-to-record hotkey: keyCode=\(keyCode), modifiers=\(modifiers.map { $0.rawValue })"
         )
     }
 
-    /// Handle events for hold-to-record mode
-    private func handleHoldEvent(
-        event: NSEvent,
-        eventKeyCode: Int,
-        targetKeyCode: Int,
-        modifiersMatch: Bool,
-        requiredFlags: NSEvent.ModifierFlags
-    ) {
-        switch event.type {
-        case .keyDown:
-            handleKeyDown(
-                eventKeyCode: eventKeyCode,
-                targetKeyCode: targetKeyCode,
-                modifiersMatch: modifiersMatch,
-                isRepeat: event.isARepeat
-            )
+    // MARK: - Carbon Hotkey Registration
 
-        case .keyUp:
-            handleKeyUp(
-                eventKeyCode: eventKeyCode,
-                targetKeyCode: targetKeyCode
-            )
-
-        case .flagsChanged:
-            // Handle modifier key release (e.g., user releases Cmd before Space)
-            handleModifierChange(
-                currentFlags: event.modifierFlags,
-                requiredFlags: requiredFlags
-            )
-
-        default:
-            break
-        }
-    }
-
-    /// Handle keyDown event for hold-to-record
-    private func handleKeyDown(
-        eventKeyCode: Int,
-        targetKeyCode: Int,
-        modifiersMatch: Bool,
-        isRepeat: Bool
-    ) {
-        // Ignore key repeat events
-        guard !isRepeat else { return }
-
-        // Check if this is our registered hotkey
-        guard eventKeyCode == targetKeyCode && modifiersMatch else { return }
-
-        // Only start if we're idle
-        guard case .idle = holdState else { return }
-
-        holdState = .keyDown(startTime: Date())
-        AppLogger.service.debug("Hold hotkey: keyDown detected")
-
-        // Trigger onKeyDown callback immediately
-        onKeyDownCallback?()
-
-        // Transition to recording state
-        holdState = .recording
-    }
-
-    /// Handle keyUp event for hold-to-record
-    private func handleKeyUp(
-        eventKeyCode: Int,
-        targetKeyCode: Int
-    ) {
-        // Check if this is our registered hotkey being released
-        guard eventKeyCode == targetKeyCode else { return }
-
-        // Only process if we're in recording state
-        guard case .recording = holdState else {
-            // If we're in keyDown but not yet recording, still handle release
-            if case let .keyDown(startTime) = holdState {
-                let duration = Date().timeIntervalSince(startTime)
-                completeHold(duration: duration)
-            }
-            return
-        }
-
-        // Calculate hold duration (use minimum if we don't have start time)
-        let duration = minimumHoldDuration
-        completeHold(duration: duration)
-    }
-
-    /// Handle modifier key changes for hold-to-record
-    private func handleModifierChange(
-        currentFlags: NSEvent.ModifierFlags,
-        requiredFlags: NSEvent.ModifierFlags
-    ) {
-        let relevantFlags: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
-        let currentRelevant = currentFlags.intersection(relevantFlags)
-
-        // If modifiers no longer match while recording, treat as release
-        if case .recording = holdState {
-            if currentRelevant != requiredFlags {
-                AppLogger.service.debug("Hold hotkey: modifier released during recording")
-                completeHold(duration: minimumHoldDuration)
-            }
-        }
-    }
-
-    /// Complete the hold-to-record cycle
-    private func completeHold(duration: TimeInterval) {
-        holdState = .releasing
-        AppLogger.service.debug("Hold hotkey: completing hold, duration=\(duration)s")
-
-        // Only trigger if held for minimum duration
-        if duration >= minimumHoldDuration {
-            onKeyUpCallback?(duration)
-        } else {
-            AppLogger.service.debug("Hold too short (\(duration)s), minimum is \(self.minimumHoldDuration)s")
-        }
-
-        // Reset to idle
-        holdState = .idle
-    }
-
-    // MARK: - Private Helpers
-
-    /// Convert our KeyModifier array to NSEvent.ModifierFlags
-    private func convertToNSEventModifiers(_ modifiers: [KeyModifier]) -> NSEvent.ModifierFlags {
-        var flags: NSEvent.ModifierFlags = []
+    /// Register hotkey using Carbon API
+    private func registerCarbonHotkey(keyCode: Int, modifiers: [KeyModifier]) throws {
+        // Convert modifiers to Carbon format
+        var carbonModifiers: UInt32 = 0
         for modifier in modifiers {
             switch modifier {
-            case .command: flags.insert(.command)
-            case .control: flags.insert(.control)
-            case .option: flags.insert(.option)
-            case .shift: flags.insert(.shift)
+            case .command: carbonModifiers |= UInt32(cmdKey)
+            case .control: carbonModifiers |= UInt32(controlKey)
+            case .option: carbonModifiers |= UInt32(optionKey)
+            case .shift: carbonModifiers |= UInt32(shiftKey)
             }
         }
-        return flags
+
+        // Set up event type spec for hotkey events
+        var eventTypes = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased))
+        ]
+
+        // Install event handler
+        let status = InstallEventHandler(
+            GetApplicationEventTarget(),
+            carbonHotkeyCallback,
+            eventTypes.count,
+            &eventTypes,
+            nil,
+            &eventHandlerRef
+        )
+
+        guard status == noErr else {
+            throw HotkeyError.installationFailed("Failed to install Carbon event handler: \(status)")
+        }
+
+        // Register the hotkey
+        let registerStatus = RegisterEventHotKey(
+            UInt32(keyCode),
+            carbonModifiers,
+            hotkeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotkeyRef
+        )
+
+        guard registerStatus == noErr else {
+            // Clean up event handler if registration failed
+            if let handler = eventHandlerRef {
+                RemoveEventHandler(handler)
+                eventHandlerRef = nil
+                deinitEventHandlerRef = nil
+            }
+            throw HotkeyError.registrationFailed("Failed to register hotkey: \(registerStatus)")
+        }
+
+        // Sync deinit copies for nonisolated cleanup
+        deinitHotkeyRef = hotkeyRef
+        deinitEventHandlerRef = eventHandlerRef
     }
 
     /// Unregister current hotkey
     func unregisterHotkey() {
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-            AppLogger.service.debug("Unregistered global hotkey")
+        // Unregister hotkey
+        if let hotkey = hotkeyRef {
+            UnregisterEventHotKey(hotkey)
+            hotkeyRef = nil
+            deinitHotkeyRef = nil
+            AppLogger.service.debug("Unregistered Carbon hotkey")
+        }
+
+        // Remove event handler
+        if let handler = eventHandlerRef {
+            RemoveEventHandler(handler)
+            eventHandlerRef = nil
+            deinitEventHandlerRef = nil
         }
 
         registeredKeyCode = nil
@@ -301,15 +206,53 @@ class HotkeyService {
         holdState = .idle
     }
 
+    // MARK: - Event Handling
+
+    /// Handle hotkey pressed event from Carbon
+    func handleHotkeyPressed() {
+        if isHoldMode {
+            // Hold-to-record mode: start recording
+            let startTime = Date()
+            holdState = .recording(startTime: startTime)
+            AppLogger.service.debug("Hold hotkey: pressed")
+            onKeyDownCallback?()
+        } else {
+            // Toggle mode: invoke callback
+            callback?()
+        }
+    }
+
+    /// Handle hotkey released event from Carbon
+    func handleHotkeyReleased() {
+        guard isHoldMode else { return }
+
+        switch holdState {
+        case .recording(let startTime):
+            let duration = Date().timeIntervalSince(startTime)
+            AppLogger.service.debug("Hold hotkey: released after \(duration)s")
+
+            if duration >= minimumHoldDuration {
+                onKeyUpCallback?(duration)
+            } else {
+                AppLogger.service.debug("Hold too short (\(duration)s), minimum is \(self.minimumHoldDuration)s")
+            }
+            holdState = .idle
+
+        default:
+            holdState = .idle
+        }
+    }
+
     /// Check if a hotkey conflicts with system shortcuts
     func checkConflict(keyCode: Int, modifiers: [KeyModifier]) -> Bool {
-        // Common system shortcuts
+        // Common system shortcuts to avoid
         let systemShortcuts: [(keyCode: Int, modifiers: Set<KeyModifier>)] = [
-            (36, [.command]), // Cmd+Enter
-            (48, [.command]), // Cmd+Tab
-            (49, [.command]), // Cmd+Space (Spotlight)
-            (12, [.command]), // Cmd+Q (Quit)
-            (13, [.command]) // Cmd+W (Close window)
+            (36, [.command]),          // Cmd+Enter
+            (48, [.command]),          // Cmd+Tab
+            (49, [.command]),          // Cmd+Space (Spotlight)
+            (49, [.command, .control]), // Cmd+Ctrl+Space (Emoji picker)
+            (12, [.command]),          // Cmd+Q (Quit)
+            (13, [.command])           // Cmd+W (Close window)
         ]
 
         let modifierSet = Set(modifiers)
@@ -332,15 +275,11 @@ class HotkeyService {
     /// - Parameter duration: Simulated hold duration
     func simulateHoldCycle(duration: TimeInterval = 0.5) {
         guard isHoldMode else {
-            // Fall back to regular press if not in hold mode
             callback?()
             return
         }
 
-        // Simulate keyDown
         onKeyDownCallback?()
-
-        // Simulate keyUp after duration
         if duration >= minimumHoldDuration {
             onKeyUpCallback?(duration)
         }
@@ -350,6 +289,32 @@ class HotkeyService {
     var currentHoldState: HoldState {
         holdState
     }
+}
+
+// MARK: - Carbon Callback
+
+/// Carbon event handler callback (must be a C function pointer)
+private func carbonHotkeyCallback(
+    nextHandler: EventHandlerCallRef?,
+    event: EventRef?,
+    userData: UnsafeMutableRawPointer?
+) -> OSStatus {
+    guard let event = event else { return OSStatus(eventNotHandledErr) }
+
+    let eventKind = GetEventKind(event)
+
+    // Dispatch to main actor
+    Task { @MainActor in
+        guard let service = HotkeyService.sharedInstance else { return }
+
+        if eventKind == UInt32(kEventHotKeyPressed) {
+            service.handleHotkeyPressed()
+        } else if eventKind == UInt32(kEventHotKeyReleased) {
+            service.handleHotkeyReleased()
+        }
+    }
+
+    return noErr
 }
 
 /// Errors related to hotkey registration

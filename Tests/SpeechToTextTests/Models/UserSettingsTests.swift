@@ -14,7 +14,8 @@ final class UserSettingsTests: XCTestCase {
     }
 
     func test_defaultSettings_hotkey_hasCorrectModifiers() {
-        XCTAssertEqual(UserSettings.default.hotkey.modifiers, [.command, .control])
+        // Default uses Control+Shift+Space to avoid conflict with macOS emoji picker (Cmd+Ctrl+Space)
+        XCTAssertEqual(UserSettings.default.hotkey.modifiers, [.control, .shift])
     }
 
     func test_defaultSettings_hotkey_isEnabled() {

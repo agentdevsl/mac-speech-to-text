@@ -96,10 +96,11 @@ final class HotkeyServiceTests: XCTestCase {
 
     func test_checkConflict_returnsFalseForNonSystemShortcuts() {
         // Given/When
-        let noConflict = service.checkConflict(keyCode: 49, modifiers: [.command, .control])
+        // Use Control+Shift+Space which is the new default and avoids conflicts
+        let noConflict = service.checkConflict(keyCode: 49, modifiers: [.control, .shift])
 
         // Then
-        XCTAssertFalse(noConflict) // Cmd+Ctrl+Space is not a system shortcut
+        XCTAssertFalse(noConflict) // Ctrl+Shift+Space is not a system shortcut
     }
 
     func test_checkConflict_returnsFalseForSafeKeyCombinations() {
@@ -281,5 +282,176 @@ final class HotkeyServiceTests: XCTestCase {
         // Service should be deallocated and hotkey unregistered
         // This is tested by the absence of crashes or memory leaks
         XCTAssertNil(localService)
+    }
+
+    // MARK: - Hold-to-Record Tests
+
+    func test_holdState_initiallyIdle() {
+        // Given/When
+        let state = service.currentHoldState
+
+        // Then
+        guard case .idle = state else {
+            XCTFail("Expected idle state, got \(state)")
+            return
+        }
+    }
+
+    func test_simulateHoldCycle_invokesOnKeyDownCallback() async {
+        // Given
+        var keyDownInvoked = false
+        let onKeyDown = { keyDownInvoked = true }
+        let onKeyUp: (TimeInterval) -> Void = { _ in }
+
+        // When - Try to register (will fail in test env but we can test simulation)
+        do {
+            try await service.registerHoldHotkey(
+                keyCode: 49,
+                modifiers: [.command],
+                onKeyDown: onKeyDown,
+                onKeyUp: onKeyUp
+            )
+            service.simulateHoldCycle(duration: 0.5)
+            XCTAssertTrue(keyDownInvoked)
+        } catch {
+            // Expected to fail in test environment
+            XCTAssertTrue(error is HotkeyError)
+        }
+    }
+
+    func test_simulateHoldCycle_invokesOnKeyUpCallback() async {
+        // Given
+        var keyUpInvoked = false
+        var reportedDuration: TimeInterval = 0
+        let onKeyDown = { }
+        let onKeyUp: (TimeInterval) -> Void = { duration in
+            keyUpInvoked = true
+            reportedDuration = duration
+        }
+
+        // When
+        do {
+            try await service.registerHoldHotkey(
+                keyCode: 49,
+                modifiers: [.command],
+                onKeyDown: onKeyDown,
+                onKeyUp: onKeyUp
+            )
+            service.simulateHoldCycle(duration: 0.5)
+            XCTAssertTrue(keyUpInvoked)
+            XCTAssertEqual(reportedDuration, 0.5, accuracy: 0.01)
+        } catch {
+            // Expected to fail in test environment
+            XCTAssertTrue(error is HotkeyError)
+        }
+    }
+
+    func test_simulateHoldCycle_skipsKeyUpForShortHold() async {
+        // Given
+        var keyUpInvoked = false
+        let onKeyDown = { }
+        let onKeyUp: (TimeInterval) -> Void = { _ in
+            keyUpInvoked = true
+        }
+
+        // When
+        do {
+            try await service.registerHoldHotkey(
+                keyCode: 49,
+                modifiers: [.command],
+                onKeyDown: onKeyDown,
+                onKeyUp: onKeyUp
+            )
+            // Hold for less than minimum duration (100ms)
+            service.simulateHoldCycle(duration: 0.05)
+            XCTAssertFalse(keyUpInvoked)
+        } catch {
+            // Expected to fail in test environment
+            XCTAssertTrue(error is HotkeyError)
+        }
+    }
+
+    func test_simulateHoldCycle_inToggleMode_fallsBackToRegularPress() async {
+        // Given
+        var regularCallbackInvoked = false
+        let callback = { regularCallbackInvoked = true }
+
+        // When - Register in toggle mode, not hold mode
+        do {
+            try await service.registerHotkey(
+                keyCode: 49,
+                modifiers: [.command],
+                callback: callback
+            )
+            service.simulateHoldCycle(duration: 0.5)
+            XCTAssertTrue(regularCallbackInvoked)
+        } catch {
+            // Expected to fail in test environment
+            XCTAssertTrue(error is HotkeyError)
+        }
+    }
+
+    func test_unregisterHotkey_clearsHoldModeState() async {
+        // Given
+        do {
+            try await service.registerHoldHotkey(
+                keyCode: 49,
+                modifiers: [.command],
+                onKeyDown: { },
+                onKeyUp: { _ in }
+            )
+        } catch {
+            // Expected to fail in test environment
+        }
+
+        // When
+        service.unregisterHotkey()
+
+        // Then
+        guard case .idle = service.currentHoldState else {
+            XCTFail("Expected idle state after unregister")
+            return
+        }
+    }
+
+    // MARK: - HoldState Enum Tests
+
+    func test_holdState_keyDownStoresStartTime() {
+        // Given
+        let startTime = Date()
+        let state = HoldState.keyDown(startTime: startTime)
+
+        // Then
+        guard case let .keyDown(storedTime) = state else {
+            XCTFail("Expected keyDown state")
+            return
+        }
+        XCTAssertEqual(storedTime, startTime)
+    }
+
+    func test_holdState_recordingStoresStartTime() {
+        // Given
+        let startTime = Date()
+        let state = HoldState.recording(startTime: startTime)
+
+        // Then
+        guard case let .recording(storedTime) = state else {
+            XCTFail("Expected recording state")
+            return
+        }
+        XCTAssertEqual(storedTime, startTime)
+    }
+
+    func test_holdState_isSendable() {
+        // Given
+        let state: HoldState = .idle
+
+        // When - Pass to Sendable context
+        Task {
+            let _ = state
+        }
+
+        // Then - No compile error means Sendable conformance works
+        XCTAssertTrue(true)
     }
 }

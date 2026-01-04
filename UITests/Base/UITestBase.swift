@@ -286,111 +286,162 @@ class UITestBase: XCTestCase {
     }
 }
 
-// MARK: - Welcome Flow Helpers
+// MARK: - Main View Helpers (New Unified UI)
 
 extension UITestBase {
-    /// Wait for the welcome view to appear
+    /// Wait for the main window to appear
     /// - Parameter timeout: Timeout in seconds
-    /// - Returns: true if welcome view appears within timeout
+    /// - Returns: true if main window appears within timeout
     @discardableResult
-    func waitForWelcomeView(timeout: TimeInterval? = nil) -> Bool {
-        let welcomeView = app.otherElements["welcomeView"]
-        return welcomeView.waitForExistence(timeout: timeout ?? extendedTimeout)
+    func waitForMainWindow(timeout: TimeInterval? = nil) -> Bool {
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        return mainWindow.waitForExistence(timeout: timeout ?? extendedTimeout)
     }
 
-    /// Dismiss the welcome screen by tapping "Get Started"
-    /// - Returns: true if dismissal succeeded
+    /// Wait for the main view content to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if main view appears within timeout
     @discardableResult
-    func dismissWelcome() -> Bool {
-        let getStartedButton = app.buttons["getStartedButton"]
-        if getStartedButton.waitForExistence(timeout: defaultTimeout) && getStartedButton.isEnabled {
-            getStartedButton.tap()
+    func waitForMainView(timeout: TimeInterval? = nil) -> Bool {
+        let mainView = app.otherElements["mainView"]
+        return mainView.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Wait for the home section to appear (first launch experience)
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if home section appears within timeout
+    @discardableResult
+    func waitForHomeSection(timeout: TimeInterval? = nil) -> Bool {
+        let homeSection = app.otherElements["homeSection"]
+        return homeSection.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Get the main window element
+    func getMainWindow() -> XCUIElement? {
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        if mainWindow.waitForExistence(timeout: extendedTimeout) {
+            return mainWindow
+        }
+        return nil
+    }
+
+    /// Navigate to a specific section in the sidebar
+    /// - Parameter sectionId: The accessibility identifier of the sidebar item (e.g., "sidebarHome", "sidebarGeneral")
+    /// - Returns: true if navigation succeeded
+    @discardableResult
+    func navigateToSection(_ sectionId: String) -> Bool {
+        let sidebarItem = app.otherElements[sectionId]
+        if sidebarItem.waitForExistence(timeout: defaultTimeout) {
+            sidebarItem.tap()
+            return true
+        }
+        // Try as button
+        let sidebarButton = app.buttons[sectionId]
+        if sidebarButton.waitForExistence(timeout: 2) {
+            sidebarButton.tap()
             return true
         }
         return false
     }
 
-    /// Get the welcome view element
-    func getWelcomeView() -> XCUIElement? {
-        let welcomeView = app.otherElements["welcomeView"]
-        if welcomeView.waitForExistence(timeout: extendedTimeout) {
-            return welcomeView
+    /// Close the main window using the quit button
+    /// - Returns: true if quit succeeded
+    @discardableResult
+    func closeMainWindow() -> Bool {
+        let quitButton = app.buttons["quitButton"]
+        if quitButton.waitForExistence(timeout: defaultTimeout) && quitButton.isEnabled {
+            quitButton.tap()
+            return true
+        }
+        return false
+    }
+}
+
+// MARK: - Glass Overlay Helpers
+
+extension UITestBase {
+    /// Wait for the glass recording overlay to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if overlay appears within timeout
+    @discardableResult
+    func waitForGlassOverlay(timeout: TimeInterval? = nil) -> Bool {
+        let overlay = app.otherElements["glassRecordingOverlay"]
+        return overlay.waitForExistence(timeout: timeout ?? extendedTimeout)
+    }
+
+    /// Get the glass overlay element
+    func getGlassOverlay() -> XCUIElement? {
+        let overlay = app.otherElements["glassRecordingOverlay"]
+        if overlay.waitForExistence(timeout: defaultTimeout) {
+            return overlay
         }
         return nil
     }
 
-    /// Navigate through onboarding steps by clicking Next/Continue buttons
-    /// - Parameters:
-    ///   - stepsToAdvance: Number of steps to advance (default: navigate to completion)
-    ///   - checkForGetStarted: Whether to stop and click "Get Started" button
-    /// - Returns: true if navigation succeeded
-    /// - Note: Deprecated - use dismissWelcome() for new single-screen welcome flow
+    /// Check if overlay is in recording state
+    func isOverlayRecording() -> Bool {
+        let statusText = app.staticTexts["overlayStatusText"]
+        if statusText.waitForExistence(timeout: 2) {
+            return statusText.label.contains("Recording")
+        }
+        return false
+    }
+
+    /// Check if overlay is in transcribing state
+    func isOverlayTranscribing() -> Bool {
+        let statusText = app.staticTexts["overlayStatusText"]
+        if statusText.waitForExistence(timeout: 2) {
+            return statusText.label.contains("Transcribing")
+        }
+        return false
+    }
+}
+
+// MARK: - Legacy Welcome Flow Helpers (Compatibility)
+
+extension UITestBase {
+    /// Wait for the welcome view to appear
+    /// - Parameter timeout: Timeout in seconds
+    /// - Returns: true if welcome view appears within timeout
+    /// - Note: Maps to waitForMainWindow for new UI structure
+    @discardableResult
+    func waitForWelcomeView(timeout: TimeInterval? = nil) -> Bool {
+        // New UI: MainWindow with HomeSection serves as welcome
+        return waitForMainWindow(timeout: timeout) || waitForHomeSection(timeout: timeout)
+    }
+
+    /// Dismiss the welcome screen
+    /// - Returns: true if dismissal succeeded
+    /// - Note: In new UI, window stays open - use closeMainWindow() to close
+    @discardableResult
+    func dismissWelcome() -> Bool {
+        // New UI doesn't have a "Get Started" button - the window stays open
+        // Closing the window is done via the quit button or window close button
+        return closeMainWindow()
+    }
+
+    /// Get the welcome view element
+    /// - Note: Returns main window for compatibility
+    func getWelcomeView() -> XCUIElement? {
+        return getMainWindow()
+    }
+
+    /// Navigate through onboarding steps
+    /// - Note: Deprecated - new UI uses single-window NavigationSplitView
     @discardableResult
     func navigateOnboardingSteps(count stepsToAdvance: Int = 5, clickGetStarted: Bool = true) -> Bool {
-        // For new welcome flow, just dismiss directly
-        if waitForWelcomeView(timeout: 2) {
-            return dismissWelcome()
-        }
-
-        // Legacy multi-step onboarding flow
-        for step in 0..<stepsToAdvance {
-            // Check if we've reached the completion step
-            let getStartedButton = app.buttons["Get Started"]
-            if getStartedButton.waitForExistence(timeout: 1) && getStartedButton.isEnabled {
-                if clickGetStarted {
-                    getStartedButton.tap()
-                }
-                return true
-            }
-
-            // Try accessibility identifier first (works for all steps)
-            let nextButtonById = app.buttons.matching(
-                NSPredicate(format: "identifier == 'nextButton'")
-            ).firstMatch
-
-            if nextButtonById.waitForExistence(timeout: 2) && nextButtonById.isEnabled {
-                nextButtonById.tap()
-            } else if step == 0 {
-                // Step 0 uses "Continue" button label
-                let continueButton = app.buttons["Continue"]
-                if continueButton.waitForExistence(timeout: 1) && continueButton.isEnabled {
-                    continueButton.tap()
-                }
-            } else {
-                // Steps 1+ use "Next" button label
-                let nextButton = app.buttons["Next"]
-                if nextButton.waitForExistence(timeout: 1) && nextButton.isEnabled {
-                    nextButton.tap()
-                }
-            }
-
-            // Wait for UI to update after navigation
-            _ = app.windows.firstMatch.waitForExistence(timeout: 1)
-        }
-        return true
+        // New UI doesn't have multi-step onboarding
+        return waitForMainWindow()
     }
 
-    /// Get the onboarding window (checks both identifier and title)
-    /// - Note: Deprecated - use getWelcomeView() for new single-screen welcome flow
+    /// Get the onboarding window
+    /// - Note: Returns main window for compatibility
     func getOnboardingWindow() -> XCUIElement? {
-        // Try new welcome view first
-        let welcomeView = app.otherElements["welcomeView"]
-        if welcomeView.waitForExistence(timeout: 3) {
-            return welcomeView
-        }
-
-        // Legacy onboarding window
-        let windowById = app.windows.matching(
-            NSPredicate(format: "identifier == 'onboardingWindow'")
-        ).firstMatch
-        let windowByTitle = app.windows["Welcome to Speech-to-Text"]
-
-        if windowById.waitForExistence(timeout: extendedTimeout) {
-            return windowById
-        } else if windowByTitle.waitForExistence(timeout: 3) {
-            return windowByTitle
-        }
-        return nil
+        return getMainWindow()
     }
 }
 

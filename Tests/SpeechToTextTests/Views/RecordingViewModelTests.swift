@@ -614,6 +614,19 @@ final class RecordingViewModelTests: XCTestCase {
         // Then
         XCTAssertFalse(sut.showAccessibilityPrompt)
     }
+
+    // MARK: - setClipboardOnlyMode Tests
+
+    func test_setClipboardOnlyMode_hidesPrompt() {
+        // Given
+        sut.showAccessibilityPrompt = true
+
+        // When
+        sut.setClipboardOnlyMode()
+
+        // Then
+        XCTAssertFalse(sut.showAccessibilityPrompt)
+    }
 }
 
 // MARK: - Mock Services

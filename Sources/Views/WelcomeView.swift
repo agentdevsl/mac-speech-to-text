@@ -131,23 +131,44 @@ struct WelcomeView: View {
                 Spacer()
             }
 
-            Button {
-                Task {
-                    await viewModel.requestMicrophonePermission()
-                }
-            } label: {
-                Text("Grant Microphone Access")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color("AmberPrimary", bundle: nil))
-            .accessibilityIdentifier("grantMicrophoneButton")
+            if viewModel.errorMessage != nil {
+                // Permission was denied - show Open Settings button
+                VStack(spacing: 8) {
+                    Button {
+                        viewModel.openMicrophoneSettings()
+                    } label: {
+                        HStack {
+                            Image(systemName: "gear")
+                            Text("Open System Settings")
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color("AmberPrimary", bundle: nil))
+                    .accessibilityIdentifier("openMicrophoneSettingsButton")
 
-            if let error = viewModel.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
+                    Text("Grant access in Privacy & Security → Microphone")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+
+                    Text("The app will detect when you grant permission")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            } else {
+                // First time - show request button
+                Button {
+                    Task {
+                        await viewModel.requestMicrophonePermission()
+                    }
+                } label: {
+                    Text("Grant Microphone Access")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color("AmberPrimary", bundle: nil))
+                .accessibilityIdentifier("grantMicrophoneButton")
             }
         }
     }
@@ -240,8 +261,8 @@ struct WelcomeView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 4) {
-                    KeyCapView(symbol: "\u{2318}")
-                    KeyCapView(symbol: "\u{2303}")
+                    KeyCapView(symbol: "\u{2303}") // Control
+                    KeyCapView(symbol: "\u{21E7}") // Shift
                     KeyCapView(text: "Space")
                 }
 
@@ -250,11 +271,12 @@ struct WelcomeView: View {
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Press Command Control Space anywhere to record")
+            .accessibilityLabel("Press Control Shift Space anywhere to record")
 
             // Get Started button
             Button {
                 viewModel.complete()
+                dismiss()
             } label: {
                 Text("Get Started")
                     .font(.headline)

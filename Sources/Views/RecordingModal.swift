@@ -67,6 +67,35 @@ struct RecordingModal: View {
                     errorView(message: errorMessage)
                 }
 
+                // Inline microphone permission prompt
+                // Shows when microphone access is denied during recording
+                if viewModel.showMicrophonePrompt {
+                    InlineMicrophonePrompt(
+                        onOpenSettings: {
+                            viewModel.openMicrophoneSettings()
+                        },
+                        onCancel: {
+                            viewModel.dismissMicrophonePrompt()
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // Inline accessibility prompt (Phase 2.3)
+                // Shows after first transcription if accessibility not granted
+                if viewModel.showAccessibilityPrompt {
+                    InlineAccessibilityPrompt(
+                        onEnableAutoPaste: {
+                            viewModel.openAccessibilitySettings()
+                            viewModel.dismissAccessibilityPrompt()
+                        },
+                        onUseClipboardOnly: {
+                            viewModel.setClipboardOnlyMode()
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
                 // Action buttons
                 actionButtons
             }
