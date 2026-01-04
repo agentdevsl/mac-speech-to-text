@@ -80,9 +80,25 @@ final class RecordingViewModel {
     @ObservationIgnored private var lastTalkingTime: Date?
     @ObservationIgnored private var isAudioCaptureActive: Bool = false
     @ObservationIgnored private var microphonePermissionPollingTask: Task<Void, Never>?
+
+    /// Flag to prevent double-firing of inactivity timeout (race condition fix)
+    @ObservationIgnored private var inactivityTimeoutTriggered: Bool = false
+
+    /// Session ID at start of operation - used to detect stale session after await
+    @ObservationIgnored private var currentSessionId: UUID?
+
+    /// Flag to prevent state transitions during active operation (race condition fix)
+    @ObservationIgnored private var isTransitioning: Bool = false
+
     // nonisolated copies for deinit access (deinit cannot access MainActor-isolated state)
+    // SAFETY: These are written on MainActor during init/setup, read in deinit after all refs released.
+    // The isBeingDeallocated flag prevents notification handlers from running during deallocation.
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
     @ObservationIgnored private nonisolated(unsafe) var deinitInactivityTimer: Timer?
+    @ObservationIgnored private nonisolated(unsafe) var isBeingDeallocated: Bool = false
+
+    /// Shared permission service instance (avoids state fragmentation from multiple instances)
+    @ObservationIgnored private let permissionService: PermissionService
 
     /// Unique ID for logging
     @ObservationIgnored private let viewModelId: String
@@ -94,7 +110,8 @@ final class RecordingViewModel {
         fluidAudioService: any FluidAudioServiceProtocol = FluidAudioService(),
         textInsertionService: TextInsertionService = TextInsertionService(),
         settingsService: SettingsService = SettingsService(),
-        statisticsService: StatisticsService = StatisticsService()
+        statisticsService: StatisticsService = StatisticsService(),
+        permissionService: PermissionService = PermissionService()
     ) {
         self.viewModelId = UUID().uuidString.prefix(8).description
         self.audioService = audioService
@@ -102,6 +119,7 @@ final class RecordingViewModel {
         self.textInsertionService = textInsertionService
         self.settingsService = settingsService
         self.statisticsService = statisticsService
+        self.permissionService = permissionService
         // Get current language from settings (T068)
         self.currentLanguage = settingsService.load().language.defaultLanguage
         AppLogger.lifecycle(AppLogger.viewModel, self, event: "init[\(viewModelId)]")
@@ -110,6 +128,8 @@ final class RecordingViewModel {
     }
 
     deinit {
+        // Set deallocation flag FIRST to prevent notification handlers from executing
+        isBeingDeallocated = true
         AppLogger.trace(AppLogger.viewModel, "RecordingViewModel[\(viewModelId)] deallocating")
         if let observer = deinitLanguageSwitchObserver { NotificationCenter.default.removeObserver(observer) }
         deinitInactivityTimer?.invalidate()
@@ -119,24 +139,32 @@ final class RecordingViewModel {
     // MARK: - Language Switch Observer
 
     private func setupLanguageSwitchObserver() {
+        // Guard against duplicate observer registration (bug fix)
+        if let existing = languageSwitchObserver {
+            NotificationCenter.default.removeObserver(existing)
+            languageSwitchObserver = nil
+            deinitLanguageSwitchObserver = nil
+        }
+
         // Listen for language switch notifications (T064, T067)
-        // Note: We use queue: nil to receive on posting queue, then explicitly
-        // defer to MainActor. This prevents the notification from firing synchronously
-        // during SwiftUI view body evaluation which could cause @Observable re-entrancy.
+        // Note: We use queue: .main to ensure synchronous removal in deinit prevents races.
+        // The isBeingDeallocated flag provides additional protection against handler execution
+        // during deallocation.
         let observer = NotificationCenter.default.addObserver(
             forName: .switchLanguage,
             object: nil,
-            queue: nil  // Receive on posting thread, not main queue
+            queue: .main  // Use main queue for synchronous deinit removal
         ) { [weak self] notification in
-            guard let languageCode = notification.userInfo?["languageCode"] as? String else {
+            guard let self,
+                  !self.isBeingDeallocated,
+                  let languageCode = notification.userInfo?["languageCode"] as? String else {
                 return
             }
 
-            // Use Task.detached to ensure we don't inherit any context that might
-            // be in the middle of SwiftUI view evaluation. This creates a completely
-            // new async context that will run after current synchronous work completes.
-            Task.detached { @MainActor [weak self] in
-                guard let self else { return }
+            // Use Task to defer to next run loop iteration, avoiding @Observable re-entrancy
+            // during SwiftUI view body evaluation
+            Task { @MainActor [weak self] in
+                guard let self, !self.isBeingDeallocated else { return }
                 await self.handleLanguageSwitch(to: languageCode)
             }
         }
@@ -146,6 +174,12 @@ final class RecordingViewModel {
 
     /// Handle language switch - extracted to avoid @Observable mutations during notification delivery
     private func handleLanguageSwitch(to languageCode: String) async {
+        // Re-entrancy guard: prevent concurrent language switches (bug fix)
+        guard !isLanguageSwitching else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Language switch already in progress, ignoring")
+            return
+        }
+
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] handleLanguageSwitch to \(languageCode)")
         isLanguageSwitching = true
         currentLanguage = languageCode
@@ -168,21 +202,34 @@ final class RecordingViewModel {
     func startRecording() async throws {
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] startRecording() called, isRecording=\(isRecording)")
 
+        // Transition guard: prevent concurrent start calls racing through cancel (bug fix)
+        guard !isTransitioning else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: transition in progress, ignoring")
+            throw RecordingError.alreadyRecording
+        }
+
         // Reset stale state if needed (defensive - handles edge cases where state wasn't cleaned up)
         if isRecording {
             AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: found stale recording state, resetting")
+            isTransitioning = true
             await cancelRecording()
+            isTransitioning = false
         }
 
-        // Clear previous state
+        // Clear ALL previous state (bug fix: previously missed permission prompts)
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Clearing previous state")
         errorMessage = nil
         transcribedText = ""
         confidence = 0.0
+        showAccessibilityPrompt = false
+        showMicrophonePrompt = false
+        lastTranscriptionCopiedToClipboard = false
+        inactivityTimeoutTriggered = false
 
         // Create new recording session with state set to recording
         let settings = settingsService.load()
         let sessionId = UUID()
+        currentSessionId = sessionId  // Track session ID for staleness detection
         currentSession = RecordingSession(
             id: sessionId,
             startTime: Date(),
@@ -215,8 +262,12 @@ final class RecordingViewModel {
             // Don't throw - we're waiting for permission
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed: \(error.localizedDescription)")
+            // Update session state before clearing (bug fix: preserve error info for debugging)
+            currentSession?.state = .cancelled
+            currentSession?.errorMessage = error.localizedDescription
             isRecording = false
             currentSession = nil
+            currentSessionId = nil
             throw RecordingError.audioCaptureFailed(error.localizedDescription)
         }
     }
@@ -267,6 +318,9 @@ final class RecordingViewModel {
 
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] stopRecording error: \(error.localizedDescription)")
+            // Update session state on error (bug fix: consistent error state tracking)
+            currentSession?.state = .cancelled
+            currentSession?.errorMessage = error.localizedDescription
             errorMessage = error.localizedDescription
             throw error
         }
@@ -285,6 +339,7 @@ final class RecordingViewModel {
         inactivityTimer?.invalidate()
         inactivityTimer = nil
         deinitInactivityTimer = nil
+        inactivityTimeoutTriggered = false  // Reset timeout flag
         microphonePermissionPollingTask?.cancel()
         microphonePermissionPollingTask = nil
 
@@ -307,6 +362,7 @@ final class RecordingViewModel {
         currentSession?.state = .cancelled
         currentSession?.errorMessage = "User cancelled"
         currentSession = nil
+        currentSessionId = nil  // Clear session tracking
 
         // Reset state
         audioLevel = 0.0
@@ -450,6 +506,17 @@ final class RecordingViewModel {
     /// Called when microphone permission is granted (either by polling or manually)
     func onMicrophonePermissionGranted() async {
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] onMicrophonePermissionGranted() called")
+
+        // State validation: ensure we're still in a valid waiting state (bug fix)
+        guard isRecording, currentSession != nil, !isAudioCaptureActive else {
+            AppLogger.warning(
+                AppLogger.viewModel,
+                "[\(viewModelId)] onMicrophonePermissionGranted: invalid state (isRecording=\(isRecording), " +
+                "hasSession=\(currentSession != nil), isAudioCaptureActive=\(isAudioCaptureActive))"
+            )
+            return
+        }
+
         showMicrophonePrompt = false
         microphonePermissionPollingTask?.cancel()
         microphonePermissionPollingTask = nil
@@ -466,8 +533,12 @@ final class RecordingViewModel {
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture started after permission granted")
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed after permission: \(error.localizedDescription)")
+            // Update session state before clearing (bug fix: consistent error handling)
+            currentSession?.state = .cancelled
+            currentSession?.errorMessage = error.localizedDescription
             isRecording = false
             currentSession = nil
+            currentSessionId = nil
             errorMessage = "Audio capture failed: \(error.localizedDescription)"
         }
     }
@@ -483,6 +554,9 @@ final class RecordingViewModel {
             throw RecordingError.noActiveSession
         }
 
+        // Capture session ID at start to detect staleness after await
+        let startSessionId = currentSessionId
+
         AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isTranscribing")
         isTranscribing = true
         session.state = .transcribing
@@ -494,6 +568,13 @@ final class RecordingViewModel {
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Initializing FluidAudio with language=\(settings.language.defaultLanguage)")
             try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
 
+            // Check for session cancellation after await (bug fix: staleness detection)
+            guard currentSessionId == startSessionId, currentSession != nil else {
+                AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during FluidAudio init")
+                isTranscribing = false
+                throw RecordingError.noActiveSession
+            }
+
             // Transcribe
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
             let result = try await fluidAudioService.transcribe(samples: samples)
@@ -502,10 +583,17 @@ final class RecordingViewModel {
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
             )
 
-            // Update session
-            session.transcribedText = result.text
-            session.confidenceScore = Double(result.confidence)
-            currentSession = session
+            // Check for session cancellation after await (bug fix: staleness detection)
+            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+                AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during transcription")
+                isTranscribing = false
+                throw RecordingError.noActiveSession
+            }
+
+            // Update session - re-fetch to avoid stale copy issues
+            currentSession.transcribedText = result.text
+            currentSession.confidenceScore = Double(result.confidence)
+            self.currentSession = currentSession
 
             // Update local state
             transcribedText = result.text
@@ -522,9 +610,12 @@ final class RecordingViewModel {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
-            session.errorMessage = error.localizedDescription
-            session.state = .cancelled
-            currentSession = session
+            // Re-fetch session to avoid overwriting concurrent changes (bug fix)
+            if var currentSession = currentSession, currentSessionId == startSessionId {
+                currentSession.errorMessage = error.localizedDescription
+                currentSession.state = .cancelled
+                self.currentSession = currentSession
+            }
             throw RecordingError.transcriptionFailed(error.localizedDescription)
         }
     }
@@ -538,6 +629,9 @@ final class RecordingViewModel {
             throw RecordingError.noActiveSession
         }
 
+        // Capture session ID at start to detect staleness after await
+        let startSessionId = currentSessionId
+
         AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isInserting")
         isInserting = true
         session.state = .inserting
@@ -549,25 +643,35 @@ final class RecordingViewModel {
             try await textInsertionService.insertText(text)
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text insertion successful")
 
-            session.insertionSuccess = true
-            session.state = .completed
-            currentSession = session
+            // Check for session cancellation after await (bug fix: staleness detection)
+            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+                AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during text insertion")
+                isInserting = false
+                throw RecordingError.noActiveSession
+            }
+
+            currentSession.insertionSuccess = true
+            currentSession.state = .completed
+            self.currentSession = currentSession
 
             AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
             isInserting = false
 
             // Save statistics
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
-            await saveStatistics(session: session)
+            await saveStatistics(session: currentSession)
 
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Text insertion failed: \(error.localizedDescription)")
             isInserting = false
             errorMessage = "Text insertion failed: \(error.localizedDescription)"
-            session.errorMessage = error.localizedDescription
-            session.insertionSuccess = false
-            session.state = .cancelled
-            currentSession = session
+            // Re-fetch session to avoid overwriting concurrent changes (bug fix)
+            if var currentSession = currentSession, currentSessionId == startSessionId {
+                currentSession.errorMessage = error.localizedDescription
+                currentSession.insertionSuccess = false
+                currentSession.state = .cancelled
+                self.currentSession = currentSession
+            }
             throw RecordingError.textInsertionFailed(error.localizedDescription)
         }
     }
@@ -584,6 +688,9 @@ final class RecordingViewModel {
             throw RecordingError.noActiveSession
         }
 
+        // Capture session ID at start to detect staleness after await
+        let startSessionId = currentSessionId
+
         AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isTranscribing")
         isTranscribing = true
         session.state = .transcribing
@@ -595,6 +702,13 @@ final class RecordingViewModel {
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Initializing FluidAudio with language=\(settings.language.defaultLanguage)")
             try await fluidAudioService.initialize(language: settings.language.defaultLanguage)
 
+            // Check for session cancellation after await (bug fix: staleness detection)
+            guard currentSessionId == startSessionId, currentSession != nil else {
+                AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during FluidAudio init")
+                isTranscribing = false
+                throw RecordingError.noActiveSession
+            }
+
             // Transcribe
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
             let result = try await fluidAudioService.transcribe(samples: samples)
@@ -603,10 +717,17 @@ final class RecordingViewModel {
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
             )
 
-            // Update session
-            session.transcribedText = result.text
-            session.confidenceScore = Double(result.confidence)
-            currentSession = session
+            // Check for session cancellation after await (bug fix: staleness detection)
+            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+                AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during transcription")
+                isTranscribing = false
+                throw RecordingError.noActiveSession
+            }
+
+            // Update session - re-fetch to avoid stale copy issues
+            currentSession.transcribedText = result.text
+            currentSession.confidenceScore = Double(result.confidence)
+            self.currentSession = currentSession
 
             // Update local state
             transcribedText = result.text
@@ -623,9 +744,12 @@ final class RecordingViewModel {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
-            session.errorMessage = error.localizedDescription
-            session.state = .cancelled
-            currentSession = session
+            // Re-fetch session to avoid overwriting concurrent changes (bug fix)
+            if var currentSession = currentSession, currentSessionId == startSessionId {
+                currentSession.errorMessage = error.localizedDescription
+                currentSession.state = .cancelled
+                self.currentSession = currentSession
+            }
             throw RecordingError.transcriptionFailed(error.localizedDescription)
         }
     }
@@ -639,6 +763,9 @@ final class RecordingViewModel {
             throw RecordingError.noActiveSession
         }
 
+        // Capture session ID at start to detect staleness after await
+        let startSessionId = currentSessionId
+
         AppLogger.stateChange(AppLogger.viewModel, from: false, to: true, context: "isInserting")
         isInserting = true
         session.state = .inserting
@@ -647,15 +774,22 @@ final class RecordingViewModel {
         // Use fallback-aware insertion
         let insertionResult = await textInsertionService.insertTextWithFallback(text)
 
+        // Check for session cancellation after await (bug fix: staleness detection)
+        guard currentSessionId == startSessionId, var currentSession = currentSession else {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during text insertion")
+            isInserting = false
+            throw RecordingError.noActiveSession
+        }
+
         switch insertionResult {
         case .insertedViaAccessibility:
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text inserted via accessibility")
-            session.insertionSuccess = true
+            currentSession.insertionSuccess = true
             lastTranscriptionCopiedToClipboard = false
 
         case .copiedToClipboardOnly(let reason):
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text copied to clipboard: \(String(describing: reason))")
-            session.insertionSuccess = true // Clipboard copy is still a success
+            currentSession.insertionSuccess = true // Clipboard copy is still a success
             lastTranscriptionCopiedToClipboard = true
 
             // Don't show prompt for user preference or if already dismissed
@@ -670,20 +804,20 @@ final class RecordingViewModel {
 
         case .requiresAccessibilityPermission:
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Showing accessibility permission prompt")
-            session.insertionSuccess = true // Clipboard copy is still a success
+            currentSession.insertionSuccess = true // Clipboard copy is still a success
             lastTranscriptionCopiedToClipboard = true
             showAccessibilityPrompt = true
         }
 
-        session.state = .completed
-        currentSession = session
+        currentSession.state = .completed
+        self.currentSession = currentSession
 
         AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
         isInserting = false
 
         // Save statistics
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
-        await saveStatistics(session: session)
+        await saveStatistics(session: currentSession)
     }
 
     /// Handle audio level update - detect talking and manage inactivity timer
@@ -701,10 +835,18 @@ final class RecordingViewModel {
     /// Start the inactivity timer that checks for prolonged silence
     private func startInactivityTimer() {
         inactivityTimer?.invalidate()
+        inactivityTimeoutTriggered = false  // Reset flag on timer start
 
         // Check every second if we've exceeded the inactivity timeout
-        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task.detached { @MainActor [weak self] in
+        // Using synchronous callback on main run loop (Timer runs on main), then dispatch to MainActor
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            // Timer callbacks run on main run loop which is MainActor-compatible
+            // Use explicit @MainActor Task to ensure proper isolation (bug fix)
+            Task { @MainActor [weak self] in
                 self?.checkInactivity()
             }
         }
@@ -715,26 +857,38 @@ final class RecordingViewModel {
 
     /// Check if inactivity timeout has been exceeded
     private func checkInactivity() {
-        guard isRecording, let lastTalking = lastTalkingTime else { return }
+        // Guard against double-triggering (bug fix: race condition between timer fires)
+        guard isRecording, !inactivityTimeoutTriggered, let lastTalking = lastTalkingTime else { return }
 
         let silenceDuration = Date().timeIntervalSince(lastTalking)
 
         if silenceDuration >= Constants.Audio.inactivityTimeout {
+            // Set flag BEFORE invalidating to prevent concurrent triggers
+            inactivityTimeoutTriggered = true
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Inactivity timeout reached (\(String(format: "%.1f", silenceDuration))s of silence)")
             // Invalidate timer immediately to prevent multiple timeout triggers
             inactivityTimer?.invalidate()
             inactivityTimer = nil
             deinitInactivityTimer = nil
-            Task { await onInactivityTimeout() }
+            Task { @MainActor [weak self] in
+                await self?.onInactivityTimeout()
+            }
         }
     }
 
     /// Called when inactivity timeout is reached
     private func onInactivityTimeout() async {
-        guard isRecording else { return }
+        // Double-check recording state and timeout flag (bug fix: race with manual stop)
+        guard isRecording, inactivityTimeoutTriggered else {
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] onInactivityTimeout: state changed, skipping")
+            return
+        }
         do {
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Auto-stopping recording due to inactivity")
             try await stopRecording()
+        } catch RecordingError.notRecording {
+            // Expected if user manually stopped - not an error
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Recording already stopped when inactivity triggered")
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to stop on inactivity: \(error.localizedDescription)")
             errorMessage = "Failed to stop recording: \(error.localizedDescription)"
@@ -747,17 +901,16 @@ extension RecordingViewModel {
     /// Check microphone permission and show prompt if not granted
     /// Returns true if permission is granted, false if prompt is shown
     fileprivate func ensureMicrophonePermission() async throws {
-        let svc = PermissionService()
-
+        // Use shared permissionService to avoid state fragmentation (bug fix)
         // Check if already granted
-        if await svc.checkMicrophonePermission() {
+        if await permissionService.checkMicrophonePermission() {
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Microphone permission already granted")
             return
         }
 
         // Try requesting permission (shows system dialog if not determined)
         do {
-            try await svc.requestMicrophonePermission()
+            try await permissionService.requestMicrophonePermission()
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Microphone permission granted via system dialog")
             return
         } catch PermissionError.microphoneDenied {
@@ -776,29 +929,30 @@ extension RecordingViewModel {
 
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting microphone permission polling")
 
-        microphonePermissionPollingTask = Task { [weak self] in
-            let svc = PermissionService()
+        // Use explicit @MainActor to ensure proper isolation (bug fix)
+        microphonePermissionPollingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
 
             while !Task.isCancelled {
                 // Wait 1 second between polls
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, !self.isBeingDeallocated else { break }
 
-                // Check if permission is now granted
-                if await svc.checkMicrophonePermission() {
+                // Check if permission is now granted using shared service (bug fix)
+                if await self.permissionService.checkMicrophonePermission() {
                     AppLogger.info(
                         AppLogger.viewModel,
-                        "[\(self?.viewModelId ?? "??")] Microphone permission granted via polling"
+                        "[\(self.viewModelId)] Microphone permission granted via polling"
                     )
-                    await self?.onMicrophonePermissionGranted()
+                    await self.onMicrophonePermissionGranted()
                     break
                 }
             }
 
             AppLogger.debug(
                 AppLogger.viewModel,
-                "[\(self?.viewModelId ?? "??")] Microphone permission polling stopped"
+                "[\(self.viewModelId)] Microphone permission polling stopped"
             )
         }
     }
