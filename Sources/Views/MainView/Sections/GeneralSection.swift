@@ -440,29 +440,26 @@ private struct GeneralToggleRow: View {
 
 // MARK: - Key Badge
 
-/// Styled badge for displaying keyboard keys
+/// Styled keyboard key badge - matches GlassKeyboardKey from HomeSection
 private struct KeyBadge: View {
     @Environment(\.colorScheme) private var colorScheme
     let text: String
 
     var body: some View {
         Text(text)
-            .font(.system(.caption, design: .rounded, weight: .semibold))
-            .foregroundStyle(Color.textPrimary)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                colorScheme == .dark
-                    ? Color.white.opacity(0.1)
-                    : Color(white: 0.95)
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(
-                        colorScheme == .dark
-                            ? Color.white.opacity(0.2)
-                            : Color.black.opacity(0.15),
+                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1),
                         lineWidth: 1
                     )
             )
