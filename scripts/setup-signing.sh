@@ -205,7 +205,7 @@ validate_certificate_name() {
     fi
 
     # Check for invalid characters (basic validation)
-    if [[ "$name" =~ [/\\:\*\?\"\'<>\|] ]]; then
+    if [[ "$name" =~ [/\\:\*\?\"\'\<\>\|] ]]; then
         print_error "Certificate name contains invalid characters"
         echo ""
         echo "  Invalid characters: / \\ : * ? \" ' < > |"

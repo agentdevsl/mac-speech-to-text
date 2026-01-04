@@ -99,6 +99,7 @@ class AudioCaptureService {
     private var streamingBuffer: StreamingAudioBuffer?
     private var bufferProcessor: AudioBufferProcessor?
     private let serviceId: String
+    private var isCapturing: Bool = false
 
     init() {
         inputNode = audioEngine.inputNode
@@ -114,14 +115,28 @@ class AudioCaptureService {
     func startCapture(levelCallback: @escaping @Sendable (Double) -> Void) async throws {
         AppLogger.info(AppLogger.audio, "[\(serviceId)] startCapture() called")
 
+        // Guard against concurrent capture attempts
+        guard !isCapturing else {
+            AppLogger.warning(AppLogger.audio, "[\(serviceId)] startCapture() called while already capturing")
+            throw AudioCaptureError.alreadyCapturing
+        }
+        isCapturing = true
+
+        do {
+            try await performCapture(levelCallback: levelCallback)
+        } catch {
+            isCapturing = false
+            throw error
+        }
+    }
+
+    /// Internal capture implementation
+    private func performCapture(levelCallback: @escaping @Sendable (Double) -> Void) async throws {
         let buffer = StreamingAudioBuffer()
         streamingBuffer = buffer
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] StreamingAudioBuffer created")
 
         // Check microphone permission
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Checking microphone permission...")
         let microphonePermission = await PermissionService().checkMicrophonePermission()
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Microphone permission: \(microphonePermission)")
         guard microphonePermission else {
             AppLogger.error(AppLogger.audio, "[\(serviceId)] Microphone permission denied")
             throw PermissionError.microphoneDenied
@@ -129,46 +144,27 @@ class AudioCaptureService {
 
         // Use the input node's native format to avoid hardware incompatibility issues
         let nativeFormat = inputNode.outputFormat(forBus: 0)
-        AppLogger.debug(
-            AppLogger.audio,
-            "[\(serviceId)] Native format: sampleRate=\(nativeFormat.sampleRate), channels=\(nativeFormat.channelCount), commonFormat=\(nativeFormat.commonFormat.rawValue)"
-        )
-
         guard nativeFormat.sampleRate > 0 && nativeFormat.channelCount > 0 else {
             AppLogger.error(AppLogger.audio, "[\(serviceId)] Invalid audio format detected")
             throw AudioCaptureError.invalidFormat
         }
 
-        // Create processor with captured references (no self needed in tap closure)
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Creating AudioBufferProcessor...")
-        let processor = AudioBufferProcessor(
-            streamingBuffer: buffer,
-            levelCallback: levelCallback
-        )
+        // Create processor and install tap
+        let processor = AudioBufferProcessor(streamingBuffer: buffer, levelCallback: levelCallback)
         bufferProcessor = processor
-
-        // Install tap - processor handles everything, no self reference needed
-        // CRITICAL: Mark closure as @Sendable to break @MainActor isolation inheritance.
-        // This closure is called from Core Audio's real-time thread, NOT MainActor.
-        let chunkSize = Constants.Audio.chunkSize
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Installing tap with bufferSize=\(chunkSize)")
         inputNode.installTap(
             onBus: 0,
-            bufferSize: AVAudioFrameCount(chunkSize),
+            bufferSize: AVAudioFrameCount(Constants.Audio.chunkSize),
             format: nativeFormat
         ) { @Sendable buffer, time in
-            // processor is @unchecked Sendable and handles its own thread safety
             processor.process(buffer, time: time)
         }
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Tap installed successfully")
 
         // Start audio engine
-        AppLogger.debug(AppLogger.audio, "[\(serviceId)] Starting audio engine...")
         do {
             try audioEngine.start()
             AppLogger.info(AppLogger.audio, "[\(serviceId)] Audio engine started successfully")
         } catch {
-            AppLogger.error(AppLogger.audio, "[\(serviceId)] Audio engine failed to start: \(error.localizedDescription)")
             inputNode.removeTap(onBus: 0)
             throw AudioCaptureError.engineStartFailed(error.localizedDescription)
         }
@@ -207,6 +203,7 @@ class AudioCaptureService {
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Clearing state...")
         self.streamingBuffer = nil
         self.bufferProcessor = nil
+        self.isCapturing = false
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] State cleared")
 
         return samples
@@ -218,6 +215,7 @@ enum AudioCaptureError: Error, LocalizedError, Equatable, Sendable {
     case invalidFormat
     case noDataRecorded
     case engineStartFailed(String)
+    case alreadyCapturing
 
     var errorDescription: String? {
         switch self {
@@ -227,6 +225,8 @@ enum AudioCaptureError: Error, LocalizedError, Equatable, Sendable {
             return "No audio data was recorded"
         case .engineStartFailed(let message):
             return "Failed to start audio engine: \(message)"
+        case .alreadyCapturing:
+            return "Audio capture is already in progress"
         }
     }
 }
