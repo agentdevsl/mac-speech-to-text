@@ -1,4 +1,3 @@
-// swiftlint:disable file_length type_body_length
 // SettingsTests.swift
 // macOS Local Speech-to-Text Application
 //
@@ -42,7 +41,6 @@ final class SettingsTests: UITestBase {
 
         if sidebarItem.waitForExistence(timeout: 3) {
             sidebarItem.click()
-            sleep(1)
 
             // Verify content loaded if contentId provided
             if let contentId = contentId {
@@ -54,6 +52,11 @@ final class SettingsTests: UITestBase {
                 let scrollContent = app.scrollViews[contentId].firstMatch
                 return scrollContent.waitForExistence(timeout: 2)
             }
+            // Wait for any section content to appear
+            let anyContent = app.otherElements.matching(
+                NSPredicate(format: "identifier CONTAINS[c] 'SectionContent'")
+            ).firstMatch
+            _ = anyContent.waitForExistence(timeout: 2)
             return true
         }
 
@@ -64,7 +67,11 @@ final class SettingsTests: UITestBase {
 
         if labelItem.waitForExistence(timeout: 2) {
             labelItem.click()
-            sleep(1)
+            // Wait for any section content to appear
+            let anyContent = app.otherElements.matching(
+                NSPredicate(format: "identifier CONTAINS[c] 'SectionContent'")
+            ).firstMatch
+            _ = anyContent.waitForExistence(timeout: 2)
             return true
         }
 
@@ -76,7 +83,9 @@ final class SettingsTests: UITestBase {
     /// SE-001: Test that main window opens with sidebar navigation
     func test_settings_mainWindowOpens() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         captureScreenshot(named: "SE-001-App-Launched")
 
@@ -92,7 +101,7 @@ final class SettingsTests: UITestBase {
         )
 
         // Verify sidebar exists
-        let sidebar = app.otherElements["mainViewSidebar"]
+        let sidebar = app.otherElements[AccessibilityIDs.MainWindow.sidebar]
         if sidebar.waitForExistence(timeout: 3) {
             captureScreenshot(named: "SE-001-Sidebar-Found")
         }
@@ -103,7 +112,9 @@ final class SettingsTests: UITestBase {
     /// SE-002: Test Home section displays correctly
     func test_settings_homeSectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -113,15 +124,18 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-002-Before-Home-Navigation")
 
         // Navigate to Home section
-        let navigated = navigateAndVerify(sidebarId: "sidebarHome", contentId: "homeSection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.home,
+            contentId: AccessibilityIDs.HomeSection.container
+        )
 
         captureScreenshot(named: "SE-002-Home-Section")
 
         if navigated {
             // Verify Home section elements
-            let heroSection = app.otherElements["heroSection"]
-            let permissionCards = app.otherElements["permissionCards"]
-            let typingPreview = app.otherElements["typingPreview"]
+            let heroSection = app.otherElements[AccessibilityIDs.HomeSection.hero]
+            let permissionCards = app.otherElements[AccessibilityIDs.HomeSection.permissionCards]
+            let typingPreview = app.otherElements[AccessibilityIDs.HomeSection.typingPreview]
 
             let hasHomeElements = heroSection.exists || permissionCards.exists || typingPreview.exists
 
@@ -137,7 +151,9 @@ final class SettingsTests: UITestBase {
     /// SE-003: Test General section with recording mode, toggles, and hotkey
     func test_settings_generalSectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -147,15 +163,18 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-003-Before-General-Navigation")
 
         // Navigate to General section
-        let navigated = navigateAndVerify(sidebarId: "sidebarGeneral", contentId: "generalSection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.general,
+            contentId: AccessibilityIDs.GeneralSection.container
+        )
 
         captureScreenshot(named: "SE-003-General-Section")
 
         if navigated {
             // Verify General section elements
-            let recordingModeSection = app.otherElements["recordingModeSection"]
-            let behaviorSection = app.otherElements["behaviorSection"]
-            let hotkeySection = app.otherElements["hotkeySection"]
+            let recordingModeSection = app.otherElements[AccessibilityIDs.GeneralSection.recordingMode]
+            let behaviorSection = app.otherElements[AccessibilityIDs.GeneralSection.behaviorSection]
+            let hotkeySection = app.otherElements[AccessibilityIDs.GeneralSection.hotkeySection]
 
             let hasGeneralElements = recordingModeSection.exists
                 || behaviorSection.exists || hotkeySection.exists
@@ -167,30 +186,39 @@ final class SettingsTests: UITestBase {
             }
 
             // Test recording mode cards
-            let holdToRecordCard = app.buttons["holdToRecordCard"]
-            let toggleModeCard = app.buttons["toggleModeCard"]
+            let holdToRecordCard = app.buttons[AccessibilityIDs.GeneralSection.holdToRecordCard]
+            let toggleModeCard = app.buttons[AccessibilityIDs.GeneralSection.toggleModeCard]
 
             if holdToRecordCard.waitForExistence(timeout: 2) {
                 holdToRecordCard.click()
-                sleep(1)
+                // Wait for selection state to update
+                let selectedPredicate = NSPredicate(format: "isSelected == true")
+                let expectation1 = XCTNSPredicateExpectation(predicate: selectedPredicate, object: holdToRecordCard)
+                _ = XCTWaiter.wait(for: [expectation1], timeout: 2)
                 captureScreenshot(named: "SE-003-Hold-To-Record-Selected")
             }
 
             if toggleModeCard.waitForExistence(timeout: 2) {
                 toggleModeCard.click()
-                sleep(1)
+                // Wait for selection state to update
+                let selectedPredicate = NSPredicate(format: "isSelected == true")
+                let expectation2 = XCTNSPredicateExpectation(predicate: selectedPredicate, object: toggleModeCard)
+                _ = XCTWaiter.wait(for: [expectation2], timeout: 2)
                 captureScreenshot(named: "SE-003-Toggle-Mode-Selected")
             }
 
             // Test behavior toggles
-            let launchAtLoginToggle = app.switches["launchAtLoginToggle"]
-            let autoInsertToggle = app.switches["autoInsertToggle"]
-            let copyToClipboardToggle = app.switches["copyToClipboardToggle"]
+            let launchAtLoginToggle = app.switches[AccessibilityIDs.GeneralSection.launchAtLoginToggle]
+            let autoInsertToggle = app.switches[AccessibilityIDs.GeneralSection.autoInsertToggle]
+            let copyToClipboardToggle = app.switches[AccessibilityIDs.GeneralSection.copyToClipboardToggle]
 
             if launchAtLoginToggle.waitForExistence(timeout: 2) {
                 let wasOn = launchAtLoginToggle.value as? String == "1"
                 launchAtLoginToggle.click()
-                sleep(1)
+                // Wait for toggle value to change
+                let valuePredicate = NSPredicate(format: "value != %@", wasOn ? "1" : "0")
+                let expectation3 = XCTNSPredicateExpectation(predicate: valuePredicate, object: launchAtLoginToggle)
+                _ = XCTWaiter.wait(for: [expectation3], timeout: 2)
                 captureScreenshot(named: "SE-003-Launch-Toggle-Changed")
                 print("Launch at login toggle changed: \(wasOn) -> \(launchAtLoginToggle.value ?? "unknown")")
             }
@@ -210,7 +238,9 @@ final class SettingsTests: UITestBase {
     /// SE-004: Test Audio section with sliders and toggles
     func test_settings_audioSectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -220,15 +250,18 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-004-Before-Audio-Navigation")
 
         // Navigate to Audio section
-        let navigated = navigateAndVerify(sidebarId: "sidebarAudio", contentId: "audioSection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.audio,
+            contentId: AccessibilityIDs.AudioSection.container
+        )
 
         captureScreenshot(named: "SE-004-Audio-Section")
 
         if navigated {
             // Verify Audio section elements
-            let sensitivitySection = app.otherElements["sensitivitySection"]
-            let silenceThresholdSection = app.otherElements["silenceThresholdSection"]
-            let processingSection = app.otherElements["processingSection"]
+            let sensitivitySection = app.otherElements[AccessibilityIDs.AudioSection.sensitivitySection]
+            let silenceThresholdSection = app.otherElements[AccessibilityIDs.AudioSection.silenceThresholdSection]
+            let processingSection = app.otherElements[AccessibilityIDs.AudioSection.processingSection]
 
             let hasAudioElements = sensitivitySection.exists
                 || silenceThresholdSection.exists || processingSection.exists
@@ -238,36 +271,57 @@ final class SettingsTests: UITestBase {
             }
 
             // Test sensitivity slider
-            let sensitivitySlider = app.sliders["sensitivitySlider"]
+            let sensitivitySlider = app.sliders[AccessibilityIDs.AudioSection.sensitivitySlider]
             if sensitivitySlider.waitForExistence(timeout: 2) {
                 let initialValue = sensitivitySlider.value as? String ?? ""
                 sensitivitySlider.adjust(toNormalizedSliderPosition: 0.7)
-                sleep(1)
+                // Wait for slider value to update
+                let sliderValuePredicate = NSPredicate(format: "value != %@", initialValue)
+                let sliderExpectation = XCTNSPredicateExpectation(
+                    predicate: sliderValuePredicate,
+                    object: sensitivitySlider
+                )
+                _ = XCTWaiter.wait(for: [sliderExpectation], timeout: 2)
                 captureScreenshot(named: "SE-004-Sensitivity-Adjusted")
                 print("Sensitivity slider adjusted: \(initialValue) -> \(sensitivitySlider.value ?? "unknown")")
             }
 
             // Test silence threshold slider
-            let silenceThresholdSlider = app.sliders["silenceThresholdSlider"]
+            let silenceThresholdSlider = app.sliders[AccessibilityIDs.AudioSection.silenceThresholdSlider]
             if silenceThresholdSlider.waitForExistence(timeout: 2) {
+                let initialThresholdValue = silenceThresholdSlider.value as? String ?? ""
                 silenceThresholdSlider.adjust(toNormalizedSliderPosition: 0.5)
-                sleep(1)
+                // Wait for slider value to update
+                let thresholdPredicate = NSPredicate(format: "value != %@", initialThresholdValue)
+                let thresholdExpectation = XCTNSPredicateExpectation(
+                    predicate: thresholdPredicate,
+                    object: silenceThresholdSlider
+                )
+                _ = XCTWaiter.wait(for: [thresholdExpectation], timeout: 2)
                 captureScreenshot(named: "SE-004-Silence-Threshold-Adjusted")
             }
 
             // Test audio processing toggles
-            let noiseSuppressionToggle = app.switches["noiseSuppressionToggle"]
-            let autoGainControlToggle = app.switches["autoGainControlToggle"]
+            let noiseSuppressionToggle = app.switches[AccessibilityIDs.AudioSection.noiseSuppressionToggle]
+            let autoGainControlToggle = app.switches[AccessibilityIDs.AudioSection.autoGainToggle]
 
             if noiseSuppressionToggle.waitForExistence(timeout: 2) {
+                let wasNoiseOn = noiseSuppressionToggle.value as? String == "1"
                 noiseSuppressionToggle.click()
-                sleep(1)
+                // Wait for toggle value to change
+                let noisePredicate = NSPredicate(format: "value != %@", wasNoiseOn ? "1" : "0")
+                let noiseExpectation = XCTNSPredicateExpectation(predicate: noisePredicate, object: noiseSuppressionToggle)
+                _ = XCTWaiter.wait(for: [noiseExpectation], timeout: 2)
                 captureScreenshot(named: "SE-004-Noise-Suppression-Toggle")
             }
 
             if autoGainControlToggle.waitForExistence(timeout: 2) {
+                let wasGainOn = autoGainControlToggle.value as? String == "1"
                 autoGainControlToggle.click()
-                sleep(1)
+                // Wait for toggle value to change
+                let gainPredicate = NSPredicate(format: "value != %@", wasGainOn ? "1" : "0")
+                let gainExpectation = XCTNSPredicateExpectation(predicate: gainPredicate, object: autoGainControlToggle)
+                _ = XCTWaiter.wait(for: [gainExpectation], timeout: 2)
                 captureScreenshot(named: "SE-004-Auto-Gain-Toggle")
             }
         }
@@ -278,7 +332,9 @@ final class SettingsTests: UITestBase {
     /// SE-005: Test Language section with picker and auto-detect toggle
     func test_settings_languageSectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -288,15 +344,18 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-005-Before-Language-Navigation")
 
         // Navigate to Language section
-        let navigated = navigateAndVerify(sidebarId: "sidebarLanguage", contentId: "languageSection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.language,
+            contentId: AccessibilityIDs.LanguageSection.container
+        )
 
         captureScreenshot(named: "SE-005-Language-Section")
 
         if navigated {
             // Verify Language section elements
-            let currentLanguage = app.otherElements["languageSection.currentLanguage"]
-            let autoDetectToggle = app.switches["languageSection.autoDetectToggle"]
-            let recentLanguages = app.otherElements["languageSection.recentLanguages"]
+            let currentLanguage = app.otherElements[AccessibilityIDs.LanguageSection.currentLanguage]
+            let autoDetectToggle = app.switches[AccessibilityIDs.LanguageSection.autoDetectToggle]
+            let recentLanguages = app.otherElements[AccessibilityIDs.LanguageSection.recentLanguages]
 
             if currentLanguage.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-005-Current-Language-Card")
@@ -307,24 +366,35 @@ final class SettingsTests: UITestBase {
             if autoDetectToggle.waitForExistence(timeout: 2) {
                 let wasOn = autoDetectToggle.value as? String == "1"
                 autoDetectToggle.click()
-                sleep(1)
+                // Wait for toggle value to change
+                let autoDetectPredicate = NSPredicate(format: "value != %@", wasOn ? "1" : "0")
+                let autoDetectExpectation = XCTNSPredicateExpectation(
+                    predicate: autoDetectPredicate,
+                    object: autoDetectToggle
+                )
+                _ = XCTWaiter.wait(for: [autoDetectExpectation], timeout: 2)
                 captureScreenshot(named: "SE-005-Auto-Detect-Toggle")
                 print("Auto-detect toggle changed: \(wasOn) -> \(autoDetectToggle.value ?? "unknown")")
             }
 
             // Test language picker expansion
-            let allLanguagesToggle = app.buttons["languageSection.allLanguagesToggle"]
+            let allLanguagesToggle = app.buttons[AccessibilityIDs.LanguageSection.allLanguagesToggle]
             if allLanguagesToggle.waitForExistence(timeout: 2) {
                 allLanguagesToggle.click()
-                sleep(1)
+                // Wait for language list to appear
+                let languageList = app.otherElements[AccessibilityIDs.LanguageSection.languageList]
+                _ = languageList.waitForExistence(timeout: 2)
                 captureScreenshot(named: "SE-005-Language-Picker-Expanded")
 
                 // Test search field
-                let searchField = app.textFields["languageSection.searchField"]
+                let searchField = app.textFields[AccessibilityIDs.LanguageSection.searchField]
                 if searchField.waitForExistence(timeout: 2) {
                     searchField.click()
                     searchField.typeText("English")
-                    sleep(1)
+                    // Wait for search results to filter
+                    let searchResultsExpectation = expectation(description: "Search results filter")
+                    searchResultsExpectation.isInverted = true
+                    wait(for: [searchResultsExpectation], timeout: 1.0)
                     captureScreenshot(named: "SE-005-Language-Search")
                 }
             }
@@ -341,7 +411,9 @@ final class SettingsTests: UITestBase {
     /// SE-006: Test Privacy section with toggles, storage policy, and retention slider
     func test_settings_privacySectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -351,52 +423,66 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-006-Before-Privacy-Navigation")
 
         // Navigate to Privacy section
-        let navigated = navigateAndVerify(sidebarId: "sidebarPrivacy", contentId: "privacySection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.privacy,
+            contentId: AccessibilityIDs.PrivacySection.container
+        )
 
         captureScreenshot(named: "SE-006-Privacy-Section")
 
         if navigated {
             // Verify local processing card
-            let localProcessingCard = app.otherElements["privacySection.localProcessing"]
+            let localProcessingCard = app.otherElements[AccessibilityIDs.PrivacySection.localProcessing]
             if localProcessingCard.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-006-Local-Processing-Card")
                 print("Local processing card found - privacy assured")
             }
 
             // Test anonymous stats toggle
-            let statsToggle = app.switches["privacySection.statsToggle"]
+            let statsToggle = app.switches[AccessibilityIDs.PrivacySection.statsToggle]
             if statsToggle.waitForExistence(timeout: 2) {
                 let wasOn = statsToggle.value as? String == "1"
                 statsToggle.click()
-                sleep(1)
+                // Wait for toggle value to change
+                let statsPredicate = NSPredicate(format: "value != %@", wasOn ? "1" : "0")
+                let statsExpectation = XCTNSPredicateExpectation(predicate: statsPredicate, object: statsToggle)
+                _ = XCTWaiter.wait(for: [statsExpectation], timeout: 2)
                 captureScreenshot(named: "SE-006-Stats-Toggle")
                 print("Stats toggle changed: \(wasOn) -> \(statsToggle.value ?? "unknown")")
             }
 
             // Test storage policy options
-            let storagePolicySection = app.otherElements["privacySection.storagePolicy"]
+            let storagePolicySection = app.otherElements[AccessibilityIDs.PrivacySection.storagePolicy]
             if storagePolicySection.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-006-Storage-Policy-Section")
 
                 // Try selecting persistent storage to reveal retention slider
-                let persistentOption = app.buttons["privacySection.storage.persistent"]
+                let persistentOption = app.buttons[AccessibilityIDs.PrivacySection.persistentStorage]
                 if persistentOption.waitForExistence(timeout: 2) {
                     persistentOption.click()
-                    sleep(1)
+                    // Wait for retention slider to appear
+                    let retentionSlider = app.sliders[AccessibilityIDs.PrivacySection.retentionSlider]
+                    _ = retentionSlider.waitForExistence(timeout: 2)
                     captureScreenshot(named: "SE-006-Persistent-Storage-Selected")
 
                     // Test data retention slider
-                    let retentionSlider = app.sliders["privacySection.retentionSlider"]
-                    if retentionSlider.waitForExistence(timeout: 2) {
+                    if retentionSlider.exists {
+                        let initialRetentionValue = retentionSlider.value as? String ?? ""
                         retentionSlider.adjust(toNormalizedSliderPosition: 0.5)
-                        sleep(1)
+                        // Wait for slider value to update
+                        let retentionPredicate = NSPredicate(format: "value != %@", initialRetentionValue)
+                        let retentionExpectation = XCTNSPredicateExpectation(
+                            predicate: retentionPredicate,
+                            object: retentionSlider
+                        )
+                        _ = XCTWaiter.wait(for: [retentionExpectation], timeout: 2)
                         captureScreenshot(named: "SE-006-Retention-Slider-Adjusted")
                     }
                 }
             }
 
             // Verify privacy footer
-            let privacyFooter = app.otherElements["privacySection.footer"]
+            let privacyFooter = app.otherElements[AccessibilityIDs.PrivacySection.footer]
             if privacyFooter.exists {
                 captureScreenshot(named: "SE-006-Privacy-Footer")
             }
@@ -408,7 +494,9 @@ final class SettingsTests: UITestBase {
     /// SE-007: Test About section with app info and links
     func test_settings_aboutSectionNavigation() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -418,33 +506,36 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-007-Before-About-Navigation")
 
         // Navigate to About section
-        let navigated = navigateAndVerify(sidebarId: "sidebarAbout", contentId: "aboutSection")
+        let navigated = navigateAndVerify(
+            sidebarId: AccessibilityIDs.Sidebar.about,
+            contentId: AccessibilityIDs.AboutSection.container
+        )
 
         captureScreenshot(named: "SE-007-About-Section")
 
         if navigated {
             // Verify app identity section
-            let identitySection = app.otherElements["aboutSection.identity"]
+            let identitySection = app.otherElements[AccessibilityIDs.AboutSection.identity]
             if identitySection.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-007-App-Identity")
                 print("App identity section found")
             }
 
             // Verify keyboard shortcuts section
-            let shortcutsSection = app.otherElements["aboutSection.shortcuts"]
+            let shortcutsSection = app.otherElements[AccessibilityIDs.AboutSection.shortcuts]
             if shortcutsSection.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-007-Keyboard-Shortcuts")
             }
 
             // Verify links section
-            let linksSection = app.otherElements["aboutSection.links"]
+            let linksSection = app.otherElements[AccessibilityIDs.AboutSection.links]
             if linksSection.waitForExistence(timeout: 2) {
                 captureScreenshot(named: "SE-007-Links-Section")
 
                 // Verify support and privacy links exist
-                let supportLink = app.buttons["aboutSection.supportLink"]
-                let privacyLink = app.buttons["aboutSection.privacyLink"]
-                let acknowledgementsLink = app.buttons["aboutSection.acknowledgementsLink"]
+                let supportLink = app.buttons[AccessibilityIDs.AboutSection.supportLink]
+                let privacyLink = app.buttons[AccessibilityIDs.AboutSection.privacyLink]
+                let acknowledgementsLink = app.buttons[AccessibilityIDs.AboutSection.acknowledgementsLink]
 
                 let hasLinks = supportLink.exists || privacyLink.exists || acknowledgementsLink.exists
                 if hasLinks {
@@ -453,7 +544,7 @@ final class SettingsTests: UITestBase {
             }
 
             // Verify copyright footer
-            let copyrightFooter = app.otherElements["aboutSection.copyright"]
+            let copyrightFooter = app.otherElements[AccessibilityIDs.AboutSection.copyright]
             if copyrightFooter.exists {
                 captureScreenshot(named: "SE-007-Copyright-Footer")
             }
@@ -465,7 +556,9 @@ final class SettingsTests: UITestBase {
     /// SE-008: Test navigation between all sections
     func test_settings_navigationBetweenSections() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -474,12 +567,12 @@ final class SettingsTests: UITestBase {
 
         // Define sections to navigate through
         let sections: [(id: String, name: String)] = [
-            ("sidebarHome", "Home"),
-            ("sidebarGeneral", "General"),
-            ("sidebarAudio", "Audio"),
-            ("sidebarLanguage", "Language"),
-            ("sidebarPrivacy", "Privacy"),
-            ("sidebarAbout", "About")
+            (AccessibilityIDs.Sidebar.home, "Home"),
+            (AccessibilityIDs.Sidebar.general, "General"),
+            (AccessibilityIDs.Sidebar.audio, "Audio"),
+            (AccessibilityIDs.Sidebar.language, "Language"),
+            (AccessibilityIDs.Sidebar.privacy, "Privacy"),
+            (AccessibilityIDs.Sidebar.about, "About")
         ]
 
         var successCount = 0
@@ -490,7 +583,7 @@ final class SettingsTests: UITestBase {
             if navigateAndVerify(sidebarId: section.id) {
                 successCount += 1
                 captureScreenshot(named: "SE-008-\(section.name)-Section")
-                sleep(1)
+                // navigateAndVerify already waits for content to load
             } else {
                 print("Note: Failed to navigate to \(section.name)")
             }
@@ -511,7 +604,9 @@ final class SettingsTests: UITestBase {
     /// SE-009: Test quit button in sidebar
     func test_settings_quitButtonFunctionality() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -521,7 +616,7 @@ final class SettingsTests: UITestBase {
         captureScreenshot(named: "SE-009-Before-Quit")
 
         // Find quit button
-        let quitButton = app.buttons["quitButton"]
+        let quitButton = app.buttons[AccessibilityIDs.Sidebar.quitButton]
 
         if quitButton.waitForExistence(timeout: 3) {
             captureScreenshot(named: "SE-009-Quit-Button-Found")
@@ -544,7 +639,9 @@ final class SettingsTests: UITestBase {
     /// SE-010: Test that Escape key behavior works
     func test_settings_escapeKeyBehavior() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -555,7 +652,12 @@ final class SettingsTests: UITestBase {
 
         // Press Escape
         UITestHelpers.pressEscape(in: app)
-        sleep(1)
+
+        // Wait for potential window state change
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        _ = waitForDisappearance(mainWindow, timeout: 2)
 
         captureScreenshot(named: "SE-010-After-Escape")
 
@@ -568,7 +670,9 @@ final class SettingsTests: UITestBase {
     /// SE-011: Test that settings persist across section navigation
     func test_settings_persistenceAcrossSections() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -576,24 +680,28 @@ final class SettingsTests: UITestBase {
         }
 
         // Navigate to Audio and change a setting
-        navigateAndVerify(sidebarId: "sidebarAudio")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.audio)
+        // navigateAndVerify already waits for content
 
-        let sensitivitySlider = app.sliders["sensitivitySlider"]
+        let sensitivitySlider = app.sliders[AccessibilityIDs.AudioSection.sensitivitySlider]
         if sensitivitySlider.waitForExistence(timeout: 2) {
+            let initialValue = sensitivitySlider.value as? String ?? ""
             sensitivitySlider.adjust(toNormalizedSliderPosition: 0.8)
-            sleep(1)
+            // Wait for slider value to update
+            let sliderPredicate = NSPredicate(format: "value != %@", initialValue)
+            let sliderExpectation = XCTNSPredicateExpectation(predicate: sliderPredicate, object: sensitivitySlider)
+            _ = XCTWaiter.wait(for: [sliderExpectation], timeout: 2)
             captureScreenshot(named: "SE-011-Sensitivity-Changed")
         }
 
         // Navigate away to General
-        navigateAndVerify(sidebarId: "sidebarGeneral")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.general)
+        // navigateAndVerify already waits for content
         captureScreenshot(named: "SE-011-At-General")
 
         // Navigate back to Audio
-        navigateAndVerify(sidebarId: "sidebarAudio")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.audio)
+        // navigateAndVerify already waits for content
         captureScreenshot(named: "SE-011-Back-To-Audio")
 
         // Setting should still be applied (visual verification via screenshot)
@@ -605,7 +713,9 @@ final class SettingsTests: UITestBase {
     /// SE-012: Test permission status indicators on Home section
     func test_settings_permissionStatusDisplay() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -613,14 +723,14 @@ final class SettingsTests: UITestBase {
         }
 
         // Navigate to Home section
-        navigateAndVerify(sidebarId: "sidebarHome")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.home)
+        // navigateAndVerify already waits for content
 
         captureScreenshot(named: "SE-012-Home-Section")
 
         // Look for permission cards
-        let microphoneCard = app.otherElements["microphonePermissionCard"]
-        let accessibilityCard = app.otherElements["accessibilityPermissionCard"]
+        let microphoneCard = app.otherElements[AccessibilityIDs.HomeSection.microphoneCard]
+        let accessibilityCard = app.otherElements[AccessibilityIDs.HomeSection.accessibilityCard]
 
         let hasPermissionCards = microphoneCard.waitForExistence(timeout: 2)
             || accessibilityCard.waitForExistence(timeout: 2)
@@ -639,7 +749,9 @@ final class SettingsTests: UITestBase {
     /// SE-013: Test hotkey display on Home section
     func test_settings_hotkeyDisplay() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -647,21 +759,21 @@ final class SettingsTests: UITestBase {
         }
 
         // Navigate to Home section
-        navigateAndVerify(sidebarId: "sidebarHome")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.home)
+        // navigateAndVerify already waits for content
 
         // Look for hotkey display
-        let hotkeyDisplay = app.otherElements["hotkeyDisplay"]
+        let hotkeyDisplay = app.otherElements[AccessibilityIDs.HomeSection.hotkeyDisplay]
         if hotkeyDisplay.waitForExistence(timeout: 2) {
             captureScreenshot(named: "SE-013-Hotkey-Display")
             print("Hotkey display found")
         }
 
         // Also check in General section
-        navigateAndVerify(sidebarId: "sidebarGeneral")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.general)
+        // navigateAndVerify already waits for content
 
-        let hotkeySection = app.otherElements["hotkeySection"]
+        let hotkeySection = app.otherElements[AccessibilityIDs.GeneralSection.hotkeySection]
         if hotkeySection.waitForExistence(timeout: 2) {
             captureScreenshot(named: "SE-013-Hotkey-Section-General")
             print("Hotkey section found in General")
@@ -673,7 +785,9 @@ final class SettingsTests: UITestBase {
     /// SE-014: Test downloaded models display in Language section
     func test_settings_downloadedModelsDisplay() throws {
         launchAppSkippingOnboarding()
-        sleep(2)
+
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         guard waitForMainViewReady() else {
             print("Note: Main view not ready")
@@ -681,11 +795,11 @@ final class SettingsTests: UITestBase {
         }
 
         // Navigate to Language section
-        navigateAndVerify(sidebarId: "sidebarLanguage")
-        sleep(1)
+        navigateAndVerify(sidebarId: AccessibilityIDs.Sidebar.language)
+        // navigateAndVerify already waits for content
 
         // Look for downloaded models section
-        let downloadedModels = app.otherElements["languageSection.downloadedModels"]
+        let downloadedModels = app.otherElements[AccessibilityIDs.LanguageSection.downloadedModels]
         if downloadedModels.waitForExistence(timeout: 2) {
             captureScreenshot(named: "SE-014-Downloaded-Models")
             print("Downloaded models section found")
@@ -695,5 +809,3 @@ final class SettingsTests: UITestBase {
         }
     }
 }
-
-// swiftlint:enable file_length type_body_length

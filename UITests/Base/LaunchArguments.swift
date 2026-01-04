@@ -28,22 +28,6 @@ enum LaunchArguments {
     /// Enable accessibility testing mode
     static let accessibilityTesting = "--accessibility-testing"
 
-    // MARK: - Deprecated Arguments (UI Re-Vision)
-    // FloatingWidget has been replaced by GlassRecordingOverlay
-    // These arguments are kept for backward compatibility but have no effect
-
-    /// @deprecated FloatingWidget removed - GlassRecordingOverlay appears during recording only
-    static let showFloatingWidget = "--show-floating-widget"
-
-    /// @deprecated FloatingWidget removed - GlassRecordingOverlay appears during recording only
-    static let hideFloatingWidget = "--hide-floating-widget"
-
-    /// Force hold-to-record mode
-    static let holdToRecordMode = "--hold-to-record"
-
-    /// Force toggle (click-to-record) mode
-    static let toggleRecordMode = "--toggle-record"
-
     /// Skip welcome flow (alias for skipOnboarding)
     static let skipWelcome = "--skip-welcome"
 

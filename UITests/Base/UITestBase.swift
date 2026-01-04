@@ -445,6 +445,51 @@ extension UITestBase {
     }
 }
 
+// MARK: - Wait Helpers
+
+extension UITestBase {
+    /// Wait for an element's value to change
+    @discardableResult
+    func waitForValueChange(
+        _ element: XCUIElement,
+        from initialValue: String?,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let predicate = NSPredicate { _, _ in
+            element.value as? String != initialValue
+        }
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Wait for section content to appear after navigation
+    @discardableResult
+    func waitForSectionContent(_ sectionId: String, timeout: TimeInterval = 3) -> Bool {
+        let section = app.otherElements[sectionId]
+        return section.waitForExistence(timeout: timeout)
+    }
+
+    /// Wait for toggle state to change
+    @discardableResult
+    func waitForToggleChange(
+        _ toggle: XCUIElement,
+        wasOn: Bool,
+        timeout: TimeInterval = 2
+    ) -> Bool {
+        let targetValue = wasOn ? "0" : "1"
+        let predicate = NSPredicate(format: "value == %@", targetValue)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: toggle)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    /// Wait for a specific time (for animation capture only)
+    func waitForAnimationFrame(_ duration: TimeInterval = 1.0) {
+        let animationExpectation = expectation(description: "Animation frame")
+        animationExpectation.isInverted = true
+        wait(for: [animationExpectation], timeout: duration)
+    }
+}
+
 // MARK: - Convenience Extensions
 
 extension UITestBase {

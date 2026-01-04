@@ -60,8 +60,6 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertTrue(ui.showConfidenceIndicator)
         XCTAssertTrue(ui.animationsEnabled)
         XCTAssertEqual(ui.menuBarIcon, .default)
-        XCTAssertTrue(ui.showFloatingWidget)
-        XCTAssertEqual(ui.widgetPosition, .bottomCenter)
         XCTAssertEqual(ui.recordingMode, .holdToRecord)
     }
 
@@ -251,17 +249,6 @@ final class UserSettingsTests: XCTestCase {
             let decoded = try JSONDecoder().decode(RecordingMode.self, from: data)
             XCTAssertEqual(decoded, mode)
         }
-    }
-
-    // MARK: - WidgetPosition Tests
-
-    func test_widgetPosition_displayName_returnsCorrectNames() {
-        XCTAssertEqual(WidgetPosition.bottomCenter.displayName, "Bottom Center")
-        XCTAssertEqual(WidgetPosition.bottomRight.displayName, "Bottom Right")
-    }
-
-    func test_widgetPosition_allCases_hasTwoCases() {
-        XCTAssertEqual(WidgetPosition.allCases.count, 2)
     }
 
     // MARK: - GeneralConfiguration New Fields Codable Tests

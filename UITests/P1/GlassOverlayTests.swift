@@ -16,20 +16,6 @@ import XCTest
 /// - Waveform and spinner visibility based on state
 /// - Proper accessibility labels and identifiers
 final class GlassOverlayTests: UITestBase {
-    // MARK: - Accessibility Identifiers
-
-    /// GlassRecordingOverlay accessibility identifiers
-    /// Must match identifiers defined in GlassRecordingOverlay.swift
-    private enum AccessibilityIDs {
-        static let glassOverlay = "glassRecordingOverlay"
-        static let glassOverlayContainer = "glassRecordingOverlayContainer"
-        static let recordingIndicatorDot = "recordingIndicatorDot"
-        static let overlayWaveform = "overlayWaveform"
-        static let transcribingSpinner = "transcribingSpinner"
-        static let overlayStatusText = "overlayStatusText"
-        static let overlayTimer = "overlayTimer"
-    }
-
     // MARK: - GO-001: Glass Overlay Appears When Recording Triggered
 
     /// Test that glass overlay appears when recording is triggered via launch argument
@@ -38,7 +24,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for the glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         let overlayAppeared = glassOverlay.waitForExistence(timeout: extendedTimeout)
 
         captureScreenshot(named: "GO-001-Glass-Overlay-Appeared")
@@ -72,7 +58,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear first
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-002-No-Overlay")
             XCTFail("GlassRecordingOverlay not found - cannot verify recording indicator")
@@ -80,7 +66,7 @@ final class GlassOverlayTests: UITestBase {
         }
 
         // Look for the recording indicator dot
-        let recordingDot = app.otherElements[AccessibilityIDs.recordingIndicatorDot]
+        let recordingDot = app.otherElements[AccessibilityIDs.GlassOverlay.recordingDot]
         let dotVisible = recordingDot.waitForExistence(timeout: defaultTimeout)
 
         captureScreenshot(named: "GO-002-Recording-Indicator-Dot")
@@ -114,7 +100,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-003-No-Overlay")
             XCTFail("GlassRecordingOverlay not found")
@@ -122,7 +108,7 @@ final class GlassOverlayTests: UITestBase {
         }
 
         // Find status text element
-        let statusText = app.staticTexts[AccessibilityIDs.overlayStatusText]
+        let statusText = app.staticTexts[AccessibilityIDs.GlassOverlay.statusText]
         let statusExists = statusText.waitForExistence(timeout: defaultTimeout)
 
         captureScreenshot(named: "GO-003-Status-Text-Recording")
@@ -149,7 +135,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-004-No-Overlay")
             XCTFail("GlassRecordingOverlay not found")
@@ -157,7 +143,7 @@ final class GlassOverlayTests: UITestBase {
         }
 
         // Find timer element
-        let timer = app.staticTexts[AccessibilityIDs.overlayTimer]
+        let timer = app.staticTexts[AccessibilityIDs.GlassOverlay.timer]
         let timerExists = timer.waitForExistence(timeout: defaultTimeout)
 
         XCTAssertTrue(
@@ -207,7 +193,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-005-No-Overlay")
             XCTFail("GlassRecordingOverlay not found")
@@ -232,7 +218,7 @@ final class GlassOverlayTests: UITestBase {
         )
 
         // Check for timer accessibility on the timer element specifically
-        let timer = app.staticTexts[AccessibilityIDs.overlayTimer]
+        let timer = app.staticTexts[AccessibilityIDs.GlassOverlay.timer]
         if timer.exists {
             let timerLabel = timer.label
             // Timer should have accessible time format in its label
@@ -243,22 +229,22 @@ final class GlassOverlayTests: UITestBase {
         }
 
         // Verify recording indicator dot is accessible
-        let recordingDot = app.otherElements[AccessibilityIDs.recordingIndicatorDot]
+        let recordingDot = app.otherElements[AccessibilityIDs.GlassOverlay.recordingDot]
         if recordingDot.exists {
             // Dot should be identifiable for testing (identifier is set)
             XCTAssertEqual(
                 recordingDot.identifier,
-                AccessibilityIDs.recordingIndicatorDot,
+                AccessibilityIDs.GlassOverlay.recordingDot,
                 "Recording indicator dot should have correct accessibility identifier"
             )
         }
 
         // Verify status text has correct identifier
-        let statusText = app.staticTexts[AccessibilityIDs.overlayStatusText]
+        let statusText = app.staticTexts[AccessibilityIDs.GlassOverlay.statusText]
         if statusText.exists {
             XCTAssertEqual(
                 statusText.identifier,
-                AccessibilityIDs.overlayStatusText,
+                AccessibilityIDs.GlassOverlay.statusText,
                 "Status text should have correct accessibility identifier"
             )
         }
@@ -272,7 +258,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-006-No-Overlay")
             XCTFail("GlassRecordingOverlay not found")
@@ -280,9 +266,9 @@ final class GlassOverlayTests: UITestBase {
         }
 
         // During recording state, waveform should be visible (not spinner)
-        let waveform = app.otherElements[AccessibilityIDs.overlayWaveform]
+        let waveform = app.otherElements[AccessibilityIDs.GlassOverlay.waveform]
         let spinner = app.progressIndicators.firstMatch
-        let transcribingSpinner = app.otherElements[AccessibilityIDs.transcribingSpinner]
+        let transcribingSpinner = app.otherElements[AccessibilityIDs.GlassOverlay.transcribingSpinner]
 
         let waveformVisible = waveform.waitForExistence(timeout: defaultTimeout)
 
@@ -317,7 +303,7 @@ final class GlassOverlayTests: UITestBase {
 
         // Check if we've transitioned to transcribing state
         // Note: In test mode, transcription may complete very quickly
-        let statusText = app.staticTexts[AccessibilityIDs.overlayStatusText]
+        let statusText = app.staticTexts[AccessibilityIDs.GlassOverlay.statusText]
         let isTranscribing = statusText.exists && statusText.label.contains("Transcribing")
 
         captureScreenshot(named: "GO-006-After-Stop-Recording")
@@ -345,12 +331,12 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay container to appear
-        let container = app.otherElements[AccessibilityIDs.glassOverlayContainer]
+        let container = app.otherElements[AccessibilityIDs.GlassOverlay.container]
         let containerExists = container.waitForExistence(timeout: extendedTimeout)
 
         // Container may or may not be exposed to accessibility - check overlay directly if not
         if !containerExists {
-            let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+            let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
             guard glassOverlay.waitForExistence(timeout: defaultTimeout) else {
                 captureScreenshot(named: "GO-Container-No-Overlay")
                 XCTFail("Neither container nor overlay found")
@@ -385,7 +371,7 @@ final class GlassOverlayTests: UITestBase {
         launchAppWithRecordingModal()
 
         // Wait for glass overlay to appear
-        let glassOverlay = app.otherElements[AccessibilityIDs.glassOverlay]
+        let glassOverlay = app.otherElements[AccessibilityIDs.GlassOverlay.overlay]
         guard glassOverlay.waitForExistence(timeout: extendedTimeout) else {
             captureScreenshot(named: "GO-Dismiss-No-Overlay")
             XCTFail("GlassRecordingOverlay not found")

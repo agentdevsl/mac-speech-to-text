@@ -164,8 +164,11 @@ final class OnboardingFlowTests: UITestBase {
             setupPermissionDialogHandlers()
             grantButton.tap()
 
-            // Allow time for permission dialog
-            Thread.sleep(forTimeInterval: 1)
+            // Wait for permission status to update to "Ready"
+            let updatedReadyLabel = microphoneCard.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] 'ready'")
+            ).firstMatch
+            _ = updatedReadyLabel.waitForExistence(timeout: 3)
             app.tap() // Trigger any pending handlers
 
             captureScreenshot(named: "OF-004-After-Permission-Request")
@@ -275,8 +278,10 @@ final class OnboardingFlowTests: UITestBase {
             "Preview label should be visible"
         )
 
-        // Wait for typing animation to show some text
-        Thread.sleep(forTimeInterval: 1.5)
+        // Wait for typing animation to show some text (legitimate animation delay)
+        let animationExpectation = expectation(description: "Animation frame")
+        animationExpectation.isInverted = true
+        wait(for: [animationExpectation], timeout: 1.5)
 
         captureScreenshot(named: "OF-007-Typing-Preview")
     }
@@ -356,7 +361,6 @@ final class OnboardingFlowTests: UITestBase {
         let sidebarGeneral = app.otherElements["sidebarGeneral"]
         if sidebarGeneral.waitForExistence(timeout: 3) {
             sidebarGeneral.tap()
-            Thread.sleep(forTimeInterval: 0.5)
 
             // Verify General section content appeared
             let generalContent = app.otherElements["generalSectionContent"]
@@ -372,7 +376,11 @@ final class OnboardingFlowTests: UITestBase {
         let sidebarAudio = app.otherElements["sidebarAudio"]
         if sidebarAudio.waitForExistence(timeout: 3) {
             sidebarAudio.tap()
-            Thread.sleep(forTimeInterval: 0.5)
+
+            // Wait for audio section content to load
+            let audioContent = app.otherElements["audioSectionContent"]
+            _ = audioContent.waitForExistence(timeout: 2)
+
             captureScreenshot(named: "OF-009-After-Audio-Navigation")
         }
 
@@ -380,7 +388,6 @@ final class OnboardingFlowTests: UITestBase {
         let sidebarHome = app.otherElements["sidebarHome"]
         if sidebarHome.waitForExistence(timeout: 3) {
             sidebarHome.tap()
-            Thread.sleep(forTimeInterval: 0.5)
 
             // Verify Home section is back
             let homeSection = app.otherElements["homeSection"]
@@ -442,8 +449,11 @@ final class OnboardingFlowTests: UITestBase {
 
         quitButton.tap()
 
-        // Wait for app to terminate
-        Thread.sleep(forTimeInterval: 1)
+        // Wait for window to disappear
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        _ = waitForDisappearance(mainWindow, timeout: 3)
 
         captureScreenshot(named: "OF-011-After-Quit")
 
@@ -458,8 +468,8 @@ final class OnboardingFlowTests: UITestBase {
         // Launch with onboarding skipped (simulates completed onboarding)
         launchAppSkippingOnboarding()
 
-        // Wait for app to initialize
-        Thread.sleep(forTimeInterval: 2)
+        // Wait for app to initialize by checking for menu bar
+        _ = app.menuBars.firstMatch.waitForExistence(timeout: 5)
 
         // Main window may or may not appear depending on app behavior
         // The key is app should be running (menu bar mode)
@@ -542,12 +552,76 @@ final class OnboardingFlowTests: UITestBase {
             "Mic icon should exist in hero section"
         )
 
-        // Capture multiple screenshots to show animation progression
+        // Capture multiple screenshots to show animation progression (legitimate animation delays)
         captureScreenshot(named: "OF-014-Hero-Animation-1")
-        Thread.sleep(forTimeInterval: 1.0)
+
+        let animationExpectation1 = expectation(description: "Animation frame 1")
+        animationExpectation1.isInverted = true
+        wait(for: [animationExpectation1], timeout: 1.0)
         captureScreenshot(named: "OF-014-Hero-Animation-2")
-        Thread.sleep(forTimeInterval: 1.0)
+
+        let animationExpectation2 = expectation(description: "Animation frame 2")
+        animationExpectation2.isInverted = true
+        wait(for: [animationExpectation2], timeout: 1.0)
         captureScreenshot(named: "OF-014-Hero-Animation-3")
+    }
+
+    // MARK: - OF-015: Window Escape Key Behavior
+
+    /// Test window interaction with Escape key
+    /// Merged from WelcomeFlowTests WF-009
+    func test_onboarding_windowEscapeKeyBehavior() throws {
+        launchAppWithFreshOnboarding()
+
+        guard waitForMainWindow() else {
+            XCTFail("Main window did not appear")
+            return
+        }
+
+        captureScreenshot(named: "OF-015-Before-Escape")
+
+        // Press Escape
+        UITestHelpers.pressEscape(in: app)
+
+        // Wait for potential window state change
+        let mainWindow = app.windows.matching(
+            NSPredicate(format: "identifier == 'mainWindow'")
+        ).firstMatch
+        _ = waitForDisappearance(mainWindow, timeout: 2)
+
+        captureScreenshot(named: "OF-015-After-Escape")
+
+        // Window behavior on Escape may vary
+        // Document the behavior
+    }
+
+    // MARK: - OF-016: Hero Mic Icon Present
+
+    /// Test that hero section mic icon is present
+    /// Merged from WelcomeFlowTests WF-010
+    func test_onboarding_heroMicIconPresent() throws {
+        launchAppWithFreshOnboarding()
+
+        guard waitForMainWindow() else {
+            XCTFail("Main window did not appear")
+            return
+        }
+
+        // Look for mic icon in hero section
+        let micIcon = app.otherElements["homeMicIcon"]
+        let hasMicIcon = micIcon.waitForExistence(timeout: 3)
+
+        // Also look for mic image
+        let micImage = app.images.matching(
+            NSPredicate(format: "identifier CONTAINS[c] 'mic'")
+        ).firstMatch
+
+        XCTAssertTrue(
+            hasMicIcon || micImage.exists,
+            "Mic icon should be visible in hero section"
+        )
+
+        captureScreenshot(named: "OF-016-Hero-Mic-Icon")
     }
 }
 // swiftlint:enable file_length type_body_length

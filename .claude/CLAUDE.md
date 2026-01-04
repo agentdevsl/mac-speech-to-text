@@ -97,12 +97,37 @@ pre-commit run --all-files # Run all pre-commit hooks
 - **Structured concurrency** with Task and async let
 - **Task.detached** for breaking actor context inheritance
 
+## CRITICAL: Build & Signing for UI Tests
+
+**IMPORTANT**: Use `./scripts/build-app.sh` to create a signed .app bundle for UI tests. Do NOT use `swift build` alone - it creates a command-line tool, not an app bundle.
+
+### Bundle ID and Permission State Issue
+
+When the app is rebuilt with different code signing or bundle identifiers, macOS permission grants (microphone, accessibility) become invalid. The app must:
+
+1. **Detect Bundle ID Changes**: Store and compare the current bundle identifier
+2. **Reset Permission State**: When bundle ID changes, reset permission-related settings/state
+3. **Re-prompt for Permissions**: Guide user through permission grant flow again
+
+This is critical for development workflows where signing identities change between builds.
+
+```bash
+# Build signed .app bundle (required for UI tests)
+./scripts/build-app.sh
+
+# Build with rsync to remote Mac
+./scripts/build-app.sh --sync
+
+# Run UI tests
+./scripts/run-ui-tests.sh
+```
+
 ## Common Commands
 
 ```bash
 # Development
 open Package.swift           # Open in Xcode (generates Xcode project)
-swift build                  # Build from command line
+swift build                  # Build from command line (NOT for UI tests)
 
 # Testing
 swift test --parallel        # Run tests in parallel

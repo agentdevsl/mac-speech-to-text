@@ -12,6 +12,11 @@ struct MainView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    // MARK: - Focus State
+
+    /// Focus state for keyboard navigation in sidebar
+    @FocusState private var focusedSection: SidebarSection?
+
     // MARK: - State
 
     @State var viewModel: MainViewModel
@@ -55,7 +60,45 @@ struct MainView: View {
         .accessibilityIdentifier("mainView")
         .onAppear {
             initializeViewModels()
+            // Set initial focus to current section
+            focusedSection = viewModel.selectedSection
         }
+        .onChange(of: focusedSection) { _, newValue in
+            // Sync focus state with selection
+            if let newValue = newValue {
+                viewModel.selectedSection = newValue
+            }
+        }
+        .onKeyPress(.upArrow) {
+            navigateToPreviousSection()
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            navigateToNextSection()
+            return .handled
+        }
+    }
+
+    // MARK: - Keyboard Navigation
+
+    /// Navigate to the previous sidebar section
+    private func navigateToPreviousSection() {
+        let allSections = SidebarSection.allCases
+        guard let currentIndex = allSections.firstIndex(of: viewModel.selectedSection),
+              currentIndex > 0 else { return }
+        let previousSection = allSections[currentIndex - 1]
+        viewModel.selectedSection = previousSection
+        focusedSection = previousSection
+    }
+
+    /// Navigate to the next sidebar section
+    private func navigateToNextSection() {
+        let allSections = SidebarSection.allCases
+        guard let currentIndex = allSections.firstIndex(of: viewModel.selectedSection),
+              currentIndex < allSections.count - 1 else { return }
+        let nextSection = allSections[currentIndex + 1]
+        viewModel.selectedSection = nextSection
+        focusedSection = nextSection
     }
 
     // MARK: - ViewModel Initialization
@@ -118,7 +161,7 @@ struct MainView: View {
         .accessibilityIdentifier("mainViewSidebar")
     }
 
-    /// Sidebar navigation item
+    /// Sidebar navigation item with keyboard focus support
     private func sidebarItem(for section: SidebarSection) -> some View {
         Label {
             Text(section.title)
@@ -131,7 +174,15 @@ struct MainView: View {
                 )
         }
         .tag(section)
+        .focusable()
+        .focused($focusedSection, equals: section)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(focusedSection == section ? Color.warmAmber.opacity(0.15) : Color.clear)
+                .animation(.easeInOut(duration: 0.15), value: focusedSection)
+        )
         .accessibilityLabel(section.accessibilityLabel)
+        .accessibilityAddTraits(viewModel.selectedSection == section ? .isSelected : [])
     }
 
     /// Quit button at bottom of sidebar
@@ -170,20 +221,20 @@ struct MainView: View {
         case .audio:
             AudioSection(settingsService: settingsService)
         case .language:
-            if let vm = languageViewModel {
-                LanguageSection(viewModel: vm)
+            if let languageVM = languageViewModel {
+                LanguageSection(viewModel: languageVM)
             } else {
                 LanguageSectionPlaceholder()
             }
         case .privacy:
-            if let vm = privacyViewModel {
-                PrivacySection(viewModel: vm)
+            if let privacyVM = privacyViewModel {
+                PrivacySection(viewModel: privacyVM)
             } else {
                 PrivacySectionPlaceholder()
             }
         case .about:
-            if let vm = aboutViewModel {
-                AboutSection(viewModel: vm)
+            if let aboutVM = aboutViewModel {
+                AboutSection(viewModel: aboutVM)
             } else {
                 AboutSectionPlaceholder()
             }

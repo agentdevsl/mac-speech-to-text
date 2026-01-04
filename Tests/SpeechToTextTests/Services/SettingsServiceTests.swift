@@ -182,8 +182,6 @@ final class SettingsServiceTests: XCTestCase {
             showConfidenceIndicator: false,
             animationsEnabled: false,
             menuBarIcon: .minimal,
-            showFloatingWidget: true,
-            widgetPosition: .bottomCenter,
             recordingMode: .holdToRecord
         )
 

@@ -51,6 +51,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await setupGlobalHotkey()
         }
 
+        // Check for app identity change (bundle ID / signing) and reset if needed
+        // This handles the case where app is rebuilt with different signing, invalidating permissions
+        checkAndHandleIdentityChange()
+
         // Check if first launch - show welcome/onboarding (T040)
         // Skip if --skip-welcome/--skip-onboarding or reset if --reset-welcome/--reset-onboarding
         let settings = settingsService.load()
@@ -61,8 +65,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             var updatedSettings = settings
             updatedSettings.onboarding.completed = true
             try? settingsService.save(updatedSettings)
-            // Show floating widget for returning users
-            showFloatingWidgetIfEnabled()
         } else if testConfig.shouldResetWelcome {
             AppLogger.app.debug("Resetting welcome state (--reset-welcome or --reset-onboarding)")
             var updatedSettings = settings
@@ -72,10 +74,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if !settings.onboarding.completed {
             // First time user - show welcome
             showOnboarding()
-        } else {
-            // Returning user with completed onboarding - show floating widget
-            showFloatingWidgetIfEnabled()
         }
+        // Returning users with completed onboarding: app runs silently in menu bar
+        // Glass overlay appears only during hold-to-record sessions
 
         // Trigger recording modal if requested (for UI tests)
         if testConfig.triggerRecordingOnLaunch {
@@ -86,13 +87,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.showRecordingModal()
             }
         }
-    }
-
-    /// Previously showed floating widget - now a no-op since glass overlay only appears during recording
-    /// The app now uses a clean desktop with overlay only during hold-to-record
-    private func showFloatingWidgetIfEnabled() {
-        // Glass overlay only shows during active recording - no persistent widget
-        AppLogger.app.debug("Floating widget deprecated - glass overlay shows only during recording")
     }
 
     // MARK: - UI Test Configuration
@@ -432,5 +426,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettingsWindow() {
         // Settings are now in the unified MainView under General section
         mainWindowController.showSettings()
+    }
+
+    // MARK: - App Identity Change Detection
+
+    /// Check if app identity (bundle ID / signing) has changed and reset permissions if so
+    /// This handles the case where the app is rebuilt with different code signing,
+    /// which invalidates macOS permission grants (microphone, accessibility)
+    @MainActor
+    private func checkAndHandleIdentityChange() {
+        var settings = settingsService.load()
+        let identityCheck = PermissionService.checkForIdentityChange(settings: settings)
+
+        if identityCheck.hasChanged {
+            AppLogger.app.warning(
+                "App identity changed: \(identityCheck.reason ?? "unknown", privacy: .public). Resetting permission state."
+            )
+
+            // Reset permission-related state
+            settings.onboarding.completed = false
+            settings.onboarding.currentStep = 0
+            settings.onboarding.permissionsGranted = PermissionsGranted(
+                microphone: false,
+                accessibility: false
+            )
+
+            // Store new identity
+            settings.onboarding.lastKnownBundleId = identityCheck.currentBundleId
+            settings.onboarding.lastKnownTeamId = identityCheck.currentTeamId
+
+            // Save updated settings
+            do {
+                try settingsService.save(settings)
+                AppLogger.app.info("Permission state reset due to identity change - user will be re-prompted")
+            } catch {
+                AppLogger.app.error("Failed to save settings after identity reset: \(error.localizedDescription, privacy: .public)")
+            }
+        } else if settings.onboarding.lastKnownBundleId == nil {
+            // First run with permission tracking - store current identity
+            settings.onboarding.lastKnownBundleId = identityCheck.currentBundleId
+            settings.onboarding.lastKnownTeamId = identityCheck.currentTeamId
+
+            do {
+                try settingsService.save(settings)
+                AppLogger.app.debug("Stored initial app identity for permission tracking")
+            } catch {
+                AppLogger.app.error("Failed to save initial identity: \(error.localizedDescription, privacy: .public)")
+            }
+        }
     }
 }

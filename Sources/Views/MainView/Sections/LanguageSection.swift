@@ -44,6 +44,11 @@ struct LanguageSection: View {
 
             // Downloaded models indicator
             downloadedModelsSection
+
+            // Global error banner (if any)
+            if let globalError = viewModel.globalError {
+                errorBanner(message: globalError)
+            }
         }
         .padding(20)
         .accessibilityElement(children: .contain)
@@ -86,16 +91,8 @@ struct LanguageSection: View {
 
             Spacer()
 
-            // Download status badge
-            if viewModel.isCurrentLanguageDownloaded {
-                Label("Ready", systemImage: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(Color.successGreen)
-            } else {
-                Label("Download needed", systemImage: "arrow.down.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            // Download status badge with loading state
+            downloadStatusView
         }
         .padding(16)
         .background(Color.warmAmber.opacity(0.1))
@@ -103,6 +100,64 @@ struct LanguageSection: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Current language: \(viewModel.currentLanguageName)")
         .accessibilityIdentifier("languageSection.currentLanguage")
+    }
+
+    /// Download status view with loading indicator
+    @ViewBuilder
+    private var downloadStatusView: some View {
+        if viewModel.isDownloadingCurrentLanguage {
+            // Downloading state with progress
+            VStack(alignment: .trailing, spacing: 4) {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                    Text("Downloading...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if viewModel.downloadProgress > 0 {
+                    ProgressView(value: viewModel.downloadProgress)
+                        .frame(width: 80)
+                        .tint(Color.warmAmber)
+                }
+            }
+            .accessibilityLabel("Downloading language model, \(Int(viewModel.downloadProgress * 100)) percent complete")
+        } else if viewModel.isCurrentLanguageDownloaded {
+            Label("Ready", systemImage: "checkmark.circle.fill")
+                .font(.caption)
+                .foregroundStyle(Color.successGreen)
+        } else if let error = viewModel.downloadError {
+            // Error state with retry option
+            VStack(alignment: .trailing, spacing: 4) {
+                Label("Download failed", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(Color.errorRed)
+
+                Button {
+                    viewModel.retryDownload()
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Retry")
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(Color.warmAmber)
+                }
+                .buttonStyle(.plain)
+            }
+            .accessibilityLabel("Download failed: \(error)")
+        } else {
+            // Not downloaded - show download button
+            Button {
+                viewModel.downloadCurrentLanguageModel()
+            } label: {
+                Label("Download", systemImage: "arrow.down.circle")
+                    .font(.caption)
+                    .foregroundStyle(Color.warmAmber)
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     // MARK: - Auto-Detect Toggle
@@ -256,8 +311,17 @@ struct LanguageSection: View {
                     LanguageRowView(
                         language: language,
                         isSelected: language.code == viewModel.selectedLanguageCode,
+                        isDownloading: viewModel.downloadingLanguages.contains(language.code),
+                        downloadProgress: viewModel.languageDownloadProgress[language.code] ?? 0,
+                        downloadError: viewModel.languageDownloadErrors[language.code],
                         onSelect: {
                             viewModel.selectLanguage(language)
+                        },
+                        onDownload: {
+                            viewModel.downloadLanguageModel(for: language.code)
+                        },
+                        onRetry: {
+                            viewModel.retryDownload(for: language.code)
                         }
                     )
                     .accessibilityIdentifier("languageSection.language.\(language.code)")
@@ -310,8 +374,48 @@ struct LanguageSection: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(viewModel.downloadedModelsCount) language models downloaded, using \(viewModel.downloadedModelsSize)")
+        .accessibilityLabel(
+            "\(viewModel.downloadedModelsCount) language models downloaded, using \(viewModel.downloadedModelsSize)"
+        )
         .accessibilityIdentifier("languageSection.downloadedModels")
+    }
+
+    // MARK: - Error Banner
+
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(Color.errorRed)
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(Color.errorRed)
+                .lineLimit(2)
+
+            Spacer()
+
+            Button {
+                viewModel.dismissGlobalError()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss error")
+        }
+        .padding(12)
+        .background(Color.errorRed.opacity(0.1))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.errorRed.opacity(0.3), lineWidth: 1)
+        )
+        .transition(.asymmetric(
+            insertion: .move(edge: .top).combined(with: .opacity),
+            removal: .opacity
+        ))
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: viewModel.globalError)
+        .accessibilityIdentifier("languageSection.errorBanner")
     }
 }
 
@@ -320,7 +424,12 @@ struct LanguageSection: View {
 private struct LanguageRowView: View {
     let language: LanguageModel
     let isSelected: Bool
+    let isDownloading: Bool
+    let downloadProgress: Double
+    let downloadError: String?
     let onSelect: () -> Void
+    let onDownload: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         Button(action: onSelect) {
@@ -364,29 +473,66 @@ private struct LanguageRowView: View {
 
     @ViewBuilder
     private var downloadStatusBadge: some View {
-        switch language.downloadStatus {
-        case .downloaded:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(Color.successGreen)
-                .font(.caption)
-                .accessibilityLabel("Downloaded")
+        if isDownloading {
+            // Downloading with progress
+            HStack(spacing: 4) {
+                if downloadProgress > 0 {
+                    Text("\(Int(downloadProgress * 100))%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                ProgressView()
+                    .scaleEffect(0.6)
+            }
+            .accessibilityLabel("Downloading, \(Int(downloadProgress * 100)) percent")
+        } else if let error = downloadError {
+            // Error state with retry
+            Button(action: onRetry) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color.errorRed)
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Download error: \(error). Double tap to retry")
+        } else {
+            // Standard status from model
+            switch language.downloadStatus {
+            case .downloaded:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.successGreen)
+                    .font(.caption)
+                    .accessibilityLabel("Downloaded")
 
-        case .downloading:
-            ProgressView()
-                .scaleEffect(0.6)
+            case .downloading(let progress, _):
+                HStack(spacing: 4) {
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    ProgressView()
+                        .scaleEffect(0.6)
+                }
                 .accessibilityLabel("Downloading")
 
-        case .notDownloaded:
-            Image(systemName: "arrow.down.circle")
-                .foregroundStyle(.secondary)
-                .font(.caption)
-                .accessibilityLabel("Not downloaded")
+            case .notDownloaded:
+                Button(action: onDownload) {
+                    Image(systemName: "arrow.down.circle")
+                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Not downloaded. Double tap to download")
 
-        case .error:
-            Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundStyle(Color.warningOrange)
-                .font(.caption)
-                .accessibilityLabel("Download error")
+            case .error(let message):
+                Button(action: onRetry) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(Color.warningOrange)
+                        .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Download error: \(message)")
+            }
         }
     }
 }
@@ -402,6 +548,13 @@ final class LanguageSectionViewModel {
     var autoDetectEnabled: Bool
     var recentLanguages: [LanguageModel]
     var downloadedModels: [String]
+
+    // Loading & Error States
+    var downloadingLanguages: Set<String> = []
+    var languageDownloadProgress: [String: Double] = [:]
+    var languageDownloadErrors: [String: String] = [:]
+    var globalError: String?
+    var downloadProgress: Double = 0
 
     // MARK: - Dependencies
 
@@ -420,6 +573,14 @@ final class LanguageSectionViewModel {
 
     var isCurrentLanguageDownloaded: Bool {
         downloadedModels.contains(selectedLanguageCode)
+    }
+
+    var isDownloadingCurrentLanguage: Bool {
+        downloadingLanguages.contains(selectedLanguageCode)
+    }
+
+    var downloadError: String? {
+        languageDownloadErrors[selectedLanguageCode]
     }
 
     var downloadedModelsCount: Int {
@@ -467,6 +628,43 @@ final class LanguageSectionViewModel {
         }
     }
 
+    /// Download the current language model
+    func downloadCurrentLanguageModel() {
+        downloadLanguageModel(for: selectedLanguageCode)
+    }
+
+    /// Download a language model
+    func downloadLanguageModel(for languageCode: String) {
+        // Clear any previous error
+        languageDownloadErrors.removeValue(forKey: languageCode)
+
+        // Start download
+        downloadingLanguages.insert(languageCode)
+        languageDownloadProgress[languageCode] = 0
+
+        // Simulate download (in real implementation, this would call FluidAudio SDK)
+        Task {
+            await simulateDownload(for: languageCode)
+        }
+    }
+
+    /// Retry failed download for current language
+    func retryDownload() {
+        retryDownload(for: selectedLanguageCode)
+    }
+
+    /// Retry failed download for a specific language
+    func retryDownload(for languageCode: String) {
+        downloadLanguageModel(for: languageCode)
+    }
+
+    /// Dismiss the global error banner
+    func dismissGlobalError() {
+        globalError = nil
+    }
+
+    // MARK: - Private Methods
+
     private func saveLanguageSettings() async {
         var settings = settingsService.load()
         settings.language.defaultLanguage = selectedLanguageCode
@@ -478,6 +676,43 @@ final class LanguageSectionViewModel {
         } catch {
             // Log error but don't crash
             print("Failed to save language settings: \(error)")
+        }
+    }
+
+    /// Simulate a download with progress updates
+    /// In a real implementation, this would call the FluidAudio SDK
+    private func simulateDownload(for languageCode: String) async {
+        // Simulate download progress
+        for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
+            guard downloadingLanguages.contains(languageCode) else { return }
+
+            languageDownloadProgress[languageCode] = progress
+            if languageCode == selectedLanguageCode {
+                downloadProgress = progress
+            }
+
+            // Simulate network delay
+            try? await Task.sleep(nanoseconds: 200_000_000) // 200ms
+        }
+
+        // Complete download
+        downloadingLanguages.remove(languageCode)
+        languageDownloadProgress.removeValue(forKey: languageCode)
+
+        // Simulate occasional failure for demo purposes (10% chance)
+        if Double.random(in: 0...1) < 0.1 {
+            languageDownloadErrors[languageCode] = "Network connection failed"
+            if languageCode == selectedLanguageCode {
+                downloadProgress = 0
+            }
+        } else {
+            // Success - add to downloaded models
+            if !downloadedModels.contains(languageCode) {
+                downloadedModels.append(languageCode)
+            }
+            if languageCode == selectedLanguageCode {
+                downloadProgress = 0
+            }
         }
     }
 }

@@ -19,6 +19,8 @@
 		C10000001A000009 /* AccessibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A000009; };
 		C10000001A00000A /* SpeechToTextUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000A; };
 		C10000001A00000B /* LaunchArguments.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000B; };
+		C10000001A00000C /* AccessibilityIDs.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000C; };
+		C10000001A00000D /* GlassOverlayTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000001A00000D; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
 		D10000001A000009 /* AccessibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityTests.swift; sourceTree = "<group>"; };
 		D10000001A00000A /* SpeechToTextUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechToTextUITests.swift; sourceTree = "<group>"; };
 		D10000001A00000B /* LaunchArguments.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchArguments.swift; sourceTree = "<group>"; };
+		D10000001A00000C /* AccessibilityIDs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityIDs.swift; sourceTree = "<group>"; };
+		D10000001A00000D /* GlassOverlayTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassOverlayTests.swift; sourceTree = "<group>"; };
 		/* Products */
 		F10000001A000003 /* SpeechToTextUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SpeechToTextUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -72,6 +76,7 @@
 		G10000001A000051 /* Base */ = {
 			isa = PBXGroup;
 			children = (
+				D10000001A00000C /* AccessibilityIDs.swift */,
 				D10000001A00000B /* LaunchArguments.swift */,
 				D10000001A000001 /* UITestBase.swift */,
 				D10000001A000002 /* UITestHelpers.swift */,
@@ -82,6 +87,7 @@
 		G10000001A000052 /* P1 */ = {
 			isa = PBXGroup;
 			children = (
+				D10000001A00000D /* GlassOverlayTests.swift */,
 				D10000001A000003 /* OnboardingFlowTests.swift */,
 				D10000001A000004 /* RecordingFlowTests.swift */,
 				D10000001A000005 /* TestInfrastructureTests.swift */,
@@ -172,9 +178,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C10000001A00000C /* AccessibilityIDs.swift in Sources */,
 				C10000001A00000B /* LaunchArguments.swift in Sources */,
 				C10000001A000001 /* UITestBase.swift in Sources */,
 				C10000001A000002 /* UITestHelpers.swift in Sources */,
+				C10000001A00000D /* GlassOverlayTests.swift in Sources */,
 				C10000001A000003 /* OnboardingFlowTests.swift in Sources */,
 				C10000001A000004 /* RecordingFlowTests.swift in Sources */,
 				C10000001A000005 /* TestInfrastructureTests.swift in Sources */,

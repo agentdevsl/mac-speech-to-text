@@ -1,4 +1,3 @@
-// swiftlint:disable file_length type_body_length
 import AppKit
 import ApplicationServices
 import AVFoundation
@@ -599,6 +598,101 @@ class PermissionService: PermissionChecker {
             AppLogger.system.error("Invalid URL for Accessibility System Settings")
         }
     }
+
+    // MARK: - App Identity Change Detection
+
+    /// Result of identity change check
+    struct IdentityChangeResult: Sendable {
+        let hasChanged: Bool
+        let reason: String?
+        let currentBundleId: String?
+        let currentTeamId: String?
+        let storedBundleId: String?
+        let storedTeamId: String?
+    }
+
+    /// Check if the app's signing identity has changed since permissions were granted
+    /// - Parameter settings: Current user settings containing stored identity
+    /// - Returns: Result indicating if identity changed and why
+    static func checkForIdentityChange(settings: UserSettings) -> IdentityChangeResult {
+        let validation = validateAppIdentity()
+        let currentBundleId = validation.bundleId
+        let currentTeamId = validation.teamId
+
+        let storedBundleId = settings.onboarding.lastKnownBundleId
+        let storedTeamId = settings.onboarding.lastKnownTeamId
+
+        // If no stored identity, this is first run - no change
+        guard storedBundleId != nil || storedTeamId != nil else {
+            AppLogger.system.debug("No stored app identity - first run or fresh install")
+            return IdentityChangeResult(
+                hasChanged: false,
+                reason: nil,
+                currentBundleId: currentBundleId,
+                currentTeamId: currentTeamId,
+                storedBundleId: nil,
+                storedTeamId: nil
+            )
+        }
+
+        // Check for bundle ID change
+        if let stored = storedBundleId, let current = currentBundleId, stored != current {
+            let reason = "Bundle ID changed from '\(stored)' to '\(current)'"
+            AppLogger.system.warning("\(reason, privacy: .public) - permissions may be invalid")
+            return IdentityChangeResult(
+                hasChanged: true,
+                reason: reason,
+                currentBundleId: currentBundleId,
+                currentTeamId: currentTeamId,
+                storedBundleId: storedBundleId,
+                storedTeamId: storedTeamId
+            )
+        }
+
+        // Check for team ID change (signing identity changed)
+        if let stored = storedTeamId, let current = currentTeamId, stored != current {
+            let reason = "Team ID changed from '\(stored)' to '\(current)'"
+            AppLogger.system.warning("\(reason, privacy: .public) - permissions may be invalid")
+            return IdentityChangeResult(
+                hasChanged: true,
+                reason: reason,
+                currentBundleId: currentBundleId,
+                currentTeamId: currentTeamId,
+                storedBundleId: storedBundleId,
+                storedTeamId: storedTeamId
+            )
+        }
+
+        // Check if we had a team ID but now don't (or vice versa)
+        if (storedTeamId != nil) != (currentTeamId != nil) {
+            let reason = "Signing status changed (teamId: \(storedTeamId ?? "none") -> \(currentTeamId ?? "none"))"
+            AppLogger.system.warning("\(reason, privacy: .public) - permissions may be invalid")
+            return IdentityChangeResult(
+                hasChanged: true,
+                reason: reason,
+                currentBundleId: currentBundleId,
+                currentTeamId: currentTeamId,
+                storedBundleId: storedBundleId,
+                storedTeamId: storedTeamId
+            )
+        }
+
+        AppLogger.system.debug("App identity unchanged - permissions should still be valid")
+        return IdentityChangeResult(
+            hasChanged: false,
+            reason: nil,
+            currentBundleId: currentBundleId,
+            currentTeamId: currentTeamId,
+            storedBundleId: storedBundleId,
+            storedTeamId: storedTeamId
+        )
+    }
+
+    /// Get current app identity for storing after permissions are granted
+    static func getCurrentIdentity() -> (bundleId: String?, teamId: String?) {
+        let validation = validateAppIdentity()
+        return (validation.bundleId, validation.teamId)
+    }
 }
 
 /// Mock implementation for testing
@@ -745,4 +839,3 @@ class MockPermissionService: PermissionChecker {
         isPolling = false
     }
 }
-// swiftlint:enable file_length type_body_length

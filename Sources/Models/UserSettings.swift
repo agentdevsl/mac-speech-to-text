@@ -52,8 +52,6 @@ struct UserSettings: Codable, Sendable {
             showConfidenceIndicator: true,
             animationsEnabled: true,
             menuBarIcon: .default,
-            showFloatingWidget: true,
-            widgetPosition: .bottomCenter,
             recordingMode: .holdToRecord
         ),
         privacy: PrivacyConfiguration(
@@ -130,8 +128,6 @@ struct UIConfiguration: Codable, Sendable {
     var showConfidenceIndicator: Bool
     var animationsEnabled: Bool
     var menuBarIcon: MenuBarIcon
-    var showFloatingWidget: Bool
-    var widgetPosition: WidgetPosition
     var recordingMode: RecordingMode
 }
 
@@ -185,18 +181,6 @@ enum RecordingMode: String, Codable, CaseIterable, Sendable {
     }
 }
 
-enum WidgetPosition: String, Codable, CaseIterable, Sendable {
-    case bottomCenter
-    case bottomRight
-
-    var displayName: String {
-        switch self {
-        case .bottomCenter: return "Bottom Center"
-        case .bottomRight: return "Bottom Right"
-        }
-    }
-}
-
 struct PrivacyConfiguration: Codable, Sendable {
     var collectAnonymousStats: Bool
     var storagePolicy: StoragePolicy
@@ -223,6 +207,14 @@ struct OnboardingState: Codable, Sendable {
     var currentStep: Int
     var permissionsGranted: PermissionsGranted
     var skippedSteps: [String]
+
+    /// Last known app bundle ID when permissions were granted
+    /// Used to detect signing/rebuild changes that invalidate permissions
+    var lastKnownBundleId: String?
+
+    /// Last known team ID when permissions were granted
+    /// Used to detect signing identity changes
+    var lastKnownTeamId: String?
 }
 
 struct PermissionsGranted: Codable, Sendable {

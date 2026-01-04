@@ -21,10 +21,16 @@ final class AppStateTests: XCTestCase {
         // These tests pass locally but crash in headless CI environments
         try XCTSkipIf(Self.isCI, "AppStateTests require real macOS hardware, skipping in CI")
 
-        // Clear settings from UserDefaults.standard to ensure test isolation
+        // Clear ALL settings from UserDefaults.standard to ensure test isolation
         // AppState internally uses SettingsService with .standard UserDefaults
+        // Also clear MainView settings which may interfere with onboarding state
         UserDefaults.standard.removeObject(forKey: settingsKey)
+        UserDefaults.standard.removeObject(forKey: "MainView.selectedSection")
+        UserDefaults.standard.removeObject(forKey: "MainView.hasLaunchedBefore")
         UserDefaults.standard.synchronize()
+
+        // Small delay to ensure UserDefaults sync completes before creating AppState
+        try await Task.sleep(for: .milliseconds(50))
 
         // Note: AppState creates its own services internally
         // For full testing, we'd need dependency injection
@@ -32,8 +38,11 @@ final class AppStateTests: XCTestCase {
     }
 
     override func tearDown() async throws {
-        // Clean up to avoid affecting other tests
+        appState = nil
+        // Clean up ALL test-affected keys to avoid affecting other tests
         UserDefaults.standard.removeObject(forKey: settingsKey)
+        UserDefaults.standard.removeObject(forKey: "MainView.selectedSection")
+        UserDefaults.standard.removeObject(forKey: "MainView.hasLaunchedBefore")
         UserDefaults.standard.synchronize()
         try await super.tearDown()
     }

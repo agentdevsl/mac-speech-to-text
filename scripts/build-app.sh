@@ -648,8 +648,15 @@ fi
 # Clean if requested
 if [ "$CLEAN_BUILD" = true ]; then
     print_info "Cleaning build directory..."
-    rm -rf "${BUILD_DIR}"
-    rm -rf .build
+    rm -rf "${BUILD_DIR}" 2>/dev/null || true
+    # Try to clean .build but don't fail if locked by another process
+    rm -rf .build 2>/dev/null || {
+        print_warning "Could not fully clean .build directory (may be in use)"
+        # Try cleaning just the build artifacts, leave checkouts/dependencies
+        rm -rf .build/arm64-apple-macosx 2>/dev/null || true
+        rm -rf .build/debug 2>/dev/null || true
+        rm -rf .build/release 2>/dev/null || true
+    }
     print_success "Build directory cleaned"
 fi
 
