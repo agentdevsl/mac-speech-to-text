@@ -52,42 +52,78 @@ struct MainView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Simple sidebar
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Speech to Text")
-                    .font(.headline)
-                    .padding(.bottom, 10)
+            // Glassmorphic sidebar
+            VStack(alignment: .leading, spacing: 4) {
+                // App branding header with amber accent
+                VStack(spacing: 8) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.amberPrimary.opacity(0.15))
+                            .frame(width: 44, height: 44)
 
-                ForEach(SidebarSection.allCases, id: \.self) { section in
-                    Button {
-                        viewModel.selectedSection = section
-                    } label: {
-                        HStack {
-                            Image(systemName: section.icon)
-                            Text(section.title)
-                            Spacer()
-                        }
-                        .padding(.vertical, 6)
-                        .padding(.horizontal, 10)
-                        .background(viewModel.selectedSection == section ? Color.accentColor.opacity(0.2) : Color.clear)
-                        .cornerRadius(6)
+                        Image(systemName: "waveform.circle.fill")
+                            .font(.system(size: 28))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.amberLight, .amberPrimary],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
                     }
-                    .buttonStyle(.plain)
+                    .shadow(color: .amberPrimary.opacity(0.3), radius: 6, x: 0, y: 2)
+
+                    Text("Speech to Text")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.primary)
+                }
+                .padding(.bottom, 16)
+
+                // Navigation items with amber selection
+                ForEach(SidebarSection.allCases, id: \.self) { section in
+                    sidebarButton(for: section)
                 }
 
                 Spacer()
+
+                // Quit button
+                Button {
+                    viewModel.quitApplication()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "power")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("Quit")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("quitButton")
             }
             .frame(width: 180)
-            .padding()
-            .background(Color(NSColor.controlBackgroundColor))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+            .background(sidebarBackground)
 
-            Divider()
+            // Subtle divider
+            Rectangle()
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
+                .frame(width: 1)
 
-            // Detail content
+            // Detail content area
             detailContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(detailBackground)
         }
-        .frame(minWidth: 600, minHeight: 500)
+        .background(backgroundGradient)
+        .frame(minWidth: 720, minHeight: 560)
         .accessibilityIdentifier("mainView")
         .onAppear {
             initializeViewModels()
@@ -108,6 +144,65 @@ struct MainView: View {
         }
     }
 
+    // MARK: - Sidebar Button
+
+    private func sidebarButton(for section: SidebarSection) -> some View {
+        let isSelected = viewModel.selectedSection == section
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                viewModel.selectedSection = section
+            }
+        } label: {
+            HStack(spacing: 10) {
+                // Icon with amber glow when selected
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(Color.amberPrimary.opacity(0.2))
+                            .frame(width: 24, height: 24)
+                    }
+
+                    Image(systemName: section.icon)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Color.amberPrimary : .secondary)
+                }
+                .frame(width: 24)
+
+                Text(section.title)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+
+                Spacer()
+
+                // Selection indicator bar
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(Color.amberPrimary)
+                        .frame(width: 3, height: 14)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                Group {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(colorScheme == .dark
+                                ? Color.amberPrimary.opacity(0.12)
+                                : Color.amberPrimary.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.amberPrimary.opacity(0.2), lineWidth: 1)
+                            )
+                    }
+                }
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("sidebar\(section.title.replacingOccurrences(of: " ", with: ""))")
+    }
+
     // MARK: - Background Components
 
     /// Subtle gradient background that spans the entire window
@@ -122,28 +217,18 @@ struct MainView: View {
         .ignoresSafeArea()
     }
 
-    /// Frosted glass background for sidebar
+    /// Frosted glass background for sidebar - subtle translucent effect
     private var sidebarBackground: some View {
-        ZStack {
-            if colorScheme == .dark {
-                Color.black.opacity(0.3)
-            } else {
-                Color.white.opacity(0.6)
-            }
-        }
-        .background(.ultraThinMaterial)
+        colorScheme == .dark
+            ? Color(white: 0.12)
+            : Color(white: 0.96)
     }
 
     /// Clean background for detail area
     private var detailBackground: some View {
-        ZStack {
-            if colorScheme == .dark {
-                Color.black.opacity(0.2)
-            } else {
-                Color.white.opacity(0.8)
-            }
-        }
-        .background(.regularMaterial)
+        colorScheme == .dark
+            ? Color(white: 0.08)
+            : Color(white: 0.98)
     }
 
     // MARK: - Keyboard Navigation

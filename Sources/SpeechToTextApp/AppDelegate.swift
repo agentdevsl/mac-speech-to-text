@@ -400,9 +400,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.recordingWindow = nil
             }
 
-        // Create window for modal
+        // Create floating window for the glassmorphism recording modal
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 400),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false

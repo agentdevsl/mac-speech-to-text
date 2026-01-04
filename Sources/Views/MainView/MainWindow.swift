@@ -26,8 +26,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
     private let permissionService: PermissionService
 
     /// Window dimensions
-    private static let windowWidth: CGFloat = 600
-    private static let windowHeight: CGFloat = 500
+    private static let windowWidth: CGFloat = 720
+    private static let windowHeight: CGFloat = 560
 
     /// Window title
     private static let windowTitle = "Speech to Text"
@@ -75,7 +75,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
                 width: Self.windowWidth,
                 height: Self.windowHeight
             ),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -152,7 +152,7 @@ final class MainWindow: NSObject, NSWindowDelegate {
         // Close button behavior
         window.standardWindowButton(.closeButton)?.isEnabled = true
         window.standardWindowButton(.miniaturizeButton)?.isEnabled = true
-        window.standardWindowButton(.zoomButton)?.isEnabled = false
+        window.standardWindowButton(.zoomButton)?.isEnabled = true
 
         // Animation behavior
         window.animationBehavior = .documentWindow
