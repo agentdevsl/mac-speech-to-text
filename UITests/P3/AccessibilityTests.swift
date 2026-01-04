@@ -4,8 +4,8 @@
 // End-to-end UI tests for accessibility compliance
 // Part of User Story 7: Accessibility and Compliance (P3)
 
-import XCTest
 import AppKit  // For NSAccessibility on macOS
+import XCTest
 
 /// Tests for accessibility compliance - VoiceOver, keyboard navigation, etc.
 final class AccessibilityTests: UITestBase {

@@ -51,7 +51,7 @@ final class SettingsTests: UITestBase {
 
         // At least one settings control should exist
         let hasContent = generalTab.exists || audioTab.exists || languageTab.exists
-            || app.staticTexts.count > 0
+            || !app.staticTexts.allElementsBoundByIndex.isEmpty
 
         XCTAssertTrue(hasContent, "Settings should have content")
 

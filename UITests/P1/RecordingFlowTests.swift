@@ -67,7 +67,7 @@ final class RecordingFlowTests: UITestBase {
         }
 
         // At minimum, the modal window should exist
-        XCTAssertTrue(app.windows.count > 0, "At least one window should exist")
+        XCTAssertFalse(app.windows.allElementsBoundByIndex.isEmpty, "At least one window should exist")
 
         captureScreenshot(named: "RF-002-Waveform-Visibility")
     }
