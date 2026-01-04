@@ -3,6 +3,7 @@
 //
 // Main View - Home Section
 // Displays recording status, permission cards, and typing animation demo
+// Glassmorphism design with frosted glass effects
 
 import SwiftUI
 
@@ -15,7 +16,12 @@ enum PermissionCardFocus: Hashable {
 }
 
 /// HomeSection displays the main dashboard with recording status and permission overview
+/// Features glassmorphism design with frosted glass cards and glowing accents
 struct HomeSection: View {
+    // MARK: - Environment
+
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Dependencies
 
     let settingsService: SettingsService
@@ -23,7 +29,6 @@ struct HomeSection: View {
 
     // MARK: - Focus State
 
-    /// Focus state for keyboard navigation between permission cards
     @FocusState private var focusedCard: PermissionCardFocus?
 
     // MARK: - State
@@ -57,14 +62,16 @@ struct HomeSection: View {
             VStack(spacing: 32) {
                 // Hero section with animated mic icon
                 heroSection
+                    .padding(.top, 20)
 
-                // Permission status cards
+                // Permission status cards in glass containers
                 permissionCards
 
                 // Typing animation preview
                 typingPreview
             }
-            .padding(24)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
         }
         .accessibilityIdentifier("homeSection")
         .task {
@@ -92,7 +99,6 @@ struct HomeSection: View {
 
     // MARK: - Keyboard Navigation
 
-    /// Handle tab key navigation between permission cards
     private func handleTabNavigation() {
         switch focusedCard {
         case .none:
@@ -104,7 +110,6 @@ struct HomeSection: View {
         }
     }
 
-    /// Handle return/space key to activate focused permission card
     private func handleReturnKey() {
         switch focusedCard {
         case .microphone:
@@ -123,76 +128,121 @@ struct HomeSection: View {
     // MARK: - Hero Section
 
     private var heroSection: some View {
-        VStack(spacing: 20) {
-            // Animated microphone icon with pulse effect
+        VStack(spacing: 24) {
+            // Animated microphone icon with glow effect
             ZStack {
                 // Outer pulse rings
-                Circle()
-                    .stroke(Color.warmAmber.opacity(0.3), lineWidth: 2)
-                    .frame(width: 120, height: 120)
-                    .scaleEffect(isPulsing ? 1.3 : 1.0)
-                    .opacity(isPulsing ? 0.0 : 0.6)
+                ForEach(0..<3, id: \.self) { index in
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.amberPrimary.opacity(0.4),
+                                    Color.amberPrimary.opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.5
+                        )
+                        .frame(width: CGFloat(80 + index * 24), height: CGFloat(80 + index * 24))
+                        .scaleEffect(isPulsing ? 1.2 : 1.0)
+                        .opacity(isPulsing ? 0.0 : 0.8 - Double(index) * 0.2)
+                        .animation(
+                            .easeInOut(duration: 2.0)
+                            .repeatForever(autoreverses: true)
+                            .delay(Double(index) * 0.2),
+                            value: isPulsing
+                        )
+                }
 
-                Circle()
-                    .stroke(Color.warmAmber.opacity(0.5), lineWidth: 2)
-                    .frame(width: 100, height: 100)
-                    .scaleEffect(isPulsing ? 1.2 : 1.0)
-                    .opacity(isPulsing ? 0.0 : 0.8)
-
-                // Main icon circle
+                // Glass card background
                 Circle()
                     .fill(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.08)
+                            : Color.white.opacity(0.9)
+                    )
+                    .frame(width: 90, height: 90)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .shadow(color: Color.amberPrimary.opacity(0.3), radius: 20, x: 0, y: 5)
+
+                // Main icon with gradient
+                Image(systemName: "mic.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundStyle(
                         LinearGradient(
-                            colors: [Color.warmAmberLight, Color.warmAmber],
+                            colors: [.amberLight, .amberPrimary, .amberDark],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: 80, height: 80)
-                    .shadow(color: Color.warmAmber.opacity(0.4), radius: 12, x: 0, y: 4)
-
-                Image(systemName: "mic.circle.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.white)
                     .symbolEffect(.pulse, options: .repeating, value: isPulsing)
             }
+            .frame(height: 160)
             .accessibilityIdentifier("homeMicIcon")
 
-            // Hotkey hint
-            VStack(spacing: 8) {
+            // Hotkey hint in glass container
+            VStack(spacing: 10) {
                 Text("Press")
-                    .font(.subheadline)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 4) {
-                    KeyboardKey(symbol: "^")
-                    KeyboardKey(symbol: "Shift")
-                    KeyboardKey(symbol: "Space")
+                HStack(spacing: 6) {
+                    GlassKeyboardKey(symbol: "^")
+                    GlassKeyboardKey(symbol: "Shift")
+                    GlassKeyboardKey(symbol: "Space")
                 }
                 .accessibilityIdentifier("hotkeyDisplay")
 
                 Text("anywhere to record")
-                    .font(.subheadline)
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+            .padding(.vertical, 16)
+            .padding(.horizontal, 24)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.7))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+            )
         }
-        .padding(.top, 16)
         .accessibilityIdentifier("heroSection")
     }
 
     // MARK: - Permission Cards
 
     private var permissionCards: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
+            // Section label
+            HStack {
+                Text("PERMISSIONS")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.5)
+
+                Spacer()
+
+                if allPermissionsGranted {
+                    Label("All Ready", systemImage: "checkmark.seal.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.successGreen)
+                }
+            }
+            .padding(.horizontal, 4)
+
             // Microphone permission card
-            PermissionStatusCard(
+            GlassPermissionCard(
                 icon: "mic.fill",
                 title: "Microphone",
+                subtitle: "Required for voice recording",
                 isGranted: microphoneGranted,
                 isLoading: isMicrophoneLoading,
                 errorMessage: microphoneError,
                 actionLabel: "Grant Access",
                 isFocused: focusedCard == .microphone,
+                colorScheme: colorScheme,
                 onAction: requestMicrophonePermission,
                 onDismissError: { microphoneError = nil }
             )
@@ -201,14 +251,16 @@ struct HomeSection: View {
             .accessibilityIdentifier("microphonePermissionCard")
 
             // Accessibility permission card
-            PermissionStatusCard(
+            GlassPermissionCard(
                 icon: "hand.raised.fill",
                 title: "Accessibility",
+                subtitle: "Required for text insertion",
                 isGranted: accessibilityGranted,
                 isLoading: isAccessibilityPolling,
                 errorMessage: accessibilityError,
                 actionLabel: "Enable",
                 isFocused: focusedCard == .accessibility,
+                colorScheme: colorScheme,
                 onAction: requestAccessibilityPermission,
                 onDismissError: { accessibilityError = nil }
             )
@@ -216,36 +268,61 @@ struct HomeSection: View {
             .focused($focusedCard, equals: .accessibility)
             .accessibilityIdentifier("accessibilityPermissionCard")
         }
-        .padding(.horizontal, 4)
         .accessibilityIdentifier("permissionCards")
+    }
+
+    private var allPermissionsGranted: Bool {
+        microphoneGranted && accessibilityGranted
     }
 
     // MARK: - Typing Preview
 
     private var typingPreview: some View {
         VStack(spacing: 12) {
-            Text("Preview")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .tracking(1)
+            HStack {
+                Text("PREVIEW")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .tracking(1.5)
+                Spacer()
+            }
+            .padding(.horizontal, 4)
 
+            // Glass typing preview container
             HStack(spacing: 0) {
                 Text(displayedText)
-                    .font(.system(.body, design: .default))
+                    .font(.system(size: 15, weight: .regular, design: .default))
                     .foregroundStyle(.primary)
 
-                // Typing cursor
+                // Animated cursor
                 Rectangle()
-                    .fill(Color.warmAmber)
-                    .frame(width: 2, height: 18)
+                    .fill(Color.amberPrimary)
+                    .frame(width: 2, height: 20)
                     .opacity(isPulsing ? 1.0 : 0.3)
+                    .animation(
+                        .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
+                        value: isPulsing
+                    )
             }
-            .frame(minHeight: 24)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.warmGray.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .frame(minHeight: 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.8))
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                colorScheme == .dark
+                                    ? Color.white.opacity(0.1)
+                                    : Color.black.opacity(0.05),
+                                lineWidth: 1
+                            )
+                    )
+            )
+            .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 2)
         }
         .accessibilityIdentifier("typingPreview")
     }
@@ -267,22 +344,19 @@ struct HomeSection: View {
     }
 
     private func startTypingAnimation() {
-        // Cancel any existing typing task
         typingTask?.cancel()
         displayedText = ""
         let phrase = samplePhrases[currentPhraseIndex]
 
-        // Use cancellable Task for animation loop
         typingTask = Task { @MainActor in
             for char in phrase {
                 guard !Task.isCancelled else { return }
                 displayedText.append(char)
-                try? await Task.sleep(nanoseconds: 80_000_000) // 80ms per character
+                try? await Task.sleep(nanoseconds: 80_000_000)
             }
 
-            // Pause at the end, then move to next phrase
             guard !Task.isCancelled else { return }
-            try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second pause
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
             guard !Task.isCancelled else { return }
             currentPhraseIndex = (currentPhraseIndex + 1) % samplePhrases.count
             startTypingAnimation()
@@ -290,7 +364,6 @@ struct HomeSection: View {
     }
 
     private func requestMicrophonePermission() {
-        // Clear any previous error
         microphoneError = nil
         isMicrophoneLoading = true
 
@@ -300,7 +373,6 @@ struct HomeSection: View {
                 await refreshPermissions()
                 isMicrophoneLoading = false
             } catch {
-                // Permission denied - show error state
                 isMicrophoneLoading = false
                 microphoneError = "Permission denied. Please grant access in System Settings."
                 AppLogger.system.warning("Microphone permission denied")
@@ -309,7 +381,6 @@ struct HomeSection: View {
     }
 
     private func requestAccessibilityPermission() {
-        // Clear any previous error
         accessibilityError = nil
         isAccessibilityPolling = true
 
@@ -317,14 +388,11 @@ struct HomeSection: View {
             do {
                 try permissionService.requestAccessibilityPermission()
             } catch {
-                // Opens System Settings for user to grant permission
                 AppLogger.system.info("Opening System Settings for accessibility permission")
             }
 
-            // Track if callback was invoked
             var callbackInvoked = false
 
-            // Start polling for permission grant
             await permissionService.pollForAccessibilityPermission(
                 interval: 1.0,
                 maxDuration: 60.0
@@ -336,7 +404,6 @@ struct HomeSection: View {
                 }
             }
 
-            // If polling finished without callback (timed out)
             if !callbackInvoked {
                 isAccessibilityPolling = false
                 if !accessibilityGranted {
@@ -347,64 +414,83 @@ struct HomeSection: View {
     }
 }
 
-// MARK: - Keyboard Key View
+// MARK: - Glass Keyboard Key
 
-/// A styled keyboard key for hotkey display
-private struct KeyboardKey: View {
+/// A glassmorphism styled keyboard key
+private struct GlassKeyboardKey: View {
     let symbol: String
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Text(symbol)
-            .font(.system(.caption, design: .rounded, weight: .medium))
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(.primary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color.warmGray)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .overlay(
-                RoundedRectangle(cornerRadius: 4)
-                    .stroke(Color.warmGrayMedium, lineWidth: 1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
             )
-            .shadow(color: .black.opacity(0.1), radius: 1, x: 0, y: 1)
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1),
+                        lineWidth: 1
+                    )
+            )
     }
 }
 
-// MARK: - Permission Status Card
+// MARK: - Glass Permission Card
 
-/// Compact permission status card for the home section with loading and error states
-private struct PermissionStatusCard: View {
+/// Glassmorphism permission status card
+private struct GlassPermissionCard: View {
     let icon: String
     let title: String
+    let subtitle: String
     let isGranted: Bool
     let isLoading: Bool
     let errorMessage: String?
     let actionLabel: String
     let isFocused: Bool
+    let colorScheme: ColorScheme
     let onAction: () -> Void
     let onDismissError: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Main card content
-            HStack(spacing: 12) {
-                // Icon
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(iconColor)
-                    .frame(width: 32)
+            HStack(spacing: 14) {
+                // Icon with status glow
+                ZStack {
+                    Circle()
+                        .fill(iconBackgroundColor)
+                        .frame(width: 44, height: 44)
 
-                // Title
-                Text(title)
-                    .font(.body)
-                    .foregroundStyle(.primary)
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(iconColor)
+                }
+                .shadow(color: iconGlowColor, radius: 8, x: 0, y: 2)
+
+                // Title and subtitle
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.primary)
+
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundStyle(.secondary)
+                }
 
                 Spacer()
 
                 // Status or action button
                 statusContent
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(16)
 
             // Error message row (if present)
             if let errorMessage = errorMessage {
@@ -412,8 +498,9 @@ private struct PermissionStatusCard: View {
             }
         }
         .background(cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(cardBorder)
+        .shadow(color: shadowColor, radius: 12, x: 0, y: 4)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isGranted)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isLoading)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: errorMessage != nil)
@@ -428,34 +515,67 @@ private struct PermissionStatusCard: View {
         } else if isGranted {
             return Color.successGreen
         } else {
-            return Color.warmAmber
+            return Color.amberPrimary
+        }
+    }
+
+    private var iconBackgroundColor: Color {
+        if errorMessage != nil {
+            return Color.errorRed.opacity(0.15)
+        } else if isGranted {
+            return Color.successGreen.opacity(0.15)
+        } else {
+            return Color.amberPrimary.opacity(0.15)
+        }
+    }
+
+    private var iconGlowColor: Color {
+        if errorMessage != nil {
+            return Color.errorRed.opacity(0.2)
+        } else if isGranted {
+            return Color.successGreen.opacity(0.2)
+        } else {
+            return Color.amberPrimary.opacity(0.2)
         }
     }
 
     private var cardBackground: some View {
         Group {
             if isFocused {
-                Color.warmAmber.opacity(0.08)
+                Color.amberPrimary.opacity(0.08)
+            } else if colorScheme == .dark {
+                Color.white.opacity(0.06)
             } else {
-                Color.cardBackground
+                Color.white.opacity(0.85)
             }
         }
+        .background(.ultraThinMaterial)
     }
 
     private var cardBorder: some View {
-        RoundedRectangle(cornerRadius: 10)
+        RoundedRectangle(cornerRadius: 14)
             .stroke(borderColor, lineWidth: isFocused ? 2 : 1)
     }
 
     private var borderColor: Color {
         if isFocused {
-            return Color.warmAmber.opacity(0.6)
+            return Color.amberPrimary.opacity(0.6)
         } else if errorMessage != nil {
-            return Color.errorRed.opacity(0.5)
+            return Color.errorRed.opacity(0.4)
         } else if isGranted {
             return Color.successGreen.opacity(0.3)
         } else {
-            return Color.warmGrayMedium.opacity(0.5)
+            return colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.05)
+        }
+    }
+
+    private var shadowColor: Color {
+        if isGranted {
+            return Color.successGreen.opacity(0.1)
+        } else if errorMessage != nil {
+            return Color.errorRed.opacity(0.1)
+        } else {
+            return Color.black.opacity(0.05)
         }
     }
 
@@ -464,40 +584,49 @@ private struct PermissionStatusCard: View {
     @ViewBuilder
     private var statusContent: some View {
         if isLoading {
-            // Loading state with spinner
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ProgressView()
                     .scaleEffect(0.7)
                 Text("Checking...")
-                    .font(.caption)
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
             }
             .accessibilityLabel("Checking permission status")
         } else if isGranted {
-            // Granted state
             Label("Ready", systemImage: "checkmark.circle.fill")
-                .font(.caption)
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Color.successGreen)
         } else if errorMessage != nil {
-            // Error state - show retry button
             Button(action: onAction) {
                 HStack(spacing: 4) {
                     Text("Retry")
                     Image(systemName: "arrow.clockwise")
                 }
-                .font(.caption)
-                .foregroundStyle(Color.warmAmber)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(Color.amberPrimary)
             }
             .buttonStyle(.plain)
         } else {
-            // Default action button
             Button(action: onAction) {
                 HStack(spacing: 4) {
                     Text(actionLabel)
                     Image(systemName: "arrow.right")
                 }
-                .font(.caption)
-                .foregroundStyle(Color.warmAmber)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [.amberLight, .amberPrimary],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .shadow(color: Color.amberPrimary.opacity(0.3), radius: 4, x: 0, y: 2)
             }
             .buttonStyle(.plain)
         }
@@ -506,11 +635,11 @@ private struct PermissionStatusCard: View {
     private func errorRow(message: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(Color.errorRed)
 
             Text(message)
-                .font(.caption)
+                .font(.system(size: 12))
                 .foregroundStyle(Color.errorRed)
                 .lineLimit(2)
 
@@ -520,14 +649,14 @@ private struct PermissionStatusCard: View {
                 onDismissError()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.caption)
+                    .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Dismiss error")
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(Color.errorRed.opacity(0.1))
     }
 }
@@ -539,7 +668,7 @@ private struct PermissionStatusCard: View {
         settingsService: SettingsService(),
         permissionService: PermissionService()
     )
-    .frame(width: 380, height: 600)
+    .frame(width: 500, height: 650)
 }
 
 #Preview("Home Section - Dark Mode") {
@@ -547,6 +676,6 @@ private struct PermissionStatusCard: View {
         settingsService: SettingsService(),
         permissionService: PermissionService()
     )
-    .frame(width: 380, height: 600)
+    .frame(width: 500, height: 650)
     .preferredColorScheme(.dark)
 }

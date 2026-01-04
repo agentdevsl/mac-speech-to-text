@@ -2,11 +2,12 @@
 // macOS Local Speech-to-Text Application
 //
 // Phase 2: Unified Main View
-// NavigationSplitView container serving as both Welcome (first launch) and Settings (subsequent)
+// NavigationSplitView container with glassmorphism design
 
 import SwiftUI
 
 /// MainView provides a unified interface for both first-launch welcome and subsequent settings access
+/// Features a glassmorphism design with frosted glass effects and warm amber accents
 struct MainView: View {
     // MARK: - Environment
 
@@ -50,21 +51,26 @@ struct MainView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
-            sidebarContent
-        } detail: {
-            detailContent
+        ZStack {
+            // Background gradient
+            backgroundGradient
+
+            NavigationSplitView {
+                sidebarContent
+                    .background(sidebarBackground)
+            } detail: {
+                detailContent
+                    .background(detailBackground)
+            }
         }
-        .frame(minWidth: 600, minHeight: 500)
-        .frame(width: 600, height: 500)
+        .frame(minWidth: 700, minHeight: 550)
+        .frame(width: 750, height: 580)
         .accessibilityIdentifier("mainView")
         .onAppear {
             initializeViewModels()
-            // Set initial focus to current section
             focusedSection = viewModel.selectedSection
         }
         .onChange(of: focusedSection) { _, newValue in
-            // Sync focus state with selection
             if let newValue = newValue {
                 viewModel.selectedSection = newValue
             }
@@ -79,9 +85,46 @@ struct MainView: View {
         }
     }
 
+    // MARK: - Background Components
+
+    /// Subtle gradient background that spans the entire window
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: colorScheme == .dark
+                ? [Color(white: 0.08), Color(white: 0.05)]
+                : [Color(hex: "FDFBF9"), Color(hex: "F5F0EB")],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
+    /// Frosted glass background for sidebar
+    private var sidebarBackground: some View {
+        ZStack {
+            if colorScheme == .dark {
+                Color.black.opacity(0.3)
+            } else {
+                Color.white.opacity(0.6)
+            }
+        }
+        .background(.ultraThinMaterial)
+    }
+
+    /// Clean background for detail area
+    private var detailBackground: some View {
+        ZStack {
+            if colorScheme == .dark {
+                Color.black.opacity(0.2)
+            } else {
+                Color.white.opacity(0.8)
+            }
+        }
+        .background(.regularMaterial)
+    }
+
     // MARK: - Keyboard Navigation
 
-    /// Navigate to the previous sidebar section
     private func navigateToPreviousSection() {
         let allSections = SidebarSection.allCases
         guard let currentIndex = allSections.firstIndex(of: viewModel.selectedSection),
@@ -91,7 +134,6 @@ struct MainView: View {
         focusedSection = previousSection
     }
 
-    /// Navigate to the next sidebar section
     private func navigateToNextSection() {
         let allSections = SidebarSection.allCases
         guard let currentIndex = allSections.firstIndex(of: viewModel.selectedSection),
@@ -103,9 +145,7 @@ struct MainView: View {
 
     // MARK: - ViewModel Initialization
 
-    /// Initialize section ViewModels on first appear
     private func initializeViewModels() {
-        // ViewModels use default initializers - they manage their own dependencies internally
         if languageViewModel == nil {
             languageViewModel = LanguageSectionViewModel()
         }
@@ -119,70 +159,166 @@ struct MainView: View {
 
     // MARK: - Sidebar
 
-    /// Sidebar navigation content
     private var sidebarContent: some View {
         VStack(spacing: 0) {
+            // App branding header
+            sidebarHeader
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+
             // Main navigation sections
-            List(selection: $viewModel.selectedSection) {
-                // Home section (default on first launch)
+            VStack(spacing: 4) {
                 sidebarItem(for: .home)
                     .accessibilityIdentifier("sidebarHome")
-
-                Divider()
-                    .padding(.vertical, 8)
-
-                // Settings sections
-                Section {
-                    sidebarItem(for: .general)
-                        .accessibilityIdentifier("sidebarGeneral")
-                    sidebarItem(for: .audio)
-                        .accessibilityIdentifier("sidebarAudio")
-                    sidebarItem(for: .language)
-                        .accessibilityIdentifier("sidebarLanguage")
-                    sidebarItem(for: .privacy)
-                        .accessibilityIdentifier("sidebarPrivacy")
-                }
-
-                Divider()
-                    .padding(.vertical, 8)
-
-                // About section
-                sidebarItem(for: .about)
-                    .accessibilityIdentifier("sidebarAbout")
             }
-            .listStyle(.sidebar)
+
+            // Divider with subtle styling
+            sidebarDivider
+
+            // Settings sections
+            VStack(spacing: 4) {
+                sidebarItem(for: .general)
+                    .accessibilityIdentifier("sidebarGeneral")
+                sidebarItem(for: .audio)
+                    .accessibilityIdentifier("sidebarAudio")
+                sidebarItem(for: .language)
+                    .accessibilityIdentifier("sidebarLanguage")
+                sidebarItem(for: .privacy)
+                    .accessibilityIdentifier("sidebarPrivacy")
+            }
+
+            // Divider with subtle styling
+            sidebarDivider
+
+            // About section
+            sidebarItem(for: .about)
+                .accessibilityIdentifier("sidebarAbout")
 
             Spacer()
 
             // Quit button at bottom
             quitButton
+                .padding(.bottom, 16)
         }
-        .frame(minWidth: 160, idealWidth: 180, maxWidth: 200)
+        .padding(.horizontal, 12)
+        .frame(minWidth: 180, idealWidth: 200, maxWidth: 220)
         .accessibilityIdentifier("mainViewSidebar")
     }
 
-    /// Sidebar navigation item with keyboard focus support
-    private func sidebarItem(for section: SidebarSection) -> some View {
-        Label {
-            Text(section.title)
-        } icon: {
-            Image(systemName: section.icon)
-                .foregroundStyle(
-                    viewModel.selectedSection == section
-                    ? Color("AmberPrimary", bundle: nil)
-                    : .secondary
-                )
+    /// App branding in sidebar header
+    private var sidebarHeader: some View {
+        VStack(spacing: 8) {
+            // Glowing amber icon
+            ZStack {
+                Circle()
+                    .fill(Color.amberPrimary.opacity(0.15))
+                    .frame(width: 50, height: 50)
+
+                Image(systemName: "waveform.circle.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.amberLight, .amberPrimary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .shadow(color: .amberPrimary.opacity(0.3), radius: 8, x: 0, y: 2)
+
+            Text("Speech to Text")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
         }
-        .tag(section)
+    }
+
+    /// Styled divider for sidebar
+    private var sidebarDivider: some View {
+        Rectangle()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        Color.clear,
+                        colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.08),
+                        Color.clear
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(height: 1)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
+    }
+
+    /// Sidebar navigation item with keyboard focus support and glassmorphism
+    private func sidebarItem(for section: SidebarSection) -> some View {
+        let isSelected = viewModel.selectedSection == section
+        let isFocused = focusedSection == section
+
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.selectedSection = section
+            }
+        } label: {
+            HStack(spacing: 12) {
+                // Icon with glow when selected
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(Color.amberPrimary.opacity(0.2))
+                            .frame(width: 28, height: 28)
+                    }
+
+                    Image(systemName: section.icon)
+                        .font(.system(size: 14, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? Color.amberPrimary : .secondary)
+                }
+                .frame(width: 28)
+
+                Text(section.title)
+                    .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? .primary : .secondary)
+
+                Spacer()
+
+                // Selection indicator
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.amberPrimary)
+                        .frame(width: 3, height: 16)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(
+                Group {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(
+                                colorScheme == .dark
+                                    ? Color.amberPrimary.opacity(0.15)
+                                    : Color.amberPrimary.opacity(0.12)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.amberPrimary.opacity(0.3), lineWidth: 1)
+                            )
+                    } else if isFocused {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+                    }
+                }
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
         .focusable()
         .focused($focusedSection, equals: section)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(focusedSection == section ? Color.warmAmber.opacity(0.15) : Color.clear)
-                .animation(.easeInOut(duration: 0.15), value: focusedSection)
-        )
+        .animation(.easeInOut(duration: 0.15), value: isSelected)
+        .animation(.easeInOut(duration: 0.15), value: isFocused)
         .accessibilityLabel(section.accessibilityLabel)
-        .accessibilityAddTraits(viewModel.selectedSection == section ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     /// Quit button at bottom of sidebar
@@ -190,24 +326,27 @@ struct MainView: View {
         Button {
             viewModel.quitApplication()
         } label: {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "power")
+                    .font(.system(size: 12, weight: .medium))
                 Text("Quit")
+                    .font(.system(size: 12, weight: .medium))
             }
             .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.03))
+            )
         }
         .buttonStyle(.plain)
-        .background(Color.gray.opacity(0.1))
         .accessibilityIdentifier("quitButton")
         .accessibilityLabel("Quit Speech to Text")
     }
 
     // MARK: - Detail Content
 
-    /// Main content area based on selected section
     @ViewBuilder
     private var detailContent: some View {
         switch viewModel.selectedSection {
@@ -242,68 +381,58 @@ struct MainView: View {
     }
 }
 
-// MARK: - Placeholder Views (fallback until ViewModels initialize)
+// MARK: - Placeholder Views
 
-/// Placeholder for Language section
 private struct LanguageSectionPlaceholder: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "globe")
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-
-            Text("Language Section")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Loading...")
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("languageSectionContent")
+        GlassPlaceholder(icon: "globe", title: "Language Section")
     }
 }
 
-/// Placeholder for Privacy section
 private struct PrivacySectionPlaceholder: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
-
-            Text("Privacy Section")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Loading...")
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("privacySectionContent")
+        GlassPlaceholder(icon: "lock.shield", title: "Privacy Section")
     }
 }
 
-/// Placeholder for About section
 private struct AboutSectionPlaceholder: View {
     var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "info.circle")
-                .font(.system(size: 48))
-                .foregroundStyle(Color("AmberPrimary", bundle: nil))
+        GlassPlaceholder(icon: "info.circle", title: "About Section")
+    }
+}
 
-            Text("About Section")
-                .font(.title2)
+/// Reusable glass-styled placeholder
+private struct GlassPlaceholder: View {
+    let icon: String
+    let title: String
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(Color.amberPrimary.opacity(0.1))
+                    .frame(width: 80, height: 80)
+
+                Image(systemName: icon)
+                    .font(.system(size: 36))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.amberLight, .amberPrimary],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            .shadow(color: .amberPrimary.opacity(0.2), radius: 12, x: 0, y: 4)
+
+            Text(title)
+                .font(.title3)
                 .fontWeight(.semibold)
 
-            Text("Loading...")
-                .font(.body)
-                .foregroundStyle(.secondary)
+            ProgressView()
+                .scaleEffect(0.8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityIdentifier("aboutSectionContent")
     }
 }
 
@@ -321,7 +450,11 @@ private struct AboutSectionPlaceholder: View {
     MainViewPreview(section: .audio)
 }
 
-/// Preview helper with customizable section
+#Preview("Main View - Dark Mode") {
+    MainViewPreview(section: .home)
+        .preferredColorScheme(.dark)
+}
+
 private struct MainViewPreview: View {
     let section: SidebarSection
 
