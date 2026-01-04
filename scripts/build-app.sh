@@ -647,8 +647,12 @@ fi
 
 # Clean if requested
 if [ "$CLEAN_BUILD" = true ]; then
-    print_info "Cleaning build directory..."
+    print_info "Cleaning build caches..."
+
+    # Clean local build directory
     rm -rf "${BUILD_DIR}" 2>/dev/null || true
+    print_success "Cleaned build/"
+
     # Try to clean .build but don't fail if locked by another process
     rm -rf .build 2>/dev/null || {
         print_warning "Could not fully clean .build directory (may be in use)"
@@ -657,7 +661,18 @@ if [ "$CLEAN_BUILD" = true ]; then
         rm -rf .build/debug 2>/dev/null || true
         rm -rf .build/release 2>/dev/null || true
     }
-    print_success "Build directory cleaned"
+    print_success "Cleaned .build/"
+
+    # Clean Xcode DerivedData for this project
+    rm -rf "${HOME}/Library/Developer/Xcode/DerivedData/SpeechToText-"* 2>/dev/null || true
+    rm -rf "${HOME}/Library/Developer/Xcode/DerivedData/mac-speech-to-text-"* 2>/dev/null || true
+    print_success "Cleaned Xcode DerivedData"
+
+    # Clean SwiftPM cache (optional - can slow rebuilds)
+    rm -rf "${HOME}/Library/Caches/org.swift.swiftpm" 2>/dev/null || true
+    print_success "Cleaned SwiftPM cache"
+
+    print_success "All build caches cleaned"
 fi
 
 # Create build directory

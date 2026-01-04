@@ -51,20 +51,43 @@ struct MainView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack {
-            // Background gradient
-            backgroundGradient
+        HStack(spacing: 0) {
+            // Simple sidebar
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Speech to Text")
+                    .font(.headline)
+                    .padding(.bottom, 10)
 
-            NavigationSplitView {
-                sidebarContent
-                    .background(sidebarBackground)
-            } detail: {
-                detailContent
-                    .background(detailBackground)
+                ForEach(SidebarSection.allCases, id: \.self) { section in
+                    Button {
+                        viewModel.selectedSection = section
+                    } label: {
+                        HStack {
+                            Image(systemName: section.icon)
+                            Text(section.title)
+                            Spacer()
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
+                        .background(viewModel.selectedSection == section ? Color.accentColor.opacity(0.2) : Color.clear)
+                        .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
             }
+            .frame(width: 180)
+            .padding()
+            .background(Color(NSColor.controlBackgroundColor))
+
+            Divider()
+
+            // Detail content
+            detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 700, minHeight: 550)
-        .frame(width: 750, height: 580)
+        .frame(minWidth: 600, minHeight: 500)
         .accessibilityIdentifier("mainView")
         .onAppear {
             initializeViewModels()
