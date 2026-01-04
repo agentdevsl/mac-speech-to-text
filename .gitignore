@@ -60,3 +60,16 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Build directories
+build/
+DerivedData/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+.swiftpm/
+xcode-project/DerivedData/
+
+# Signing files (machine-specific)
+.signing-identity
+.signing-fingerprint
+xcode-project/Config/Signing.xcconfig

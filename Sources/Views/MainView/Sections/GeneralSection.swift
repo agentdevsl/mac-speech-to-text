@@ -302,16 +302,16 @@ private struct RecordingModeCard: View {
                     .foregroundStyle(isSelected ? Color.warmAmber : Color.warmGrayDark)
                     .frame(width: 40)
 
-                // Text content
+                // Text content - use explicit colors for white card background
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.body)
                         .fontWeight(.medium)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.textPrimary)
 
                     Text(description)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                         .lineLimit(2)
                 }
 
@@ -390,7 +390,7 @@ private struct KeyBadge: View {
     var body: some View {
         Text(text)
             .font(.system(.caption, design: .rounded, weight: .semibold))
-            .foregroundStyle(.primary)
+            .foregroundStyle(Color.textPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(Color.warmGray)

@@ -72,6 +72,9 @@ struct HomeSection: View {
                 // Permission status cards in glass containers
                 permissionCards
 
+                // Hotkey hint (shown after permissions are set up)
+                hotkeyHint
+
                 // Typing animation preview
                 typingPreview
             }
@@ -205,34 +208,38 @@ struct HomeSection: View {
             }
             .frame(height: 160)
             .accessibilityIdentifier("homeMicIcon")
-
-            // Hotkey hint in glass container
-            VStack(spacing: 10) {
-                Text("Press")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-
-                HStack(spacing: 6) {
-                    GlassKeyboardKey(symbol: "^")
-                    GlassKeyboardKey(symbol: "Shift")
-                    GlassKeyboardKey(symbol: "Space")
-                }
-                .accessibilityIdentifier("hotkeyDisplay")
-
-                Text("anywhere to record")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 24)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.7))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
-            )
         }
         .accessibilityIdentifier("heroSection")
+    }
+
+    // MARK: - Hotkey Hint
+
+    private var hotkeyHint: some View {
+        VStack(spacing: 10) {
+            Text("Press")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 6) {
+                GlassKeyboardKey(symbol: "^")
+                GlassKeyboardKey(symbol: "Shift")
+                GlassKeyboardKey(symbol: "Space")
+            }
+            .accessibilityIdentifier("hotkeyDisplay")
+
+            Text("anywhere to record")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.7))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+        )
+        .accessibilityIdentifier("hotkeyHint")
     }
 
     // MARK: - Permission Cards
