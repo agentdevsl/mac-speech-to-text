@@ -18,6 +18,7 @@ struct GeneralSection: View {
     @State private var settings: UserSettings
     @State private var isSaving: Bool = false
     @State private var saveError: String?
+    @State private var showHotkeyAlert: Bool = false
 
     // MARK: - Initialization
 
@@ -70,6 +71,11 @@ struct GeneralSection: View {
             .animation(.easeInOut(duration: 0.3), value: saveError)
         }
         .accessibilityIdentifier("generalSection")
+        .alert("Custom Hotkey", isPresented: $showHotkeyAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Custom hotkey configuration is coming in a future update. The current hotkey is ⌃⇧Space (Control + Shift + Space).")
+        }
     }
 
     // MARK: - Section Header
@@ -200,10 +206,9 @@ struct GeneralSection: View {
 
                 Spacer()
 
-                // Change button (placeholder - would open hotkey recorder)
+                // Change button
                 Button("Change") {
-                    // Would open hotkey recorder modal
-                    AppLogger.system.info("Hotkey change requested")
+                    showHotkeyAlert = true
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

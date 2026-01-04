@@ -40,6 +40,15 @@ struct HomeSection: View {
     @State private var currentPhraseIndex: Int = 0
     @State private var displayedText: String = ""
     @State private var typingTask: Task<Void, Never>?
+    @State private var settings: UserSettings
+
+    // MARK: - Initialization
+
+    init(settingsService: SettingsService, permissionService: PermissionService) {
+        self.settingsService = settingsService
+        self.permissionService = permissionService
+        self._settings = State(initialValue: settingsService.load())
+    }
 
     // Loading & Error States
     @State private var isMicrophoneLoading: Bool = false
@@ -221,9 +230,10 @@ struct HomeSection: View {
                 .foregroundStyle(.secondary)
 
             HStack(spacing: 6) {
-                GlassKeyboardKey(symbol: "^")
-                GlassKeyboardKey(symbol: "Shift")
-                GlassKeyboardKey(symbol: "Space")
+                ForEach(settings.hotkey.modifiers, id: \.self) { modifier in
+                    GlassKeyboardKey(symbol: modifier.displayName)
+                }
+                GlassKeyboardKey(symbol: hotkeyKeyName)
             }
             .accessibilityIdentifier("hotkeyDisplay")
 
@@ -240,6 +250,17 @@ struct HomeSection: View {
                 .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
         )
         .accessibilityIdentifier("hotkeyHint")
+    }
+
+    /// Display name for the configured hotkey
+    private var hotkeyKeyName: String {
+        switch settings.hotkey.keyCode {
+        case 49: return "Space"
+        case 36: return "Return"
+        case 53: return "Escape"
+        case 51: return "Delete"
+        default: return "Key \(settings.hotkey.keyCode)"
+        }
     }
 
     // MARK: - Permission Cards
