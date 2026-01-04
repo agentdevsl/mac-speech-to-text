@@ -193,8 +193,9 @@ final class LanguageTests: UITestBase {
             "--initial-language=fr"
         ])
 
-        // Give app time to save settings
-        Thread.sleep(forTimeInterval: 2)
+        // Wait for app to fully initialize and save settings
+        let menuBarItem = app.menuBarItems.firstMatch
+        _ = menuBarItem.waitForExistence(timeout: 3)
 
         // Terminate
         app.terminate()

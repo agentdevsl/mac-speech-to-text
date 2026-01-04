@@ -14,8 +14,9 @@ final class SettingsTests: UITestBase {
     func test_settings_opensWithKeyboardShortcut() throws {
         launchAppSkippingOnboarding()
 
-        // Give app time to fully initialize
-        Thread.sleep(forTimeInterval: 1)
+        // Wait for app to fully initialize (menu bar icon should appear)
+        let menuBarItem = app.menuBarItems.firstMatch
+        _ = menuBarItem.waitForExistence(timeout: 2)
 
         // Open settings with Cmd+,
         UITestHelpers.openSettings(in: app)

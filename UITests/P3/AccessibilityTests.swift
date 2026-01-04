@@ -80,8 +80,8 @@ final class AccessibilityTests: UITestBase {
         // Press Enter/Return to activate focused element
         app.typeKey(.return, modifierFlags: [])
 
-        // Should navigate forward
-        Thread.sleep(forTimeInterval: 0.5)
+        // Wait for UI to respond to keyboard input
+        _ = app.windows.firstMatch.waitForExistence(timeout: 1)
         captureScreenshot(named: "AC-002-After-Enter")
 
         // Tab backwards with Shift+Tab
@@ -141,7 +141,11 @@ final class AccessibilityTests: UITestBase {
         let stopButton = app.buttons["Stop Recording"]
         if stopButton.exists {
             stopButton.tap()
-            Thread.sleep(forTimeInterval: 1)
+            // Wait for processing state to appear
+            let processingStatus = app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] 'Processing' OR label CONTAINS[c] 'Transcribing'")
+            ).firstMatch
+            _ = processingStatus.waitForExistence(timeout: 2)
             captureScreenshot(named: "AC-004-Processing-State")
         }
     }
@@ -195,11 +199,11 @@ final class AccessibilityTests: UITestBase {
             stopButton.tap()
         }
 
-        // Wait for error to appear
-        Thread.sleep(forTimeInterval: 2)
-
         // Check for error message accessibility
         let errorMessage = app.otherElements["errorMessage"]
+
+        // Wait for error message to potentially appear
+        _ = errorMessage.waitForExistence(timeout: 3)
         if errorMessage.exists {
             // Error message should have accessibility label
             XCTAssertFalse(

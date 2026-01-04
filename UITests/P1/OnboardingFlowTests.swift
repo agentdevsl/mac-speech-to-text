@@ -136,8 +136,8 @@ final class OnboardingFlowTests: UITestBase {
             let continueButton = app.buttons["Continue"]
             if continueButton.waitForExistence(timeout: 2) && continueButton.isEnabled {
                 continueButton.tap()
-                // Small delay between clicks
-                Thread.sleep(forTimeInterval: 0.5)
+                // Wait for UI to update before next iteration
+                _ = continueButton.waitForExistence(timeout: 1)
             } else {
                 break
             }
@@ -238,8 +238,8 @@ final class OnboardingFlowTests: UITestBase {
                 nextButton.tap()
             }
 
-            // Small delay between steps
-            Thread.sleep(forTimeInterval: 0.5)
+            // Wait for UI to update after navigation
+            _ = app.windows.firstMatch.waitForExistence(timeout: 1)
             captureScreenshot(named: "OB-006-Step-\(step)")
         }
 
@@ -325,8 +325,9 @@ final class OnboardingFlowTests: UITestBase {
         // Launch with onboarding skipped (simulates completed)
         launchAppSkippingOnboarding()
 
-        // Wait a moment for app to initialize
-        Thread.sleep(forTimeInterval: 1)
+        // Wait for app to initialize (menu bar should appear)
+        let menuBarItem = app.menuBarItems.firstMatch
+        _ = menuBarItem.waitForExistence(timeout: 2)
 
         // Verify onboarding window does NOT appear
         let onboardingWindow = app.windows["Welcome to Speech-to-Text"]

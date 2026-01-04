@@ -72,8 +72,9 @@ final class ErrorStateTests: UITestBase {
             NSPredicate(format: "label CONTAINS[c] 'error' OR label CONTAINS[c] 'failed' OR label CONTAINS[c] 'initialize'")
         ).firstMatch
 
-        // Wait for either modal or error
-        Thread.sleep(forTimeInterval: 3)
+        // Wait for either modal or error to appear
+        _ = recordingModal.waitForExistence(timeout: 3)
+            || errorIndicator.waitForExistence(timeout: 1)
 
         captureScreenshot(named: "ER-002-Model-Loading-Error")
 
@@ -98,12 +99,13 @@ final class ErrorStateTests: UITestBase {
         ])
 
         // Wait for potential onboarding or permission error
-        Thread.sleep(forTimeInterval: 2)
-
-        // With denied permissions, app should show error or prompt
         let errorMessage = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS[c] 'permission' OR label CONTAINS[c] 'denied' OR label CONTAINS[c] 'microphone'")
         ).firstMatch
+
+        // Wait for error message or any window to appear
+        _ = errorMessage.waitForExistence(timeout: 3)
+            || app.windows.firstMatch.waitForExistence(timeout: 1)
 
         captureScreenshot(named: "ER-003-Audio-Capture-Error")
 
@@ -137,8 +139,11 @@ final class ErrorStateTests: UITestBase {
             stopButton.tap()
         }
 
-        // Wait for error state
-        Thread.sleep(forTimeInterval: 2)
+        // Wait for error state or status change
+        let errorText = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] 'error'")
+        ).firstMatch
+        _ = errorText.waitForExistence(timeout: 3)
         captureScreenshot(named: "ER-004-Error-State")
 
         // Cancel button should still work for recovery
@@ -184,13 +189,13 @@ final class ErrorStateTests: UITestBase {
             stopButton.tap()
         }
 
-        // Wait for error
-        Thread.sleep(forTimeInterval: 2)
-
         // Look for error message
         let errorMessage = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS[c] 'failed' OR label CONTAINS[c] 'error'")
         ).firstMatch
+
+        // Wait for error message to appear
+        _ = errorMessage.waitForExistence(timeout: 3)
 
         captureScreenshot(named: "ER-005-Error-Message")
 
@@ -230,8 +235,9 @@ final class ErrorStateTests: UITestBase {
             return
         }
 
-        // Wait a moment for some audio to be captured
-        Thread.sleep(forTimeInterval: 2)
+        // Wait for recording controls to be ready
+        let stopButton = app.buttons["Stop Recording"]
+        _ = stopButton.waitForExistence(timeout: 3)
 
         captureScreenshot(named: "ER-006-Recording")
 

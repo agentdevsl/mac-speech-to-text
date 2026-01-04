@@ -127,7 +127,17 @@ sync_code() {
 sync_via_scp() {
     # Create temp archive
     local tmp_archive="/tmp/pre-push-sync-$$.tar.gz"
-    tar --exclude='.git' \
+    local archive_name
+    archive_name=$(basename "${tmp_archive}")
+
+    # Validate archive name
+    if [[ -z "${archive_name}" || "${archive_name}" == "." ]]; then
+        print_error "Invalid archive name"
+        return 1
+    fi
+
+    # Create archive, filtering expected warnings but showing errors
+    if ! tar --exclude='.git' \
         --exclude='.build' \
         --exclude='DerivedData' \
         --exclude='*.xcodeproj' \
@@ -135,13 +145,16 @@ sync_via_scp() {
         --exclude='.DS_Store' \
         -czf "${tmp_archive}" \
         -C "${PROJECT_ROOT}" \
-        . 2>/dev/null
+        . 2>&1 | grep -v "Removing leading" >&2; then
+        # tar succeeded (grep found no output or had no match)
+        :
+    fi
 
     scp "${tmp_archive}" "${REMOTE_HOST}:/tmp/"
-    ssh "${REMOTE_HOST}" "mkdir -p ${REMOTE_PATH} && cd ${REMOTE_PATH} && tar -xzf /tmp/$(basename ${tmp_archive})"
+    ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_PATH}' && cd '${REMOTE_PATH}' && tar -xzf '/tmp/${archive_name}'"
 
     rm -f "${tmp_archive}"
-    ssh "${REMOTE_HOST}" "rm -f /tmp/$(basename ${tmp_archive})"
+    ssh "${REMOTE_HOST}" "rm -f '/tmp/${archive_name}'"
 }
 
 run_unit_tests() {
@@ -151,7 +164,7 @@ run_unit_tests() {
 
     set +e
     local output
-    output=$(ssh "${REMOTE_HOST}" "cd ${REMOTE_PATH} && swift test --parallel 2>&1; echo EXIT_CODE:\$?")
+    output=$(ssh -o ConnectTimeout=10 "${REMOTE_HOST}" "cd '${REMOTE_PATH}' && swift test --parallel 2>&1; echo EXIT_CODE:\$?")
     set -e
 
     local end_time=$(date +%s)
