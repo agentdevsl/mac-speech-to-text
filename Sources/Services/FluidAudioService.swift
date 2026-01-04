@@ -56,14 +56,29 @@ actor FluidAudioService: FluidAudioServiceProtocol {
     private let serviceId: String
     private var transcriptionCount: Int = 0
 
+    /// Simulated error for testing (from launch arguments)
+    private let simulatedError: SimulatedErrorType?
+
     init() {
         serviceId = UUID().uuidString.prefix(8).description
+        // Check for simulated error from launch arguments
+        // Note: ProcessInfo is accessed during init, which is fine for actors
+        simulatedError = LaunchArguments.simulatedError
         AppLogger.service.debug("FluidAudioService[\(self.serviceId, privacy: .public)] created")
+        if let error = simulatedError {
+            AppLogger.service.debug("FluidAudioService[\(self.serviceId, privacy: .public)] will simulate error: \(error.rawValue, privacy: .public)")
+        }
     }
 
     /// Initialize FluidAudio with specified language
     func initialize(language: String = "en") async throws {
         AppLogger.info(AppLogger.service, "[\(serviceId)] initialize(language: \(language)) called")
+
+        // Check for simulated model loading error
+        if simulatedError == .modelLoading {
+            AppLogger.error(AppLogger.service, "[\(serviceId)] Simulating model loading error")
+            throw FluidAudioError.initializationFailed("Simulated model loading failure for testing")
+        }
 
         guard !isInitialized else {
             AppLogger.debug(AppLogger.service, "[\(serviceId)] Already initialized, skipping")
@@ -106,6 +121,12 @@ actor FluidAudioService: FluidAudioServiceProtocol {
         let transcriptionId = transcriptionCount
 
         AppLogger.info(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): \(samples.count) samples")
+
+        // Check for simulated transcription error
+        if simulatedError == .transcription {
+            AppLogger.error(AppLogger.service, "[\(serviceId)] Simulating transcription error")
+            throw FluidAudioError.transcriptionFailed("Simulated transcription failure for testing")
+        }
 
         guard let asrManager = asrManager else {
             AppLogger.error(AppLogger.service, "[\(serviceId)] transcribe #\(transcriptionId): NOT INITIALIZED")

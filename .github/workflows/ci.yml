@@ -57,8 +57,11 @@ jobs:
       - name: Build
         run: swift build -c release
 
-      - name: Run tests
-        run: swift test --parallel
+      # Note: Tests require real macOS hardware with audio/accessibility permissions
+      # Tests run via pre-push hook on macdev remote Mac instead of GH Actions
+      # See docs/UI_TESTING.md for the testing workflow
+      # - name: Run tests
+      #   run: swift test --parallel
 
   build:
     name: Build Release

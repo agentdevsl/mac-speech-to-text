@@ -1,0 +1,346 @@
+#!/bin/bash
+# =============================================================================
+# Pre-Push Hook: Unit Tests + UI Tests Integration
+# =============================================================================
+# This hook runs before git push to ensure code quality.
+# Tests are executed on the macdev remote Mac via SSH.
+#
+# INSTALLATION:
+#   ./scripts/install-hooks.sh
+#   OR manually: cp scripts/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push
+#
+# USAGE:
+#   git push                         # Runs both unit and UI tests on macdev
+#   SKIP_UI_TESTS=1 git push         # Skips UI tests, runs unit tests only
+#   UI_TESTS_ONLY=1 git push         # Runs UI tests only, skips unit tests
+#   SKIP_ALL_TESTS=1 git push        # Skip all tests (same as --no-verify)
+#
+# ENVIRONMENT VARIABLES:
+#   SKIP_UI_TESTS    - Set to "1" to skip UI tests
+#   UI_TESTS_ONLY    - Set to "1" to run only UI tests
+#   SKIP_ALL_TESTS   - Set to "1" to skip all tests
+#   UI_TEST_TIMEOUT  - Timeout in seconds (default: 600)
+#   REMOTE_TEST_HOST - SSH host for remote testing (default: macdev)
+#
+# EXIT CODES:
+#   0 - All tests passed
+#   1 - One or more tests failed
+#   2 - Configuration or setup error
+#
+# =============================================================================
+
+set -euo pipefail
+
+# =============================================================================
+# Configuration
+# =============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)" || SCRIPT_DIR="."
+# When running as git hook, find project root via git; otherwise use parent of script dir
+if [[ "${SCRIPT_DIR}" == *".git/hooks"* ]]; then
+    PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || PROJECT_ROOT="$(dirname "$(dirname "${SCRIPT_DIR}")")"
+else
+    PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
+fi
+REMOTE_HOST="${REMOTE_TEST_HOST:-macdev}"
+REMOTE_PATH="${REMOTE_TEST_PATH:-~/Developer/mac-speech-to-text}"
+UI_TEST_TIMEOUT="${UI_TEST_TIMEOUT:-600}"
+
+# Flags
+SKIP_UI_TESTS="${SKIP_UI_TESTS:-0}"
+UI_TESTS_ONLY="${UI_TESTS_ONLY:-0}"
+SKIP_ALL_TESTS="${SKIP_ALL_TESTS:-0}"
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+BOLD='\033[1m'
+
+# Results tracking
+UNIT_TEST_PASSED=false
+UNIT_TEST_DURATION=0
+UI_TEST_PASSED=false
+UI_TEST_DURATION=0
+
+# =============================================================================
+# Functions
+# =============================================================================
+
+print_header() {
+    echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}${CYAN}$1${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+print_success() { echo -e "${GREEN}[PASS]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+print_error() { echo -e "${RED}[FAIL]${NC} $1"; }
+
+check_ssh() {
+    print_info "Checking SSH connection to ${REMOTE_HOST}..."
+    if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "${REMOTE_HOST}" "echo 'connected'" &>/dev/null; then
+        print_error "Cannot connect to ${REMOTE_HOST}"
+        echo ""
+        echo "Please check:"
+        echo "  1. SSH key is configured: ssh-add -l"
+        echo "  2. Host is reachable: ping ${REMOTE_HOST}"
+        echo "  3. SSH config exists: cat ~/.ssh/config"
+        echo ""
+        echo "To configure SSH for macdev, run:"
+        echo "  ./scripts/setup-ssh-for-mac.sh"
+        return 1
+    fi
+    print_success "SSH connection verified"
+    return 0
+}
+
+sync_code() {
+    print_info "Syncing code to ${REMOTE_HOST}..."
+
+    # Use rsync if available, otherwise use scp
+    if command -v rsync &>/dev/null; then
+        rsync -avz --progress --delete \
+            --exclude='.git' \
+            --exclude='.build' \
+            --exclude='DerivedData' \
+            --exclude='*.xcodeproj' \
+            --exclude='*.xcworkspace' \
+            --exclude='.DS_Store' \
+            --exclude='node_modules' \
+            --exclude='.env*' \
+            "${PROJECT_ROOT}/" "${REMOTE_HOST}:${REMOTE_PATH}/" 2>/dev/null || {
+                print_warning "rsync failed, trying scp..."
+                sync_via_scp
+            }
+    else
+        sync_via_scp
+    fi
+
+    print_success "Code synced"
+}
+
+sync_via_scp() {
+    # Create temp archive
+    local tmp_archive="/tmp/pre-push-sync-$$.tar.gz"
+    local archive_name
+    archive_name=$(basename "${tmp_archive}")
+
+    # Validate archive name
+    if [[ -z "${archive_name}" || "${archive_name}" == "." ]]; then
+        print_error "Invalid archive name"
+        return 1
+    fi
+
+    # Create archive, filtering expected warnings but showing errors
+    if ! tar --exclude='.git' \
+        --exclude='.build' \
+        --exclude='DerivedData' \
+        --exclude='*.xcodeproj' \
+        --exclude='*.xcworkspace' \
+        --exclude='.DS_Store' \
+        -czf "${tmp_archive}" \
+        -C "${PROJECT_ROOT}" \
+        . 2>&1 | grep -v "Removing leading" >&2; then
+        # tar succeeded (grep found no output or had no match)
+        :
+    fi
+
+    scp "${tmp_archive}" "${REMOTE_HOST}:/tmp/"
+    ssh "${REMOTE_HOST}" "mkdir -p '${REMOTE_PATH}' && cd '${REMOTE_PATH}' && tar -xzf '/tmp/${archive_name}'"
+
+    rm -f "${tmp_archive}"
+    ssh "${REMOTE_HOST}" "rm -f '/tmp/${archive_name}'"
+}
+
+run_unit_tests() {
+    print_header "Running Unit Tests on ${REMOTE_HOST}"
+
+    local start_time=$(date +%s)
+
+    set +e
+    local output
+    output=$(ssh -o ConnectTimeout=10 "${REMOTE_HOST}" "cd '${REMOTE_PATH}' && swift test --parallel 2>&1; echo EXIT_CODE:\$?")
+    set -e
+
+    local end_time=$(date +%s)
+    UNIT_TEST_DURATION=$((end_time - start_time))
+
+    # Extract exit code (portable - works on macOS and Linux)
+    local exit_code
+    exit_code=$(echo "$output" | grep -E 'EXIT_CODE:[0-9]+' | tail -1 | sed 's/.*EXIT_CODE://')
+
+    # Validate exit code was extracted
+    if [ -z "${exit_code}" ]; then
+        print_warning "Could not extract exit code from test output"
+        exit_code=1
+    fi
+
+    # Remove exit code line from output
+    output=$(echo "$output" | sed 's/EXIT_CODE:[0-9]*$//')
+
+    # Display output
+    echo "$output"
+
+    if [ "${exit_code}" -eq 0 ]; then
+        UNIT_TEST_PASSED=true
+        print_success "Unit tests passed (${UNIT_TEST_DURATION}s)"
+        return 0
+    else
+        print_error "Unit tests failed (${UNIT_TEST_DURATION}s)"
+        return 1
+    fi
+}
+
+run_ui_tests() {
+    print_header "Running UI Tests on ${REMOTE_HOST}"
+
+    print_info "Timeout: ${UI_TEST_TIMEOUT}s"
+
+    local start_time=$(date +%s)
+
+    set +e
+    local output
+    output=$(ssh -o ConnectTimeout=10 "${REMOTE_HOST}" "cd '${REMOTE_PATH}' && timeout ${UI_TEST_TIMEOUT} ./scripts/run-ui-tests.sh --verbose 2>&1; echo EXIT_CODE:\$?")
+    set -e
+
+    local end_time=$(date +%s)
+    UI_TEST_DURATION=$((end_time - start_time))
+
+    # Extract exit code (portable - works on macOS and Linux)
+    local exit_code
+    exit_code=$(echo "$output" | grep -E 'EXIT_CODE:[0-9]+' | tail -1 | sed 's/.*EXIT_CODE://')
+
+    # Validate exit code was extracted
+    if [ -z "${exit_code}" ]; then
+        print_warning "Could not extract exit code from test output"
+        exit_code=1
+    fi
+
+    # Remove exit code line from output
+    output=$(echo "$output" | sed 's/EXIT_CODE:[0-9]*$//')
+
+    # Display output
+    echo "$output"
+
+    if [ "${exit_code:-1}" -eq 0 ]; then
+        UI_TEST_PASSED=true
+        print_success "UI tests passed (${UI_TEST_DURATION}s)"
+        return 0
+    elif [ "${exit_code:-1}" -eq 124 ]; then
+        print_error "UI tests timed out after ${UI_TEST_TIMEOUT}s"
+        return 1
+    else
+        print_error "UI tests failed (${UI_TEST_DURATION}s)"
+        return 1
+    fi
+}
+
+report_results() {
+    print_header "Pre-Push Hook: Test Results"
+
+    local any_failed=false
+
+    # Report unit test results
+    if [ "$UI_TESTS_ONLY" != "1" ]; then
+        if [ "$UNIT_TEST_PASSED" = true ]; then
+            print_success "Unit Tests: passed (${UNIT_TEST_DURATION}s)"
+        else
+            print_error "Unit Tests: FAILED (${UNIT_TEST_DURATION}s)"
+            any_failed=true
+        fi
+    else
+        echo -e "${YELLOW}[SKIP]${NC} Unit Tests: skipped (UI_TESTS_ONLY=1)"
+    fi
+
+    # Report UI test results
+    if [ "$SKIP_UI_TESTS" != "1" ]; then
+        if [ "$UI_TEST_PASSED" = true ]; then
+            print_success "UI Tests: passed (${UI_TEST_DURATION}s)"
+        else
+            print_error "UI Tests: FAILED (${UI_TEST_DURATION}s)"
+            any_failed=true
+        fi
+    else
+        echo -e "${YELLOW}[SKIP]${NC} UI Tests: skipped (SKIP_UI_TESTS=1)"
+    fi
+
+    echo ""
+
+    if [ "$any_failed" = true ]; then
+        echo -e "${BOLD}${RED}Tests failed - push blocked${NC}"
+        echo ""
+        echo "Fix the failing tests and try again."
+        echo "To bypass (not recommended): git push --no-verify"
+        return 1
+    else
+        echo -e "${BOLD}${GREEN}All tests passed - push allowed${NC}"
+        return 0
+    fi
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+    print_header "Pre-Push Hook"
+
+    # Check for skip all
+    if [ "$SKIP_ALL_TESTS" = "1" ]; then
+        print_warning "Skipping all tests (SKIP_ALL_TESTS=1)"
+        print_warning "This is equivalent to --no-verify. Use with caution!"
+        exit 0
+    fi
+
+    # Validate mutually exclusive flags
+    if [ "$SKIP_UI_TESTS" = "1" ] && [ "$UI_TESTS_ONLY" = "1" ]; then
+        print_error "SKIP_UI_TESTS and UI_TESTS_ONLY cannot both be set"
+        exit 2
+    fi
+
+    echo -e "${CYAN}Configuration:${NC}"
+    echo "  Remote Host:    ${REMOTE_HOST}"
+    echo "  Skip UI Tests:  ${SKIP_UI_TESTS}"
+    echo "  UI Tests Only:  ${UI_TESTS_ONLY}"
+    echo "  UI Timeout:     ${UI_TEST_TIMEOUT}s"
+    echo ""
+
+    # Check SSH connection
+    if ! check_ssh; then
+        exit 2
+    fi
+
+    # Sync code to remote
+    sync_code
+
+    # Run unit tests (unless UI_TESTS_ONLY)
+    if [ "$UI_TESTS_ONLY" != "1" ]; then
+        if ! run_unit_tests; then
+            report_results
+            exit 1
+        fi
+    fi
+
+    # Run UI tests (unless SKIP_UI_TESTS)
+    if [ "$SKIP_UI_TESTS" != "1" ]; then
+        if ! run_ui_tests; then
+            report_results
+            exit 1
+        fi
+    fi
+
+    # Report final results
+    if report_results; then
+        exit 0
+    else
+        exit 1
+    fi
+}
+
+# Run main function
+main "$@"

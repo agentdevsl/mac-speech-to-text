@@ -1,0 +1,45 @@
+{
+  "configurations" : [
+    {
+      "id" : "accessibility-tests",
+      "name" : "Accessibility Tests",
+      "options" : {
+        "environmentVariableEntries" : [
+          {
+            "key" : "UI_TEST_MODE",
+            "value" : "1"
+          },
+          {
+            "key" : "ACCESSIBILITY_TESTING",
+            "value" : "1"
+          }
+        ],
+        "testExecutionOrdering" : "alphabetical",
+        "testTimeoutsEnabled" : true,
+        "defaultTestExecutionTimeAllowance" : 60,
+        "maximumTestExecutionTimeAllowance" : 180
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:",
+      "identifier" : "SpeechToText",
+      "name" : "SpeechToText"
+    }
+  },
+  "testTargets" : [
+    {
+      "selectedTests" : [
+        "AccessibilityTests"
+      ],
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SpeechToTextUITests",
+        "name" : "SpeechToTextUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
