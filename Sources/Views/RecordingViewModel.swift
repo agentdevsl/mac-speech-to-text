@@ -64,16 +64,13 @@ final class RecordingViewModel {
 
     // MARK: - Private State
 
-    @ObservationIgnored private var silenceTimer: Timer?
-    @ObservationIgnored private let silenceThreshold: TimeInterval
     @ObservationIgnored private var languageSwitchObserver: NSObjectProtocol?
-
-    /// Track if audio capture is active to prevent double-stop
+    @ObservationIgnored private var inactivityTimer: Timer?
+    @ObservationIgnored private var lastTalkingTime: Date?
     @ObservationIgnored private var isAudioCaptureActive: Bool = false
-
     // nonisolated copies for deinit access (deinit cannot access MainActor-isolated state)
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
-    @ObservationIgnored private nonisolated(unsafe) var deinitSilenceTimer: Timer?
+    @ObservationIgnored private nonisolated(unsafe) var deinitInactivityTimer: Timer?
 
     /// Unique ID for logging
     @ObservationIgnored private let viewModelId: String
@@ -93,33 +90,17 @@ final class RecordingViewModel {
         self.textInsertionService = textInsertionService
         self.settingsService = settingsService
         self.statisticsService = statisticsService
-
-        // Get silence threshold from settings
-        let settings = settingsService.load()
-        self.silenceThreshold = settings.audio.silenceThreshold
-
         // Get current language from settings (T068)
-        self.currentLanguage = settings.language.defaultLanguage
-
+        self.currentLanguage = settingsService.load().language.defaultLanguage
         AppLogger.lifecycle(AppLogger.viewModel, self, event: "init[\(viewModelId)]")
-        AppLogger.debug(
-            AppLogger.viewModel,
-            "[\(viewModelId)] Initialized with silenceThreshold=\(silenceThreshold), language=\(currentLanguage)"
-        )
-
-        // Setup language switch observer (T064)
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Initialized with language=\(currentLanguage)")
         setupLanguageSwitchObserver()
     }
 
     deinit {
         AppLogger.trace(AppLogger.viewModel, "RecordingViewModel[\(viewModelId)] deallocating")
-        // For closure-based observers, we must remove via the returned token
-        // Store observer in nonisolated(unsafe) property for deinit access
-        if let observer = deinitLanguageSwitchObserver {
-            NotificationCenter.default.removeObserver(observer)
-        }
-        // Invalidate any pending timer
-        deinitSilenceTimer?.invalidate()
+        if let observer = deinitLanguageSwitchObserver { NotificationCenter.default.removeObserver(observer) }
+        deinitInactivityTimer?.invalidate()
     }
 
     // MARK: - Language Switch Observer
@@ -174,9 +155,10 @@ final class RecordingViewModel {
     func startRecording() async throws {
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] startRecording() called, isRecording=\(isRecording)")
 
-        guard !isRecording else {
-            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: already recording")
-            throw RecordingError.alreadyRecording
+        // Reset stale state if needed (defensive - handles edge cases where state wasn't cleaned up)
+        if isRecording {
+            AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: found stale recording state, resetting")
+            await cancelRecording()
         }
 
         // Clear previous state
@@ -205,9 +187,12 @@ final class RecordingViewModel {
 
             // Start audio capture - callback is @Sendable and handles MainActor dispatch
             try await audioService.startCapture { @Sendable [weak self] level in
-                Task { @MainActor in self?.audioLevel = level; self?.resetSilenceTimer() }
+                Task { @MainActor in self?.handleAudioLevel(level) }
             }
             isAudioCaptureActive = true
+            // Initialize talking time and start inactivity timer
+            lastTalkingTime = Date()
+            startInactivityTimer()
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture started successfully")
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Audio capture failed: \(error.localizedDescription)")
@@ -228,9 +213,9 @@ final class RecordingViewModel {
 
         AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isRecording")
         isRecording = false
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-        deinitSilenceTimer = nil
+        inactivityTimer?.invalidate()
+        inactivityTimer = nil
+        deinitInactivityTimer = nil
 
         do {
             // Stop audio capture and get samples (only if active)
@@ -278,10 +263,9 @@ final class RecordingViewModel {
         isRecording = false
         isTranscribing = false
         isInserting = false
-
-        silenceTimer?.invalidate()
-        silenceTimer = nil
-        deinitSilenceTimer = nil
+        inactivityTimer?.invalidate()
+        inactivityTimer = nil
+        deinitInactivityTimer = nil
 
         // Stop audio capture only if active (prevents double-stop)
         if isAudioCaptureActive {
@@ -411,46 +395,60 @@ final class RecordingViewModel {
         }
     }
 
-    /// Reset silence detection timer (T029)
-    private func resetSilenceTimer() {
-        silenceTimer?.invalidate()
-        deinitSilenceTimer?.invalidate()
+    /// Handle audio level update - detect talking and manage inactivity timer
+    private func handleAudioLevel(_ level: Double) {
+        audioLevel = level
 
-        // Check if audio level is below threshold (silence)
-        if audioLevel < 0.01 { // Very low threshold for silence
-            let timer = Timer.scheduledTimer(
-                withTimeInterval: silenceThreshold,
-                repeats: false
-            ) { [weak self] _ in
-                // Timer fires on the run loop that scheduled it (main run loop since
-                // this is a @MainActor class). Use Task.detached to avoid inheriting
-                // any context that might be in the middle of SwiftUI view evaluation.
-                Task.detached { @MainActor [weak self] in
-                    await self?.onSilenceDetected()
-                }
+        // Detect if user is talking (audio above threshold)
+        if level >= Constants.Audio.talkingThreshold {
+            lastTalkingTime = Date()
+            AppLogger.trace(AppLogger.viewModel, "[\(viewModelId)] Talking detected, level=\(String(format: "%.3f", level))")
+        }
+        // Note: Legacy short-pause silence timer disabled in favor of 30-second inactivity timeout
+    }
+
+    /// Start the inactivity timer that checks for prolonged silence
+    private func startInactivityTimer() {
+        inactivityTimer?.invalidate()
+
+        // Check every second if we've exceeded the inactivity timeout
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task.detached { @MainActor [weak self] in
+                self?.checkInactivity()
             }
-            silenceTimer = timer
-            deinitSilenceTimer = timer
-        } else {
-            silenceTimer = nil
-            deinitSilenceTimer = nil
+        }
+        inactivityTimer = timer
+        deinitInactivityTimer = timer
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Inactivity timer started (\(Constants.Audio.inactivityTimeout)s timeout)")
+    }
+
+    /// Check if inactivity timeout has been exceeded
+    private func checkInactivity() {
+        guard isRecording, let lastTalking = lastTalkingTime else { return }
+
+        let silenceDuration = Date().timeIntervalSince(lastTalking)
+
+        if silenceDuration >= Constants.Audio.inactivityTimeout {
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Inactivity timeout reached (\(String(format: "%.1f", silenceDuration))s of silence)")
+            // Invalidate timer immediately to prevent multiple timeout triggers
+            inactivityTimer?.invalidate()
+            inactivityTimer = nil
+            deinitInactivityTimer = nil
+            Task { await onInactivityTimeout() }
         }
     }
 
-    /// Called when silence is detected after threshold
-    private func onSilenceDetected() async {
-        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Silence detected, isRecording=\(isRecording)")
+    /// Called when inactivity timeout is reached
+    private func onInactivityTimeout() async {
         guard isRecording else { return }
-
         do {
-            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Auto-stopping recording due to silence")
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Auto-stopping recording due to inactivity")
             try await stopRecording()
         } catch {
-            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to stop recording on silence: \(error.localizedDescription)")
+            AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Failed to stop on inactivity: \(error.localizedDescription)")
             errorMessage = "Failed to stop recording: \(error.localizedDescription)"
         }
     }
-
 }
 
 // MARK: - Private Helpers

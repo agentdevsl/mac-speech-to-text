@@ -104,17 +104,18 @@ final class RecordingViewModelTests: XCTestCase {
         XCTAssertTrue(mockAudioService.startCaptureCalled)
     }
 
-    func test_startRecording_throwsWhenAlreadyRecording() async throws {
-        // Given
+    func test_startRecording_resetsStaleStateWhenAlreadyRecording() async throws {
+        // Given - start recording to set isRecording = true
+        try await sut.startRecording()
+        XCTAssertTrue(sut.isRecording)
+
+        // When - call start again (simulating stale state scenario)
+        // The fix should reset state instead of throwing
         try await sut.startRecording()
 
-        // When/Then
-        do {
-            try await sut.startRecording()
-            XCTFail("Expected alreadyRecording error")
-        } catch let error as RecordingError {
-            XCTAssertEqual(error, .alreadyRecording)
-        }
+        // Then - should succeed with fresh state
+        XCTAssertTrue(sut.isRecording)
+        XCTAssertNotNil(sut.currentSession)
     }
 
     func test_startRecording_throwsWhenAudioCaptureFails() async {
@@ -283,6 +284,95 @@ final class RecordingViewModelTests: XCTestCase {
 
         // Then
         XCTAssertFalse(sut.isRecording)
+    }
+
+    // MARK: - Inactivity Timeout Tests
+
+    func test_inactivityTimeout_constantIs30Seconds() {
+        // Verify the constant is set correctly
+        XCTAssertEqual(Constants.Audio.inactivityTimeout, 30.0)
+    }
+
+    func test_talkingThreshold_constantIsSet() {
+        // Verify the talking threshold constant exists and is reasonable
+        XCTAssertEqual(Constants.Audio.talkingThreshold, 0.02)
+        XCTAssertGreaterThan(Constants.Audio.talkingThreshold, 0.0)
+        XCTAssertLessThan(Constants.Audio.talkingThreshold, 1.0)
+    }
+
+    func test_startRecording_initializesInactivityTracking() async throws {
+        // When
+        try await sut.startRecording()
+
+        // Then - recording should be active (inactivity timer started internally)
+        XCTAssertTrue(sut.isRecording)
+        // The inactivity timer is internal, but we can verify recording started successfully
+    }
+
+    func test_stopRecording_cleansUpInactivityTimer() async throws {
+        // Given
+        try await sut.startRecording()
+
+        // When
+        try await sut.stopRecording()
+
+        // Then - should be able to start again without issues
+        XCTAssertFalse(sut.isRecording)
+    }
+
+    func test_cancelRecording_cleansUpInactivityTimer() async throws {
+        // Given
+        try await sut.startRecording()
+
+        // When
+        await sut.cancelRecording()
+
+        // Then - should be able to start again without issues
+        XCTAssertFalse(sut.isRecording)
+        try await sut.startRecording()
+        XCTAssertTrue(sut.isRecording)
+    }
+
+    func test_multipleStartStopCycles_workCorrectly() async throws {
+        // Test multiple recording cycles to verify state management
+        for i in 1...3 {
+            // Start recording
+            try await sut.startRecording()
+            XCTAssertTrue(sut.isRecording, "Cycle \(i): should be recording after start")
+
+            // Stop recording
+            try await sut.stopRecording()
+            XCTAssertFalse(sut.isRecording, "Cycle \(i): should not be recording after stop")
+        }
+    }
+
+    func test_startAfterCancel_worksCorrectly() async throws {
+        // Given - start and cancel
+        try await sut.startRecording()
+        await sut.cancelRecording()
+
+        // When - start again
+        try await sut.startRecording()
+
+        // Then
+        XCTAssertTrue(sut.isRecording)
+        XCTAssertNotNil(sut.currentSession)
+    }
+
+    func test_rapidStartCancel_handlesCorrectly() async throws {
+        // Simulate rapid start/cancel cycles that could cause race conditions
+        for _ in 1...5 {
+            try await sut.startRecording()
+            await sut.cancelRecording()
+        }
+
+        // Final state should be clean
+        XCTAssertFalse(sut.isRecording)
+        XCTAssertNil(sut.currentSession)
+
+        // Should be able to start fresh
+        try await sut.startRecording()
+        XCTAssertTrue(sut.isRecording)
     }
 
     // MARK: - currentLanguageModel Tests

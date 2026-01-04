@@ -11,6 +11,10 @@ enum Constants {
         static let defaultSilenceThreshold: TimeInterval = 1.5 // seconds
         static let minSilenceThreshold: TimeInterval = 0.5
         static let maxSilenceThreshold: TimeInterval = 3.0
+        /// Inactivity timeout - auto-stop after this many seconds of no talking
+        static let inactivityTimeout: TimeInterval = 30.0
+        /// Audio level threshold to detect talking (0.0-1.0 normalized)
+        static let talkingThreshold: Double = 0.02
     }
 
     // MARK: - Performance
