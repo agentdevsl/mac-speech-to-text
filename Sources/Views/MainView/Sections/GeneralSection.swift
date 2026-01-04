@@ -446,7 +446,7 @@ private struct GeneralToggleRow: View {
             }
         }
         .toggleStyle(.switch)
-        .tint(Color.warmAmber)
+        .tint(.blue)
         .padding(.vertical, 4)
     }
 }
