@@ -5,6 +5,7 @@
 // Part of User Story 7: Accessibility and Compliance (P3)
 
 import XCTest
+import AppKit  // For NSAccessibility on macOS
 
 /// Tests for accessibility compliance - VoiceOver, keyboard navigation, etc.
 final class AccessibilityTests: UITestBase {
@@ -156,14 +157,13 @@ final class AccessibilityTests: UITestBase {
             return
         }
 
-        // Check that static texts have proper accessibility traits
+        // Check that static texts have proper accessibility roles
         let allTexts = app.staticTexts.allElementsBoundByIndex
 
         for text in allTexts where text.exists {
-            // Verify the text is accessible
-            let traits = text.accessibilityTraits
+            // Verify the text is accessible (has static text role or a label)
             XCTAssertTrue(
-                traits.contains(.staticText) || !text.label.isEmpty,
+                text.isStaticText || !text.label.isEmpty,
                 "Static text should be accessible to screen readers"
             )
         }
@@ -290,21 +290,32 @@ extension XCUIElement {
         return exists && isEnabled && isHittable
     }
 
-    /// Get accessibility traits based on element type
-    /// Note: XCUIElement doesn't expose UIAccessibilityTraits directly on macOS
-    var accessibilityTraits: UIAccessibilityTraits {
-        // Infer traits from element type
-        switch elementType {
-        case .staticText:
-            return .staticText
-        case .button:
-            return .button
-        case .image:
-            return .image
-        case .link:
-            return .link
-        default:
-            return []
-        }
+    /// Check if element represents a specific accessibility role
+    /// Note: macOS uses NSAccessibility roles, not UIAccessibilityTraits
+    var isStaticText: Bool {
+        return elementType == .staticText
+    }
+
+    var isButton: Bool {
+        return elementType == .button
+    }
+
+    var isImage: Bool {
+        return elementType == .image
+    }
+
+    var isLink: Bool {
+        return elementType == .link
+    }
+
+    /// Check if element has an appropriate accessibility role
+    var hasAccessibilityRole: Bool {
+        // On macOS, check if element type indicates an accessibility role
+        let roleTypes: [XCUIElement.ElementType] = [
+            .button, .staticText, .textField, .secureTextField,
+            .checkBox, .radioButton, .popUpButton, .comboBox,
+            .slider, .image, .link, .table, .outline
+        ]
+        return roleTypes.contains(elementType)
     }
 }
