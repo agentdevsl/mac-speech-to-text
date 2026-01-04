@@ -18,7 +18,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Default all permissions to false for predictable test behavior
         mockPermissionService.microphoneGranted = false
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = false
         mockSettingsService = MockSettingsService()
         sut = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -97,7 +96,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given - only microphone is granted
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = false
         await sut.checkAllPermissions()
 
         // When - move from welcome (0) to next
@@ -108,45 +106,29 @@ final class OnboardingViewModelTests: XCTestCase {
     }
 
     func test_nextStep_autoSkipsAccessibilityWhenGranted() async {
-        // Given - microphone and accessibility granted, but not input monitoring
+        // Given - microphone and accessibility granted
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = false
         await sut.checkAllPermissions()
 
         // When - move from welcome (0) to next
         sut.nextStep()
 
-        // Then - should skip steps 1 and 2, go to step 3 (input monitoring)
+        // Then - should skip steps 1 and 2, go to step 3 (demo)
         XCTAssertEqual(sut.currentStep, 3)
-    }
-
-    func test_nextStep_autoSkipsInputMonitoringWhenGranted() async {
-        // Given
-        mockPermissionService.microphoneGranted = true
-        mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = true
-        await sut.checkAllPermissions()
-
-        // When - move from welcome (0) to next
-        sut.nextStep()
-
-        // Then - should skip steps 1, 2, and 3, go to step 4 (demo)
-        XCTAssertEqual(sut.currentStep, 4)
     }
 
     func test_nextStep_autoSkipsAllPermissionsWhenAllGranted() async {
         // Given - all permissions granted
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // When
         sut.nextStep()
 
-        // Then - should skip to demo step (4)
-        XCTAssertEqual(sut.currentStep, 4)
+        // Then - should skip to demo step (3)
+        XCTAssertEqual(sut.currentStep, 3)
     }
 
     // MARK: - Skip Step Tests
@@ -253,22 +235,11 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertTrue(sut.canSkipCurrentStep)
     }
 
-    func test_canSkipCurrentStep_trueForInputMonitoringStep() {
-        // Given
-        sut.nextStep() // Step 1
-        sut.nextStep() // Step 2
-        sut.nextStep() // Step 3
-
-        // Then
-        XCTAssertTrue(sut.canSkipCurrentStep)
-    }
-
     func test_canSkipCurrentStep_falseForDemoStep() {
         // Given
         sut.nextStep() // Step 1
         sut.nextStep() // Step 2
-        sut.nextStep() // Step 3
-        sut.nextStep() // Step 4 (demo)
+        sut.nextStep() // Step 3 (demo)
 
         // Then
         XCTAssertFalse(sut.canSkipCurrentStep)
@@ -304,7 +275,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given - only microphone will be granted
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = false
         sut.nextStep() // Move to microphone step
         XCTAssertEqual(sut.currentStep, 1)
 
@@ -327,25 +297,12 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertTrue(sut.accessibilityGranted)
     }
 
-    func test_requestInputMonitoringPermission_updatesGrantedStatus() async {
-        // Given
-        mockPermissionService.inputMonitoringGranted = true
-        XCTAssertFalse(sut.inputMonitoringGranted)
-
-        // When
-        await sut.requestInputMonitoringPermission()
-
-        // Then
-        XCTAssertTrue(sut.inputMonitoringGranted)
-    }
-
     // MARK: - Check All Permissions Tests
 
     func test_checkAllPermissions_updatesAllStatuses() async {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = true
 
         // When
         await sut.checkAllPermissions()
@@ -353,7 +310,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Then
         XCTAssertTrue(sut.microphoneGranted)
         XCTAssertTrue(sut.accessibilityGranted)
-        XCTAssertTrue(sut.inputMonitoringGranted)
     }
 
     // MARK: - All Permissions Granted Tests
@@ -362,7 +318,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // Then
@@ -373,7 +328,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // Then
@@ -386,7 +340,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = true
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // Then
@@ -397,7 +350,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given
         mockPermissionService.microphoneGranted = false
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = false
         await sut.checkAllPermissions()
 
         // Then
@@ -405,14 +357,12 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertNotNil(warning)
         XCTAssertTrue(warning?.contains("Microphone") ?? false)
         XCTAssertTrue(warning?.contains("Accessibility") ?? false)
-        XCTAssertTrue(warning?.contains("Input Monitoring") ?? false)
     }
 
     func test_missingPermissionsWarning_listsOnlyMissingPermissions() async {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // Then
@@ -420,7 +370,6 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertNotNil(warning)
         XCTAssertFalse(warning?.contains("Microphone") ?? true)
         XCTAssertTrue(warning?.contains("Accessibility") ?? false)
-        XCTAssertFalse(warning?.contains("Input Monitoring") ?? true)
     }
 
     // MARK: - Complete Onboarding Tests
@@ -445,7 +394,6 @@ final class OnboardingViewModelTests: XCTestCase {
         // Given
         mockPermissionService.microphoneGranted = true
         mockPermissionService.accessibilityGranted = false
-        mockPermissionService.inputMonitoringGranted = true
         await sut.checkAllPermissions()
 
         // Skip a step
@@ -462,7 +410,6 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertTrue(savedSettings?.onboarding.completed ?? false)
         XCTAssertTrue(savedSettings?.onboarding.permissionsGranted.microphone ?? false)
         XCTAssertFalse(savedSettings?.onboarding.permissionsGranted.accessibility ?? true)
-        XCTAssertTrue(savedSettings?.onboarding.permissionsGranted.inputMonitoring ?? false)
     }
 
     // MARK: - Step Title Tests
@@ -471,9 +418,8 @@ final class OnboardingViewModelTests: XCTestCase {
         XCTAssertEqual(sut.stepTitle(for: 0), "Welcome")
         XCTAssertEqual(sut.stepTitle(for: 1), "Microphone Access")
         XCTAssertEqual(sut.stepTitle(for: 2), "Accessibility Access")
-        XCTAssertEqual(sut.stepTitle(for: 3), "Input Monitoring")
-        XCTAssertEqual(sut.stepTitle(for: 4), "Try It Now")
-        XCTAssertEqual(sut.stepTitle(for: 5), "All Set!")
+        XCTAssertEqual(sut.stepTitle(for: 3), "Try It Now")
+        XCTAssertEqual(sut.stepTitle(for: 4), "All Set!")
     }
 
     // MARK: - Step Subtitle Tests
@@ -481,20 +427,19 @@ final class OnboardingViewModelTests: XCTestCase {
     func test_stepSubtitle_returnsCorrectSubtitles() {
         XCTAssertEqual(sut.stepSubtitle(for: 0), "Privacy-first speech-to-text")
         XCTAssertEqual(sut.stepSubtitle(for: 1), "Required for voice capture")
-        XCTAssertEqual(sut.stepSubtitle(for: 2), "Required for text insertion")
-        XCTAssertEqual(sut.stepSubtitle(for: 3), "Required for global hotkey")
-        XCTAssertEqual(sut.stepSubtitle(for: 4), "Test your setup")
-        XCTAssertEqual(sut.stepSubtitle(for: 5), "Ready to use")
+        XCTAssertEqual(sut.stepSubtitle(for: 2), "Required for text insertion and hotkeys")
+        XCTAssertEqual(sut.stepSubtitle(for: 3), "Test your setup")
+        XCTAssertEqual(sut.stepSubtitle(for: 4), "Ready to use")
     }
 
     // MARK: - Edge Case Tests
 
     func test_nextStep_atLastStep_completesOnboarding() {
-        // Given - navigate to last step
-        for _ in 0..<5 {
+        // Given - navigate to last step (4 steps total: 0-4)
+        for _ in 0..<4 {
             sut.nextStep()
         }
-        XCTAssertEqual(sut.currentStep, 5)
+        XCTAssertEqual(sut.currentStep, 4)
 
         // When
         sut.nextStep()
@@ -512,14 +457,10 @@ final class OnboardingViewModelTests: XCTestCase {
         sut.skipStep() // Step 2
         sut.confirmSkip()
 
-        sut.skipStep() // Step 3
-        sut.confirmSkip()
-
-        // Then
+        // Then (only 2 permission steps now)
         XCTAssertTrue(sut.skippedSteps.contains(1))
         XCTAssertTrue(sut.skippedSteps.contains(2))
-        XCTAssertTrue(sut.skippedSteps.contains(3))
-        XCTAssertEqual(sut.skippedSteps.count, 3)
+        XCTAssertEqual(sut.skippedSteps.count, 2)
     }
 
     func test_permissionError_clearsOnNewRequest() async {

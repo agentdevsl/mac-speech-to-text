@@ -103,19 +103,7 @@ extension PermissionCard {
         PermissionCard(
             icon: "hand.point.up.left.fill",
             title: "Accessibility Access",
-            description: "Required to insert transcribed text into other applications. This allows the app to type for you.",
-            buttonTitle: "Open System Settings",
-            isGranted: isGranted,
-            action: action
-        )
-    }
-
-    /// Create input monitoring permission card
-    static func inputMonitoring(isGranted: Bool, action: @escaping () async -> Void) -> PermissionCard {
-        PermissionCard(
-            icon: "keyboard.fill",
-            title: "Input Monitoring",
-            description: "Required to detect the global hotkey (⌘⌃Space). Allows the app to respond when you trigger dictation.",
+            description: "Required to insert transcribed text and detect the global hotkey (⌘⌃Space). This allows the app to type for you.",
             buttonTitle: "Open System Settings",
             isGranted: isGranted,
             action: action
@@ -146,18 +134,10 @@ extension PermissionCard {
     .padding()
 }
 
-#Preview("Input Monitoring") {
-    PermissionCard.inputMonitoring(isGranted: false) {
-        // No-op
-    }
-    .padding()
-}
-
 #Preview("All Permissions") {
     VStack(spacing: 16) {
         PermissionCard.microphone(isGranted: false) {}
         PermissionCard.accessibility(isGranted: true) {}
-        PermissionCard.inputMonitoring(isGranted: false) {}
     }
     .padding()
 }

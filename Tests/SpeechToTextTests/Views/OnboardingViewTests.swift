@@ -62,7 +62,7 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertEqual(progress, 0.0, accuracy: 0.001)
     }
 
-    func test_progressPercentage_atStep1_is20Percent() {
+    func test_progressPercentage_atStep1_is25Percent() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -74,10 +74,10 @@ final class OnboardingViewTests: XCTestCase {
         let progress = calculateProgressPercentage(for: viewModel.currentStep)
 
         // Then
-        XCTAssertEqual(progress, 0.2, accuracy: 0.001)
+        XCTAssertEqual(progress, 0.25, accuracy: 0.001)
     }
 
-    func test_progressPercentage_atStep2_is40Percent() {
+    func test_progressPercentage_atStep2_is50Percent() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -90,27 +90,10 @@ final class OnboardingViewTests: XCTestCase {
         let progress = calculateProgressPercentage(for: viewModel.currentStep)
 
         // Then
-        XCTAssertEqual(progress, 0.4, accuracy: 0.001)
+        XCTAssertEqual(progress, 0.5, accuracy: 0.001)
     }
 
-    func test_progressPercentage_atStep3_is60Percent() {
-        // Given
-        let viewModel = OnboardingViewModel(
-            permissionService: mockPermissionService,
-            settingsService: mockSettingsService
-        )
-        viewModel.nextStep() // Step 1
-        viewModel.nextStep() // Step 2
-        viewModel.nextStep() // Step 3
-
-        // When
-        let progress = calculateProgressPercentage(for: viewModel.currentStep)
-
-        // Then
-        XCTAssertEqual(progress, 0.6, accuracy: 0.001)
-    }
-
-    func test_progressPercentage_atStep4_is80Percent() {
+    func test_progressPercentage_atStep3_is75Percent() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -119,22 +102,21 @@ final class OnboardingViewTests: XCTestCase {
         viewModel.nextStep() // Step 1
         viewModel.nextStep() // Step 2
         viewModel.nextStep() // Step 3
-        viewModel.nextStep() // Step 4
 
         // When
         let progress = calculateProgressPercentage(for: viewModel.currentStep)
 
         // Then
-        XCTAssertEqual(progress, 0.8, accuracy: 0.001)
+        XCTAssertEqual(progress, 0.75, accuracy: 0.001)
     }
 
-    func test_progressPercentage_atStep5_is100Percent() {
+    func test_progressPercentage_atStep4_is100Percent() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
-        for _ in 0..<5 {
+        for _ in 0..<4 {
             viewModel.nextStep()
         }
 
@@ -176,13 +158,13 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertEqual(title, "Next")
     }
 
-    func test_nextButtonTitle_atStep4_isNext() {
+    func test_nextButtonTitle_atStep3_isNext() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
-        for _ in 0..<4 {
+        for _ in 0..<3 {
             viewModel.nextStep()
         }
 
@@ -193,13 +175,13 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertEqual(title, "Next")
     }
 
-    func test_nextButtonTitle_atStep5_isGetStarted() {
+    func test_nextButtonTitle_atStep4_isGetStarted() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
-        for _ in 0..<5 {
+        for _ in 0..<4 {
             viewModel.nextStep()
         }
 
@@ -289,30 +271,13 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertTrue(visible)
     }
 
-    func test_backButtonVisible_atStep4_isTrue() {
+    func test_backButtonVisible_atStep4_isFalse() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
         for _ in 0..<4 {
-            viewModel.nextStep()
-        }
-
-        // When
-        let visible = shouldShowBackButton(for: viewModel.currentStep)
-
-        // Then
-        XCTAssertTrue(visible)
-    }
-
-    func test_backButtonVisible_atStep5_isFalse() {
-        // Given
-        let viewModel = OnboardingViewModel(
-            permissionService: mockPermissionService,
-            settingsService: mockSettingsService
-        )
-        for _ in 0..<5 {
             viewModel.nextStep()
         }
 
@@ -361,7 +326,7 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertTrue(viewModel.canSkipCurrentStep)
     }
 
-    func test_skipButtonVisible_atStep3_isTrue() {
+    func test_skipButtonVisible_atStep3_isFalse() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -369,10 +334,10 @@ final class OnboardingViewTests: XCTestCase {
         )
         viewModel.nextStep() // Step 1
         viewModel.nextStep() // Step 2
-        viewModel.nextStep() // Step 3 (input monitoring)
+        viewModel.nextStep() // Step 3 (demo)
 
-        // When/Then
-        XCTAssertTrue(viewModel.canSkipCurrentStep)
+        // When/Then - Demo step (3) cannot be skipped
+        XCTAssertFalse(viewModel.canSkipCurrentStep)
     }
 
     func test_skipButtonVisible_atStep4_isFalse() {
@@ -385,21 +350,7 @@ final class OnboardingViewTests: XCTestCase {
             viewModel.nextStep()
         }
 
-        // When/Then - Demo step (4) cannot be skipped
-        XCTAssertFalse(viewModel.canSkipCurrentStep)
-    }
-
-    func test_skipButtonVisible_atStep5_isFalse() {
-        // Given
-        let viewModel = OnboardingViewModel(
-            permissionService: mockPermissionService,
-            settingsService: mockSettingsService
-        )
-        for _ in 0..<5 {
-            viewModel.nextStep()
-        }
-
-        // When/Then - Completion step (5) cannot be skipped
+        // When/Then - Completion step (4) cannot be skipped
         XCTAssertFalse(viewModel.canSkipCurrentStep)
     }
 
@@ -473,23 +424,21 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertTrue(warning?.contains("Accessibility") ?? false)
     }
 
-    func test_permissionWarning_atStep3_whenNotGranted_showsInputMonitoringWarning() {
+    func test_permissionWarning_atStep3_isNil() {
         // Given
-        mockPermissionService.inputMonitoringGranted = false
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
-        viewModel.nextStep() // Step 1
-        viewModel.nextStep() // Step 2
-        viewModel.nextStep() // Step 3
+        for _ in 0..<3 {
+            viewModel.nextStep()
+        }
 
         // When
         let warning = calculatePermissionWarning(for: viewModel.currentStep, viewModel: viewModel)
 
-        // Then
-        XCTAssertNotNil(warning)
-        XCTAssertTrue(warning?.contains("Input monitoring") ?? false)
+        // Then - Step 3 is demo step, no permission warning
+        XCTAssertNil(warning)
     }
 
     func test_permissionWarning_atStep4_isNil() {
@@ -505,24 +454,7 @@ final class OnboardingViewTests: XCTestCase {
         // When
         let warning = calculatePermissionWarning(for: viewModel.currentStep, viewModel: viewModel)
 
-        // Then
-        XCTAssertNil(warning)
-    }
-
-    func test_permissionWarning_atStep5_isNil() {
-        // Given
-        let viewModel = OnboardingViewModel(
-            permissionService: mockPermissionService,
-            settingsService: mockSettingsService
-        )
-        for _ in 0..<5 {
-            viewModel.nextStep()
-        }
-
-        // When
-        let warning = calculatePermissionWarning(for: viewModel.currentStep, viewModel: viewModel)
-
-        // Then
+        // Then - Step 4 is completion step, no permission warning
         XCTAssertNil(warning)
     }
 
@@ -567,7 +499,7 @@ final class OnboardingViewTests: XCTestCase {
         XCTAssertEqual(viewModel.stepTitle(for: 2), "Accessibility Access")
     }
 
-    func test_contentView_atStep3_displaysInputMonitoring() {
+    func test_contentView_atStep3_displaysDemo() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -577,12 +509,12 @@ final class OnboardingViewTests: XCTestCase {
         viewModel.nextStep()
         viewModel.nextStep()
 
-        // When/Then - Step 3 is input monitoring step
+        // When/Then - Step 3 is demo step
         XCTAssertEqual(viewModel.currentStep, 3)
-        XCTAssertEqual(viewModel.stepTitle(for: 3), "Input Monitoring")
+        XCTAssertEqual(viewModel.stepTitle(for: 3), "Try It Now")
     }
 
-    func test_contentView_atStep4_displaysDemo() {
+    func test_contentView_atStep4_displaysCompletion() {
         // Given
         let viewModel = OnboardingViewModel(
             permissionService: mockPermissionService,
@@ -592,24 +524,9 @@ final class OnboardingViewTests: XCTestCase {
             viewModel.nextStep()
         }
 
-        // When/Then - Step 4 is demo step
+        // When/Then - Step 4 is completion step
         XCTAssertEqual(viewModel.currentStep, 4)
-        XCTAssertEqual(viewModel.stepTitle(for: 4), "Try It Now")
-    }
-
-    func test_contentView_atStep5_displaysCompletion() {
-        // Given
-        let viewModel = OnboardingViewModel(
-            permissionService: mockPermissionService,
-            settingsService: mockSettingsService
-        )
-        for _ in 0..<5 {
-            viewModel.nextStep()
-        }
-
-        // When/Then - Step 5 is completion step
-        XCTAssertEqual(viewModel.currentStep, 5)
-        XCTAssertEqual(viewModel.stepTitle(for: 5), "All Set!")
+        XCTAssertEqual(viewModel.stepTitle(for: 4), "All Set!")
     }
 
     // MARK: - Navigation Flow Tests
@@ -659,11 +576,11 @@ final class OnboardingViewTests: XCTestCase {
         )
 
         // When/Then - Navigate through all steps
-        for expectedStep in 0..<5 {
+        for expectedStep in 0..<4 {
             XCTAssertEqual(viewModel.currentStep, expectedStep)
             viewModel.nextStep()
         }
-        XCTAssertEqual(viewModel.currentStep, 5)
+        XCTAssertEqual(viewModel.currentStep, 4)
     }
 
     // MARK: - Edge Case Tests
@@ -674,10 +591,10 @@ final class OnboardingViewTests: XCTestCase {
             permissionService: mockPermissionService,
             settingsService: mockSettingsService
         )
-        for _ in 0..<5 {
+        for _ in 0..<4 {
             viewModel.nextStep()
         }
-        XCTAssertEqual(viewModel.currentStep, 5)
+        XCTAssertEqual(viewModel.currentStep, 4)
 
         // When
         viewModel.nextStep()
@@ -707,12 +624,12 @@ final class OnboardingViewTests: XCTestCase {
 
     /// Replicates the progressPercentage computed property from OnboardingView
     private func calculateProgressPercentage(for step: Int) -> Double {
-        return Double(step) / 5.0
+        return Double(step) / 4.0
     }
 
     /// Replicates the nextButtonTitle computed property from OnboardingView
     private func calculateNextButtonTitle(for step: Int, isComplete: Bool) -> String {
-        if step == 5 || isComplete {
+        if step == 4 || isComplete {
             return "Get Started"
         } else {
             return "Next"
@@ -721,12 +638,12 @@ final class OnboardingViewTests: XCTestCase {
 
     /// Replicates the back button visibility logic from OnboardingView
     private func shouldShowBackButton(for step: Int) -> Bool {
-        return step > 0 && step < 5
+        return step > 0 && step < 4
     }
 
     /// Replicates the permissionWarning computed property from OnboardingView
     private func calculatePermissionWarning(for step: Int, viewModel: OnboardingViewModel) -> String? {
-        guard step > 0 && step <= 3 else {
+        guard step > 0 && step <= 2 else {
             return nil
         }
 
@@ -735,8 +652,6 @@ final class OnboardingViewTests: XCTestCase {
             return viewModel.microphoneGranted ? nil : "Microphone access is required for recording"
         case 2:
             return viewModel.accessibilityGranted ? nil : "Accessibility access is required for text insertion"
-        case 3:
-            return viewModel.inputMonitoringGranted ? nil : "Input monitoring is required for the global hotkey"
         default:
             return nil
         }
@@ -744,9 +659,8 @@ final class OnboardingViewTests: XCTestCase {
 
     /// Direct calculation without viewModel for testing granted permissions
     private func calculatePermissionWarningDirect(step: Int, microphoneGranted: Bool = false,
-                                                   accessibilityGranted: Bool = false,
-                                                   inputMonitoringGranted: Bool = false) -> String? {
-        guard step > 0 && step <= 3 else {
+                                                   accessibilityGranted: Bool = false) -> String? {
+        guard step > 0 && step <= 2 else {
             return nil
         }
 
@@ -755,8 +669,6 @@ final class OnboardingViewTests: XCTestCase {
             return microphoneGranted ? nil : "Microphone access is required for recording"
         case 2:
             return accessibilityGranted ? nil : "Accessibility access is required for text insertion"
-        case 3:
-            return inputMonitoringGranted ? nil : "Input monitoring is required for the global hotkey"
         default:
             return nil
         }

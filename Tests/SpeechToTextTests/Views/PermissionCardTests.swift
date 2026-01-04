@@ -83,7 +83,7 @@ final class PermissionCardTests: XCTestCase {
         // Then
         XCTAssertEqual(
             card.description,
-            "Required to insert transcribed text into other applications. This allows the app to type for you."
+            "Required to insert transcribed text and detect the global hotkey (⌘⌃Space). This allows the app to type for you."
         )
     }
 
@@ -106,59 +106,6 @@ final class PermissionCardTests: XCTestCase {
     func test_accessibilityCard_granted_setsIsGrantedTrue() {
         // Given
         let card = PermissionCard.accessibility(isGranted: true) {}
-
-        // Then
-        XCTAssertTrue(card.isGranted)
-    }
-
-    // MARK: - Input Monitoring Permission Card Tests
-
-    func test_inputMonitoringCard_hasCorrectIcon() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.icon, "keyboard.fill")
-    }
-
-    func test_inputMonitoringCard_hasCorrectTitle() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.title, "Input Monitoring")
-    }
-
-    func test_inputMonitoringCard_hasCorrectDescription() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(
-            card.description,
-            "Required to detect the global hotkey (\u{2318}\u{2303}Space). Allows the app to respond when you trigger dictation."
-        )
-    }
-
-    func test_inputMonitoringCard_hasCorrectButtonTitle() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertEqual(card.buttonTitle, "Open System Settings")
-    }
-
-    func test_inputMonitoringCard_notGranted_setsIsGrantedFalse() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertFalse(card.isGranted)
-    }
-
-    func test_inputMonitoringCard_granted_setsIsGrantedTrue() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: true) {}
 
         // Then
         XCTAssertTrue(card.isGranted)
@@ -188,14 +135,12 @@ final class PermissionCardTests: XCTestCase {
         // Given
         let notGrantedCards = [
             PermissionCard.microphone(isGranted: false) {},
-            PermissionCard.accessibility(isGranted: false) {},
-            PermissionCard.inputMonitoring(isGranted: false) {}
+            PermissionCard.accessibility(isGranted: false) {}
         ]
 
         let grantedCards = [
             PermissionCard.microphone(isGranted: true) {},
-            PermissionCard.accessibility(isGranted: true) {},
-            PermissionCard.inputMonitoring(isGranted: true) {}
+            PermissionCard.accessibility(isGranted: true) {}
         ]
 
         // Then
@@ -228,20 +173,6 @@ final class PermissionCardTests: XCTestCase {
         // Given
         var actionWasCalled = false
         let card = PermissionCard.accessibility(isGranted: false) {
-            actionWasCalled = true
-        }
-
-        // When
-        await card.action()
-
-        // Then
-        XCTAssertTrue(actionWasCalled)
-    }
-
-    func test_inputMonitoringCard_actionCallbackIsStored() async {
-        // Given
-        var actionWasCalled = false
-        let card = PermissionCard.inputMonitoring(isGranted: false) {
             actionWasCalled = true
         }
 
@@ -361,8 +292,7 @@ final class PermissionCardTests: XCTestCase {
         // Given
         let cards = [
             PermissionCard.microphone(isGranted: false) {},
-            PermissionCard.accessibility(isGranted: false) {},
-            PermissionCard.inputMonitoring(isGranted: false) {}
+            PermissionCard.accessibility(isGranted: false) {}
         ]
 
         // Then
@@ -378,8 +308,7 @@ final class PermissionCardTests: XCTestCase {
         // Given
         let cards = [
             PermissionCard.microphone(isGranted: false) {},
-            PermissionCard.accessibility(isGranted: false) {},
-            PermissionCard.inputMonitoring(isGranted: false) {}
+            PermissionCard.accessibility(isGranted: false) {}
         ]
 
         // Then - verify all icons are valid SF Symbol names (contain expected patterns)
@@ -397,36 +326,27 @@ final class PermissionCardTests: XCTestCase {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
         XCTAssertNotEqual(micCard.icon, accessCard.icon)
-        XCTAssertNotEqual(micCard.icon, inputCard.icon)
-        XCTAssertNotEqual(accessCard.icon, inputCard.icon)
     }
 
     func test_allCardTypes_haveDistinctTitles() {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
         XCTAssertNotEqual(micCard.title, accessCard.title)
-        XCTAssertNotEqual(micCard.title, inputCard.title)
-        XCTAssertNotEqual(accessCard.title, inputCard.title)
     }
 
     func test_allCardTypes_haveDistinctDescriptions() {
         // Given
         let micCard = PermissionCard.microphone(isGranted: false) {}
         let accessCard = PermissionCard.accessibility(isGranted: false) {}
-        let inputCard = PermissionCard.inputMonitoring(isGranted: false) {}
 
         // Then
         XCTAssertNotEqual(micCard.description, accessCard.description)
-        XCTAssertNotEqual(micCard.description, inputCard.description)
-        XCTAssertNotEqual(accessCard.description, inputCard.description)
     }
 
     // MARK: - Description Content Tests
@@ -450,17 +370,6 @@ final class PermissionCardTests: XCTestCase {
         XCTAssertTrue(
             card.description.contains("insert") || card.description.contains("text"),
             "Accessibility description should mention text insertion"
-        )
-    }
-
-    func test_inputMonitoringCard_descriptionMentionsHotkey() {
-        // Given
-        let card = PermissionCard.inputMonitoring(isGranted: false) {}
-
-        // Then
-        XCTAssertTrue(
-            card.description.contains("hotkey"),
-            "Input Monitoring description should mention global hotkey"
         )
     }
 }

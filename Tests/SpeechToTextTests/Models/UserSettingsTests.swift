@@ -73,7 +73,6 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertTrue(onboarding.skippedSteps.isEmpty)
         XCTAssertFalse(onboarding.permissionsGranted.microphone)
         XCTAssertFalse(onboarding.permissionsGranted.accessibility)
-        XCTAssertFalse(onboarding.permissionsGranted.inputMonitoring)
     }
 
     // MARK: - KeyModifier Tests
@@ -122,27 +121,27 @@ final class UserSettingsTests: XCTestCase {
     // MARK: - PermissionsGranted Tests
 
     func test_permissionsGranted_allGranted_returnsTrueWhenAllTrue() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: true, inputMonitoring: true)
+        let permissions = PermissionsGranted(microphone: true, accessibility: true)
         XCTAssertTrue(permissions.allGranted)
     }
 
     func test_permissionsGranted_allGranted_returnsFalseWhenAnyFalse() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: false, inputMonitoring: true)
+        let permissions = PermissionsGranted(microphone: true, accessibility: false)
         XCTAssertFalse(permissions.allGranted)
     }
 
     func test_permissionsGranted_allGranted_returnsFalseWhenAllFalse() {
-        let permissions = PermissionsGranted(microphone: false, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: false, accessibility: false)
         XCTAssertFalse(permissions.allGranted)
     }
 
     func test_permissionsGranted_hasAnyPermission_returnsTrueWhenOneTrue() {
-        let permissions = PermissionsGranted(microphone: true, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: true, accessibility: false)
         XCTAssertTrue(permissions.hasAnyPermission)
     }
 
     func test_permissionsGranted_hasAnyPermission_returnsFalseWhenAllFalse() {
-        let permissions = PermissionsGranted(microphone: false, accessibility: false, inputMonitoring: false)
+        let permissions = PermissionsGranted(microphone: false, accessibility: false)
         XCTAssertFalse(permissions.hasAnyPermission)
     }
 

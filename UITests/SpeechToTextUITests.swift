@@ -88,13 +88,13 @@ final class SpeechToTextUITests: XCTestCase {
             app.tap()
         }
 
-        // Click Continue to next step
-        let nextButton = onboardingWindow.buttons["Continue"]
-        if nextButton.isEnabled {
+        // Click Next to next step (step 1+ uses "Next" button)
+        let nextButton = onboardingWindow.buttons["Next"]
+        if nextButton.waitForExistence(timeout: 2) && nextButton.isEnabled {
             nextButton.tap()
         }
 
-        // Step 3: Accessibility Permission
+        // Step 2: Accessibility Permission
         let accessibilityStep = onboardingWindow.staticTexts["Accessibility Access"]
         XCTAssertTrue(accessibilityStep.waitForExistence(timeout: 2))
     }
@@ -109,12 +109,17 @@ final class SpeechToTextUITests: XCTestCase {
         XCTAssertTrue(onboardingWindow.waitForExistence(timeout: 5))
 
         // Navigate through all steps
-        for _ in 0..<4 {
+        // Step 0 uses "Continue", steps 1-3 use "Next"
+        for step in 0..<4 {  // 4 taps to reach step 4 (completion)
             let continueButton = onboardingWindow.buttons["Continue"]
-            if continueButton.exists && continueButton.isEnabled {
+            let nextButton = onboardingWindow.buttons["Next"]
+
+            if step == 0 && continueButton.exists && continueButton.isEnabled {
                 continueButton.tap()
-                sleep(1)
+            } else if nextButton.exists && nextButton.isEnabled {
+                nextButton.tap()
             }
+            sleep(1)
         }
 
         // Final step: Complete

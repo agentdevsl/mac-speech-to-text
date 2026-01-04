@@ -18,6 +18,7 @@ extension OnboardingView {
             Text(title)
                 .font(.title)
                 .fontWeight(.bold)
+                .accessibilityIdentifier("\(title.lowercased().replacingOccurrences(of: " ", with: ""))Title")
 
             Text(subtitle)
                 .font(.title3)
@@ -91,37 +92,7 @@ extension OnboardingView {
         }
     }
 
-    /// Step 3: Input monitoring permission
-    func inputMonitoringStepView(viewModel: OnboardingViewModel) -> some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "keyboard.fill",
-                title: "Input Monitoring",
-                subtitle: "Required for global hotkey (⌘⌃Space)"
-            )
-
-            PermissionCard.inputMonitoring(isGranted: viewModel.inputMonitoringGranted) {
-                await viewModel.requestInputMonitoringPermission()
-            }
-
-            if !viewModel.inputMonitoringGranted {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("How to grant input monitoring:")
-                        .font(.headline)
-
-                    StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
-                    StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
-                    StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here and click \"Next\"")
-                }
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    /// Step 4: Demo/Try it now
+    /// Step 3: Demo/Try it now
     var demoStepView: some View {
         VStack(spacing: 24) {
             stepHeader(
@@ -158,7 +129,7 @@ extension OnboardingView {
         }
     }
 
-    /// Step 5: Completion
+    /// Step 4: Completion
     var completionStepView: some View {
         VStack(spacing: 24) {
             Image(systemName: "checkmark.circle.fill")

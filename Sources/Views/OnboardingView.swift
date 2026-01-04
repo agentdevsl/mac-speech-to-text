@@ -43,6 +43,7 @@ struct OnboardingView: View {
         }
         .frame(width: 640, height: 560)
         .background(.ultraThinMaterial)
+        .accessibilityIdentifier("onboardingWindow")
         .onAppear {
             // Cancel any existing task before creating a new one to prevent multiple loops
             permissionCheckTask?.cancel()
@@ -50,16 +51,13 @@ struct OnboardingView: View {
             permissionCheckTask = Task { @MainActor in
                 while !Task.isCancelled {
                     // Check permissions first for immediate responsiveness
-                    if viewModel.currentStep >= 1 && viewModel.currentStep <= 3 {
+                    if viewModel.currentStep >= 1 && viewModel.currentStep <= 2 {
                         let prevAccessibility = viewModel.accessibilityGranted
-                        let prevInputMonitoring = viewModel.inputMonitoringGranted
 
                         await viewModel.checkAllPermissions()
 
                         // Auto-advance if permission was just granted
                         if viewModel.currentStep == 2 && !prevAccessibility && viewModel.accessibilityGranted {
-                            viewModel.nextStep()
-                        } else if viewModel.currentStep == 3 && !prevInputMonitoring && viewModel.inputMonitoringGranted {
                             viewModel.nextStep()
                         }
                     }
@@ -104,6 +102,7 @@ struct OnboardingView: View {
     }
 
     /// Main content area with step-specific views
+    /// Steps: 0=Welcome, 1=Microphone, 2=Accessibility, 3=Demo, 4=Completion
     @ViewBuilder
     private var contentView: some View {
         switch viewModel.currentStep {
@@ -114,8 +113,6 @@ struct OnboardingView: View {
         case 2:
             accessibilityStep
         case 3:
-            inputMonitoringStep
-        case 4:
             demoStep
         default:
             completionStep
@@ -126,7 +123,7 @@ struct OnboardingView: View {
     private var navigationButtons: some View {
         HStack {
             // Back button
-            if viewModel.currentStep > 0 && viewModel.currentStep < 5 {
+            if viewModel.currentStep > 0 && viewModel.currentStep < 4 {
                 Button("Back") {
                     viewModel.previousStep()
                 }
@@ -145,7 +142,7 @@ struct OnboardingView: View {
 
             // Next/Done button
             Button(nextButtonTitle) {
-                if viewModel.currentStep == 5 || viewModel.isComplete {
+                if viewModel.currentStep == 4 || viewModel.isComplete {
                     viewModel.completeOnboarding()
                     dismiss()
                 } else {
@@ -154,6 +151,7 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
             .keyboardShortcut(.return)
+            .accessibilityIdentifier("nextButton")
         }
     }
 
@@ -173,6 +171,7 @@ struct OnboardingView: View {
                 .font(.largeTitle)
                 .fontWeight(.bold)
                 .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("welcomeTitle")
 
             Text("A privacy-first dictation app that runs 100% locally on your Mac. No cloud, no tracking, no data collection.")
                 .font(.title3)
@@ -216,13 +215,13 @@ struct OnboardingView: View {
         }
     }
 
-    /// Step 2: Accessibility permission
+    /// Step 2: Accessibility permission (also enables global hotkeys via NSEvent)
     private var accessibilityStep: some View {
         VStack(spacing: 24) {
             stepHeader(
                 icon: "hand.point.up.left.fill",
                 title: "Accessibility Access",
-                subtitle: "Required to insert text into apps"
+                subtitle: "Required for text insertion and hotkeys"
             )
 
             PermissionCard.accessibility(isGranted: viewModel.accessibilityGranted) {
@@ -250,39 +249,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// Step 3: Input monitoring permission
-    private var inputMonitoringStep: some View {
-        VStack(spacing: 24) {
-            stepHeader(
-                icon: "keyboard.fill",
-                title: "Input Monitoring",
-                subtitle: "Required for global hotkey (⌘⌃Space)"
-            )
-
-            PermissionCard.inputMonitoring(isGranted: viewModel.inputMonitoringGranted) {
-                await viewModel.requestInputMonitoringPermission()
-            }
-
-            if viewModel.inputMonitoringGranted {
-                PermissionGrantedView(message: "Input monitoring access granted!")
-            } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("How to grant input monitoring:")
-                        .font(.headline)
-
-                    StepInstruction(number: 1, text: "Click \"Open System Settings\" above")
-                    StepInstruction(number: 2, text: "Find \"SpeechToText\" in the list")
-                    StepInstruction(number: 3, text: "Toggle the switch to enable access")
-                    StepInstruction(number: 4, text: "Return here - it will auto-advance")
-                }
-                .padding()
-                .background(Color.blue.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-            }
-        }
-    }
-
-    /// Step 4: Demo/Try it now
+    /// Step 3: Demo/Try it now
     private var demoStep: some View {
         VStack(spacing: 24) {
             stepHeader(
@@ -319,7 +286,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// Step 5: Completion
+    /// Step 4: Completion
     private var completionStep: some View {
         VStack(spacing: 24) {
             Image(systemName: "checkmark.circle.fill")
@@ -349,13 +316,15 @@ struct OnboardingView: View {
 
     /// Progress percentage (0.0 - 1.0)
     private var progressPercentage: Double {
-        return Double(viewModel.currentStep) / 5.0
+        return Double(viewModel.currentStep) / 4.0
     }
 
     /// Next button title
     private var nextButtonTitle: String {
-        if viewModel.currentStep == 5 || viewModel.isComplete {
+        if viewModel.currentStep == 4 || viewModel.isComplete {
             return "Get Started"
+        } else if viewModel.currentStep == 0 {
+            return "Continue"  // Welcome step uses "Continue"
         } else {
             return "Next"
         }
@@ -363,7 +332,7 @@ struct OnboardingView: View {
 
     /// Permission warning message
     private var permissionWarning: String? {
-        guard viewModel.currentStep > 0 && viewModel.currentStep <= 3 else {
+        guard viewModel.currentStep > 0 && viewModel.currentStep <= 2 else {
             return nil
         }
 
@@ -371,9 +340,7 @@ struct OnboardingView: View {
         case 1:
             return viewModel.microphoneGranted ? nil : "Microphone access is required for recording"
         case 2:
-            return viewModel.accessibilityGranted ? nil : "Accessibility access is required for text insertion"
-        case 3:
-            return viewModel.inputMonitoringGranted ? nil : "Input monitoring is required for the global hotkey"
+            return viewModel.accessibilityGranted ? nil : "Accessibility access is required for text insertion and hotkeys"
         default:
             return nil
         }
@@ -426,11 +393,11 @@ private struct PermissionErrorView: View {
 }
 
 #Preview("Demo Step") {
-    OnboardingViewPreview(step: 4)
+    OnboardingViewPreview(step: 3)
 }
 
 #Preview("Completion Step") {
-    OnboardingViewPreview(step: 5)
+    OnboardingViewPreview(step: 4)
 }
 
 private struct OnboardingViewPreview: View {

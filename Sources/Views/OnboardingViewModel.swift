@@ -23,7 +23,6 @@ final class OnboardingViewModel {
     /// Permission status
     var microphoneGranted: Bool = false
     var accessibilityGranted: Bool = false
-    var inputMonitoringGranted: Bool = false
 
     /// Whether onboarding is complete
     var isComplete: Bool = false
@@ -47,7 +46,7 @@ final class OnboardingViewModel {
 
     // MARK: - Constants
 
-    private let totalSteps: Int = 5
+    private let totalSteps: Int = 4
 
     // MARK: - Initialization
 
@@ -80,8 +79,6 @@ final class OnboardingViewModel {
             if currentStep == 1 && microphoneGranted {
                 currentStep += 1
             } else if currentStep == 2 && accessibilityGranted {
-                currentStep += 1
-            } else if currentStep == 3 && inputMonitoringGranted {
                 currentStep += 1
             } else {
                 break
@@ -157,31 +154,15 @@ final class OnboardingViewModel {
         }
     }
 
-    /// Request input monitoring permission
-    func requestInputMonitoringPermission() async {
-        // Input monitoring permission is checked when registering hotkeys
-        inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
-
-        // Auto-advance when permission is granted
-        if inputMonitoringGranted {
-            nextStep()
-        } else {
-            // Input monitoring requires manual grant in System Settings
-            openSystemSettings(for: "input-monitoring")
-        }
-    }
-
     /// Check all permissions status
     func checkAllPermissions() async {
         microphoneGranted = await permissionService.checkMicrophonePermission()
         accessibilityGranted = permissionService.checkAccessibilityPermission()
-        inputMonitoringGranted = permissionService.checkInputMonitoringPermission()
 
         // Clear permission error if the relevant permission is now granted
         if permissionError != nil {
             if (currentStep == 1 && microphoneGranted) ||
-               (currentStep == 2 && accessibilityGranted) ||
-               (currentStep == 3 && inputMonitoringGranted) {
+               (currentStep == 2 && accessibilityGranted) {
                 permissionError = nil
             }
         }
@@ -198,7 +179,6 @@ final class OnboardingViewModel {
         settings.onboarding.skippedSteps = Array(skippedSteps).map { String($0) }
         settings.onboarding.permissionsGranted.microphone = microphoneGranted
         settings.onboarding.permissionsGranted.accessibility = accessibilityGranted
-        settings.onboarding.permissionsGranted.inputMonitoring = inputMonitoringGranted
 
         do {
             try settingsService.save(settings)
@@ -215,8 +195,6 @@ final class OnboardingViewModel {
             urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
         case "accessibility":
             urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-        case "input-monitoring":
-            urlString = "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
         default:
             urlString = "x-apple.systempreferences:com.apple.preference.security"
         }
@@ -235,14 +213,14 @@ final class OnboardingViewModel {
     // MARK: - Helper Methods
 
     /// Get title for step
+    /// Steps: 0=Welcome, 1=Microphone, 2=Accessibility, 3=Try It Now, 4=All Set
     func stepTitle(for step: Int) -> String {
         switch step {
         case 0: return "Welcome"
         case 1: return "Microphone Access"
         case 2: return "Accessibility Access"
-        case 3: return "Input Monitoring"
-        case 4: return "Try It Now"
-        case 5: return "All Set!"
+        case 3: return "Try It Now"
+        case 4: return "All Set!"
         default: return ""
         }
     }
@@ -252,10 +230,9 @@ final class OnboardingViewModel {
         switch step {
         case 0: return "Privacy-first speech-to-text"
         case 1: return "Required for voice capture"
-        case 2: return "Required for text insertion"
-        case 3: return "Required for global hotkey"
-        case 4: return "Test your setup"
-        case 5: return "Ready to use"
+        case 2: return "Required for text insertion and hotkeys"
+        case 3: return "Test your setup"
+        case 4: return "Ready to use"
         default: return ""
         }
     }
@@ -267,13 +244,13 @@ final class OnboardingViewModel {
             return false
         }
 
-        // Can skip permission steps
-        return currentStep >= 1 && currentStep <= 3
+        // Can skip permission steps (1 and 2)
+        return currentStep >= 1 && currentStep <= 2
     }
 
     /// Check if all required permissions are granted
     var allPermissionsGranted: Bool {
-        return microphoneGranted && accessibilityGranted && inputMonitoringGranted
+        return microphoneGranted && accessibilityGranted
     }
 
     /// Get warning message for missing permissions
@@ -282,7 +259,6 @@ final class OnboardingViewModel {
 
         if !microphoneGranted { missing.append("Microphone") }
         if !accessibilityGranted { missing.append("Accessibility") }
-        if !inputMonitoringGranted { missing.append("Input Monitoring") }
 
         guard !missing.isEmpty else { return nil }
 

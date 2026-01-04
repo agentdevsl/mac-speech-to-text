@@ -62,8 +62,7 @@ struct UserSettings: Codable, Sendable {
             currentStep: 0,
             permissionsGranted: PermissionsGranted(
                 microphone: false,
-                accessibility: false,
-                inputMonitoring: false
+                accessibility: false
             ),
             skippedSteps: []
         ),
@@ -195,13 +194,12 @@ struct OnboardingState: Codable, Sendable {
 struct PermissionsGranted: Codable, Sendable {
     var microphone: Bool
     var accessibility: Bool
-    var inputMonitoring: Bool
 
     var allGranted: Bool {
-        microphone && accessibility && inputMonitoring
+        microphone && accessibility
     }
 
     var hasAnyPermission: Bool {
-        microphone || accessibility || inputMonitoring
+        microphone || accessibility
     }
 }

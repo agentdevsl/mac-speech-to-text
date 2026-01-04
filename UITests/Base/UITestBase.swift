@@ -227,6 +227,69 @@ class UITestBase: XCTestCase {
     }
 }
 
+// MARK: - Onboarding Navigation Helpers
+
+extension UITestBase {
+    /// Navigate through onboarding steps by clicking Next/Continue buttons
+    /// - Parameters:
+    ///   - stepsToAdvance: Number of steps to advance (default: navigate to completion)
+    ///   - checkForGetStarted: Whether to stop and click "Get Started" button
+    /// - Returns: true if navigation succeeded
+    @discardableResult
+    func navigateOnboardingSteps(count stepsToAdvance: Int = 5, clickGetStarted: Bool = true) -> Bool {
+        for step in 0..<stepsToAdvance {
+            // Check if we've reached the completion step
+            let getStartedButton = app.buttons["Get Started"]
+            if getStartedButton.waitForExistence(timeout: 1) && getStartedButton.isEnabled {
+                if clickGetStarted {
+                    getStartedButton.tap()
+                }
+                return true
+            }
+
+            // Try accessibility identifier first (works for all steps)
+            let nextButtonById = app.buttons.matching(
+                NSPredicate(format: "identifier == 'nextButton'")
+            ).firstMatch
+
+            if nextButtonById.waitForExistence(timeout: 2) && nextButtonById.isEnabled {
+                nextButtonById.tap()
+            } else if step == 0 {
+                // Step 0 uses "Continue" button label
+                let continueButton = app.buttons["Continue"]
+                if continueButton.waitForExistence(timeout: 1) && continueButton.isEnabled {
+                    continueButton.tap()
+                }
+            } else {
+                // Steps 1+ use "Next" button label
+                let nextButton = app.buttons["Next"]
+                if nextButton.waitForExistence(timeout: 1) && nextButton.isEnabled {
+                    nextButton.tap()
+                }
+            }
+
+            // Wait for UI to update after navigation
+            _ = app.windows.firstMatch.waitForExistence(timeout: 1)
+        }
+        return true
+    }
+
+    /// Get the onboarding window (checks both identifier and title)
+    func getOnboardingWindow() -> XCUIElement? {
+        let windowById = app.windows.matching(
+            NSPredicate(format: "identifier == 'onboardingWindow'")
+        ).firstMatch
+        let windowByTitle = app.windows["Welcome to Speech-to-Text"]
+
+        if windowById.waitForExistence(timeout: extendedTimeout) {
+            return windowById
+        } else if windowByTitle.waitForExistence(timeout: 3) {
+            return windowByTitle
+        }
+        return nil
+    }
+}
+
 // MARK: - Convenience Extensions
 
 extension UITestBase {

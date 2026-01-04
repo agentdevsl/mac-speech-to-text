@@ -2,13 +2,11 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Foundation
-import IOKit
 
 /// Permission-related errors
 enum PermissionError: Error, LocalizedError, Equatable, Sendable {
     case microphoneDenied
     case accessibilityDenied
-    case inputMonitoringDenied
 
     var errorDescription: String? {
         switch self {
@@ -16,8 +14,6 @@ enum PermissionError: Error, LocalizedError, Equatable, Sendable {
             return "Microphone permission denied. Please grant access in System Settings > Privacy & Security > Microphone"
         case .accessibilityDenied:
             return "Accessibility permission denied. Please grant access in System Settings > Privacy & Security > Accessibility"
-        case .inputMonitoringDenied:
-            return "Input Monitoring permission denied. Please grant access in System Settings > Privacy & Security > Input Monitoring"
         }
     }
 }
@@ -29,7 +25,6 @@ protocol PermissionChecker {
     func requestMicrophonePermission() async throws
     func checkAccessibilityPermission() -> Bool
     func requestAccessibilityPermission() throws
-    func checkInputMonitoringPermission() -> Bool
 }
 
 /// Real implementation of permission service
@@ -146,38 +141,14 @@ class PermissionService: PermissionChecker {
         }
     }
 
-    /// Check input monitoring permission status
-    /// This is required for global hotkeys on macOS 10.15+
-    /// Uses IOHIDCheckAccess to check input monitoring permission
-    func checkInputMonitoringPermission() -> Bool {
-        // Handle mock state for testing
-        if let mockState = mockState {
-            AppLogger.system.debug("Using mock input monitoring permission: \(mockState.rawValue, privacy: .public)")
-            return mockState == .granted
-        }
-
-        // Skip checks if requested (always return true)
-        if skipChecks {
-            AppLogger.system.debug("Skipping input monitoring permission check")
-            return true
-        }
-
-        // Use IOHIDCheckAccess to check input monitoring permission (macOS 10.15+)
-        // This API returns true if the app has input monitoring permission
-        let status = IOHIDCheckAccess(kIOHIDRequestTypeListenEvent)
-        return status == kIOHIDAccessTypeGranted
-    }
-
     /// Get all permission statuses
     func getAllPermissionStatuses() async -> PermissionsGranted {
         let microphone = await checkMicrophonePermission()
         let accessibility = checkAccessibilityPermission()
-        let inputMonitoring = checkInputMonitoringPermission()
 
         return PermissionsGranted(
             microphone: microphone,
-            accessibility: accessibility,
-            inputMonitoring: inputMonitoring
+            accessibility: accessibility
         )
     }
 
@@ -200,7 +171,6 @@ class PermissionService: PermissionChecker {
 class MockPermissionService: PermissionChecker {
     var microphoneGranted = true
     var accessibilityGranted = true
-    var inputMonitoringGranted = true
 
     func checkMicrophonePermission() async -> Bool {
         microphoneGranted
@@ -220,9 +190,5 @@ class MockPermissionService: PermissionChecker {
         if !accessibilityGranted {
             throw PermissionError.accessibilityDenied
         }
-    }
-
-    func checkInputMonitoringPermission() -> Bool {
-        inputMonitoringGranted
     }
 }

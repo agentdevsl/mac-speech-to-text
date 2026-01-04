@@ -1,148 +1,103 @@
-import Carbon
+import AppKit
 import Foundation
 import OSLog
 
-/// Service for managing global hotkey registration using Carbon Event Manager
+/// Service for managing global hotkey registration using NSEvent global monitoring
+/// Note: Requires Accessibility permission (not Input Monitoring) to work
 @MainActor
 class HotkeyService {
-    // Mark cleanup resources as nonisolated(unsafe) to allow access from deinit
-    // This is safe because deinit guarantees exclusive access (no other references)
-    private nonisolated(unsafe) var hotKeyRef: EventHotKeyRef?
-    private nonisolated(unsafe) var eventHandler: EventHandlerRef?
-    private nonisolated(unsafe) var userDataPointer: UnsafeMutableRawPointer?
+    /// Global event monitor for key events
+    /// Mark as nonisolated(unsafe) to allow cleanup in deinit
+    private nonisolated(unsafe) var eventMonitor: Any?
+
+    /// Registered hotkey configuration
+    private var registeredKeyCode: Int?
+    private var registeredModifiers: Set<KeyModifier> = []
+
+    /// Callback to invoke when hotkey is pressed
     private var callback: (@Sendable () -> Void)?
 
     deinit {
-        // Clean up Carbon resources directly - safe due to nonisolated(unsafe) properties
-        // Note: userDataPointer is NOT released here because unregisterHotkey() handles it.
-        // Double-release protection: if unregisterHotkey() was called, userDataPointer will be nil.
-        // If unregisterHotkey() was NOT called (abnormal teardown), we need to clean up.
-        if let ref = hotKeyRef {
-            UnregisterEventHotKey(ref)
-            hotKeyRef = nil
-        }
-        if let handler = eventHandler {
-            RemoveEventHandler(handler)
-            eventHandler = nil
-        }
-        // Only release userData if it hasn't been released by unregisterHotkey()
-        if let userData = userDataPointer {
-            Unmanaged<HotkeyService>.fromOpaque(userData).release()
-            userDataPointer = nil
+        // Clean up event monitor - safe due to nonisolated(unsafe)
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
         }
     }
 
     /// Register a global hotkey
+    /// - Parameters:
+    ///   - keyCode: The virtual key code (e.g., 49 for Space)
+    ///   - modifiers: Array of modifier keys (e.g., [.command, .control])
+    ///   - callback: Closure to call when hotkey is pressed
     func registerHotkey(
         keyCode: Int,
         modifiers: [KeyModifier],
         callback: @escaping @Sendable () -> Void
     ) async throws {
         unregisterHotkey()
+
         self.callback = callback
+        self.registeredKeyCode = keyCode
+        self.registeredModifiers = Set(modifiers)
 
-        let carbonModifiers = convertModifiers(modifiers)
-        var hotkeyID = EventHotKeyID(signature: 0x53545458, id: UInt32(keyCode))
+        // Convert our modifiers to NSEvent.ModifierFlags for comparison
+        let requiredFlags = convertToNSEventModifiers(modifiers)
 
-        let userData = Unmanaged.passRetained(self).toOpaque()
-        userDataPointer = userData
+        // Install global monitor for key down events
+        // Note: This requires Accessibility permission, NOT Input Monitoring
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return }
 
-        try installEventHandler(userData: userData)
-        try registerHotKey(keyCode: keyCode, modifiers: carbonModifiers, hotkeyID: &hotkeyID)
+            // Check if the pressed key matches our registered hotkey
+            let eventKeyCode = Int(event.keyCode)
+
+            // Check modifiers - we need to match exactly the required modifiers
+            // Use intersection to only compare the modifier keys we care about
+            let relevantFlags: NSEvent.ModifierFlags = [.command, .control, .option, .shift]
+            let eventModifiers = event.modifierFlags.intersection(relevantFlags)
+
+            if eventKeyCode == keyCode && eventModifiers == requiredFlags {
+                // Dispatch callback to MainActor
+                Task { @MainActor in
+                    self.callback?()
+                }
+            }
+        }
+
+        guard eventMonitor != nil else {
+            throw HotkeyError.installationFailed("Failed to install global event monitor. Ensure Accessibility permission is granted.")
+        }
+
+        AppLogger.service.info("Registered global hotkey: keyCode=\(keyCode), modifiers=\(modifiers.map { $0.rawValue })")
     }
 
     // MARK: - Private Helpers
 
-    private func convertModifiers(_ modifiers: [KeyModifier]) -> UInt32 {
-        var carbonModifiers: UInt32 = 0
+    /// Convert our KeyModifier array to NSEvent.ModifierFlags
+    private func convertToNSEventModifiers(_ modifiers: [KeyModifier]) -> NSEvent.ModifierFlags {
+        var flags: NSEvent.ModifierFlags = []
         for modifier in modifiers {
             switch modifier {
-            case .command: carbonModifiers |= UInt32(cmdKey)
-            case .control: carbonModifiers |= UInt32(controlKey)
-            case .option: carbonModifiers |= UInt32(optionKey)
-            case .shift: carbonModifiers |= UInt32(shiftKey)
+            case .command: flags.insert(.command)
+            case .control: flags.insert(.control)
+            case .option: flags.insert(.option)
+            case .shift: flags.insert(.shift)
             }
         }
-        return carbonModifiers
-    }
-
-    private func installEventHandler(userData: UnsafeMutableRawPointer) throws {
-        var eventSpec = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
-        let eventHandlerCallback: EventHandlerUPP = { _, _, userData -> OSStatus in
-            guard let userData = userData else { return OSStatus(eventNotHandledErr) }
-            let service = Unmanaged<HotkeyService>.fromOpaque(userData).takeUnretainedValue()
-            // Dispatch callback to MainActor since this callback runs on Carbon's event loop thread
-            // and HotkeyService is @MainActor isolated
-            Task { @MainActor in
-                service.callback?()
-            }
-            return noErr
-        }
-
-        let status = InstallEventHandler(
-            GetApplicationEventTarget(), eventHandlerCallback, 1, &eventSpec, userData, &eventHandler
-        )
-
-        guard status == noErr else {
-            releaseUserData()
-            throw HotkeyError.installationFailed("Failed to install event handler: \(status)")
-        }
-    }
-
-    private func registerHotKey(keyCode: Int, modifiers: UInt32, hotkeyID: inout EventHotKeyID) throws {
-        let status = RegisterEventHotKey(
-            UInt32(keyCode), modifiers, hotkeyID, GetApplicationEventTarget(), 0, &hotKeyRef
-        )
-
-        guard status == noErr else {
-            cleanupEventHandler()
-            throw HotkeyError.registrationFailed("Failed to register hotkey: \(status)")
-        }
-    }
-
-    private func releaseUserData() {
-        if let userData = userDataPointer {
-            Unmanaged<HotkeyService>.fromOpaque(userData).release()
-            userDataPointer = nil
-        }
-    }
-
-    private func cleanupEventHandler() {
-        if let handler = eventHandler {
-            RemoveEventHandler(handler)
-            eventHandler = nil
-        }
-        releaseUserData()
+        return flags
     }
 
     /// Unregister current hotkey
     func unregisterHotkey() {
-        if let hotKeyRef = hotKeyRef {
-            let status = UnregisterEventHotKey(hotKeyRef)
-            if status != noErr {
-                AppLogger.service.warning("Failed to unregister hotkey: \(status, privacy: .public)")
-            }
-            self.hotKeyRef = nil
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+            AppLogger.service.debug("Unregistered global hotkey")
         }
 
-        if let eventHandler = eventHandler {
-            let status = RemoveEventHandler(eventHandler)
-            if status != noErr {
-                AppLogger.service.warning("Failed to remove event handler: \(status, privacy: .public)")
-            }
-
-            // Release the retained self reference that was created in registerHotkey
-            if let userData = userDataPointer {
-                Unmanaged<HotkeyService>.fromOpaque(userData).release()
-                userDataPointer = nil
-            }
-
-            self.eventHandler = nil
-        }
-
+        registeredKeyCode = nil
+        registeredModifiers = []
         callback = nil
     }
 
