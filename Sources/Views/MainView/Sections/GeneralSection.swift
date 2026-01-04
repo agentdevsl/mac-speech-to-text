@@ -445,9 +445,35 @@ private struct GeneralToggleRow: View {
                 }
             }
         }
-        .toggleStyle(.switch)
-        .tint(.blue)
+        .toggleStyle(BlueToggleStyle())
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Blue Toggle Style
+
+/// Custom toggle style that shows blue when ON in both light and dark modes
+private struct BlueToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            RoundedRectangle(cornerRadius: 11)
+                .fill(configuration.isOn ? Color.blue : Color(white: 0.3))
+                .frame(width: 38, height: 22)
+                .overlay(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(radius: 1)
+                        .padding(2)
+                        .offset(x: configuration.isOn ? 8 : -8)
+                )
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        configuration.isOn.toggle()
+                    }
+                }
+        }
     }
 }
 
