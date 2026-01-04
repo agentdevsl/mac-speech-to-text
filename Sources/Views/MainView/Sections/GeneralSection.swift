@@ -9,6 +9,10 @@ import SwiftUI
 
 /// GeneralSection provides configuration for recording behavior and general app settings
 struct GeneralSection: View {
+    // MARK: - Environment
+
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Dependencies
 
     let settingsService: SettingsService
@@ -24,7 +28,16 @@ struct GeneralSection: View {
 
     init(settingsService: SettingsService) {
         self.settingsService = settingsService
-        self._settings = State(initialValue: settingsService.load())
+        let loadedSettings = settingsService.load()
+        AppLogger.system.info(
+            """
+            GeneralSection init: Loaded settings - \
+            launchAtLogin=\(loadedSettings.general.launchAtLogin), \
+            autoInsertText=\(loadedSettings.general.autoInsertText), \
+            copyToClipboard=\(loadedSettings.general.copyToClipboard)
+            """
+        )
+        self._settings = State(initialValue: loadedSettings)
     }
 
     // MARK: - Body
@@ -206,17 +219,47 @@ struct GeneralSection: View {
 
                 Spacer()
 
-                // Change button
-                Button("Change") {
+                // Change button with amber gradient (matches Home page style)
+                Button {
                     showHotkeyAlert = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Change")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.amberLight, .amberPrimary],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                    )
+                    .shadow(color: Color.amberPrimary.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("changeHotkeyButton")
             }
             .padding(16)
-            .background(Color.warmGray.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.1)
+                            : Color.black.opacity(0.08),
+                        lineWidth: 1
+                    )
+            )
 
             // Hotkey hint
             Text("Use a unique key combination to avoid conflicts with other apps")
@@ -251,7 +294,16 @@ struct GeneralSection: View {
         isSaving = true
         saveError = nil
         do {
+            AppLogger.system.info(
+                """
+                GeneralSection: Saving settings - \
+                launchAtLogin=\(settings.general.launchAtLogin), \
+                autoInsertText=\(settings.general.autoInsertText), \
+                copyToClipboard=\(settings.general.copyToClipboard)
+                """
+            )
             try settingsService.save(settings)
+            AppLogger.system.info("GeneralSection: Settings saved successfully")
         } catch {
             AppLogger.service.error("Failed to save settings: \(error.localizedDescription)")
             saveError = "Failed to save settings. Please try again."
@@ -390,6 +442,7 @@ private struct GeneralToggleRow: View {
 
 /// Styled badge for displaying keyboard keys
 private struct KeyBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
     let text: String
 
     var body: some View {
@@ -398,11 +451,20 @@ private struct KeyBadge: View {
             .foregroundStyle(Color.textPrimary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.warmGray)
+            .background(
+                colorScheme == .dark
+                    ? Color.white.opacity(0.1)
+                    : Color(white: 0.95)
+            )
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.warmGrayMedium, lineWidth: 1)
+                    .stroke(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.2)
+                            : Color.black.opacity(0.15),
+                        lineWidth: 1
+                    )
             )
     }
 }
