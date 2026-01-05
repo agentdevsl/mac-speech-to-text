@@ -169,9 +169,11 @@ struct GeneralSection: View {
                     isOn: Binding(
                         get: { settings.general.launchAtLogin },
                         set: { newValue in
-                            settings.general.launchAtLogin = newValue
-                            updateLaunchAtLogin(enabled: newValue)
-                            saveSettings()
+                            // Only persist if system call succeeds
+                            if updateLaunchAtLogin(enabled: newValue) {
+                                settings.general.launchAtLogin = newValue
+                                saveSettings()
+                            }
                         }
                     )
                 )
@@ -263,7 +265,8 @@ struct GeneralSection: View {
         }
     }
 
-    private func updateLaunchAtLogin(enabled: Bool) {
+    @discardableResult
+    private func updateLaunchAtLogin(enabled: Bool) -> Bool {
         do {
             if enabled {
                 try SMAppService.mainApp.register()
@@ -272,11 +275,11 @@ struct GeneralSection: View {
                 try SMAppService.mainApp.unregister()
                 AppLogger.system.info("Unregistered app from launch at login")
             }
+            return true
         } catch {
             AppLogger.service.error("Failed to update launch at login: \(error.localizedDescription)")
-            // Revert the setting since the system call failed
-            settings.general.launchAtLogin = !enabled
             showError("Failed to update launch at login setting.")
+            return false
         }
     }
 }

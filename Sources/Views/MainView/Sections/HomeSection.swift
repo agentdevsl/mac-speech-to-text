@@ -518,14 +518,19 @@ struct HomeSection: View {
 
         microphonePermissionTask?.cancel()
         microphonePermissionTask = Task { @MainActor in
+            // Ensure loading state is cleared regardless of how Task exits
+            defer {
+                if !Task.isCancelled {
+                    isMicrophoneLoading = false
+                }
+            }
+
             do {
                 try await permissionService.requestMicrophonePermission()
                 guard !Task.isCancelled else { return }
                 await refreshPermissions()
-                isMicrophoneLoading = false
             } catch {
                 guard !Task.isCancelled else { return }
-                isMicrophoneLoading = false
                 microphoneError = "Permission denied. Please grant access in System Settings."
                 AppLogger.system.warning("Microphone permission denied")
             }
@@ -538,27 +543,34 @@ struct HomeSection: View {
 
         accessibilityPermissionTask?.cancel()
         accessibilityPermissionTask = Task { @MainActor in
+            // Ensure loading state is cleared regardless of how Task exits
+            defer {
+                if !Task.isCancelled {
+                    isAccessibilityPolling = false
+                }
+            }
+
             do {
                 try permissionService.requestAccessibilityPermission()
             } catch {
                 AppLogger.system.info("Opening System Settings for accessibility permission")
             }
 
+            var grantedViaCallback = false
             await permissionService.pollForAccessibilityPermission(
                 interval: 1.0,
                 maxDuration: 60.0
             ) {
                 // Callback is already @MainActor, no nested Task needed
                 self.accessibilityGranted = true
-                self.isAccessibilityPolling = false
+                grantedViaCallback = true
             }
 
             guard !Task.isCancelled else { return }
 
             // Check actual permission state instead of relying on callback flag
             // This avoids race conditions between callback invocation and check
-            if !accessibilityGranted {
-                isAccessibilityPolling = false
+            if !accessibilityGranted && !grantedViaCallback {
                 accessibilityError = "Permission not granted. Please enable in System Settings."
             }
         }

@@ -120,7 +120,7 @@ struct ShortcutRecorderView: View {
         isRecording = true
 
         // Start monitoring key events
-        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [self] event in
             if event.type == .keyDown {
                 handleKeyDown(event)
                 return nil // Consume the event
@@ -132,8 +132,11 @@ struct ShortcutRecorderView: View {
         }
 
         // Also monitor for clicks outside to cancel (store monitor for proper cleanup)
+        // Use [self] capture and verify still recording to avoid setting up monitor after view disappears
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
-            mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
+            // Bail out if recording was cancelled (e.g., view disappeared)
+            guard isRecording else { return }
+            mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [self] event in
                 if isRecording {
                     stopRecording()
                 }
