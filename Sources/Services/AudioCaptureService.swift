@@ -15,11 +15,18 @@ final class AudioBufferProcessor: @unchecked Sendable {
     private var processedBufferCount: Int = 0
     private let countLock = NSLock()
 
-    init(streamingBuffer: StreamingAudioBuffer, levelCallback: @escaping @Sendable (Double) -> Void) {
+    /// Native sample rate (stored for downstream resampling)
+    let nativeSampleRate: Double
+
+    init(streamingBuffer: StreamingAudioBuffer, nativeFormat: AVAudioFormat, levelCallback: @escaping @Sendable (Double) -> Void) {
         self.streamingBuffer = streamingBuffer
         self.levelCallback = levelCallback
         self.processorId = UUID().uuidString.prefix(8).description
-        AppLogger.trace(AppLogger.audio, "AudioBufferProcessor[\(processorId)] created")
+        self.nativeSampleRate = nativeFormat.sampleRate
+
+        print("[DEBUG] AudioBufferProcessor[\(processorId)] created: nativeRate=\(Int(nativeSampleRate))Hz, targetRate=\(Constants.Audio.sampleRate)Hz")
+        fflush(stdout)
+        AppLogger.debug(AppLogger.audio, "AudioBufferProcessor[\(processorId)] created: nativeRate=\(Int(nativeSampleRate))Hz")
     }
 
     deinit {
@@ -27,6 +34,7 @@ final class AudioBufferProcessor: @unchecked Sendable {
     }
 
     /// Process audio buffer - safe to call from any thread
+    /// Note: Samples are stored at native rate - resampling to 16kHz happens at transcription time
     func process(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         // Track buffer count for debugging
         countLock.lock()
@@ -37,26 +45,24 @@ final class AudioBufferProcessor: @unchecked Sendable {
         let frameLength = Int(buffer.frameLength)
         AppLogger.trace(AppLogger.audio, "[\(processorId)] Processing buffer #\(currentCount): frames=\(frameLength), time=\(time.sampleTime)")
 
-        // Convert to Int16 samples
+        // Convert to Int16 samples (keeping native sample rate)
         let samples: [Int16]
 
         if let floatData = buffer.floatChannelData {
-            AppLogger.trace(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): float format detected")
             let floatSamples = UnsafeBufferPointer(start: floatData[0], count: frameLength)
             samples = floatSamples.map { sample in
                 let clamped = max(-1.0, min(1.0, sample))
                 return Int16(clamped * Float(Int16.max))
             }
         } else if let int16Data = buffer.int16ChannelData {
-            AppLogger.trace(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): int16 format detected")
             samples = Array(UnsafeBufferPointer(start: int16Data[0], count: frameLength))
         } else {
             AppLogger.warning(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): UNSUPPORTED FORMAT - samples lost!")
             return
         }
 
-        let audioBuffer = AudioBuffer(samples: samples)
-        AppLogger.trace(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): created AudioBuffer with \(samples.count) samples, RMS=\(audioBuffer.rmsLevel)")
+        let audioBuffer = AudioBuffer(samples: samples, sampleRate: Int(nativeSampleRate))
+        AppLogger.trace(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): created AudioBuffer with \(samples.count) samples at \(Int(nativeSampleRate))Hz")
 
         // Append to streaming buffer via Task (no actor isolation issues)
         pendingWrites.increment()
@@ -150,7 +156,7 @@ class AudioCaptureService {
         }
 
         // Create processor and install tap
-        let processor = AudioBufferProcessor(streamingBuffer: buffer, levelCallback: levelCallback)
+        let processor = AudioBufferProcessor(streamingBuffer: buffer, nativeFormat: nativeFormat, levelCallback: levelCallback)
         bufferProcessor = processor
         inputNode.installTap(
             onBus: 0,
@@ -262,9 +268,13 @@ class AudioCaptureService {
         #endif
     }
 
-    /// Stop audio capture and return recorded samples
-    func stopCapture() async throws -> [Int16] {
+    /// Stop audio capture and return recorded samples with native sample rate
+    /// - Returns: Tuple of (samples at native rate, native sample rate in Hz)
+    func stopCapture() async throws -> (samples: [Int16], sampleRate: Double) {
         AppLogger.info(AppLogger.audio, "[\(serviceId)] stopCapture() called")
+
+        // Get native sample rate before clearing processor
+        let nativeSampleRate = bufferProcessor?.nativeSampleRate ?? Double(Constants.Audio.sampleRate)
 
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Stopping audio engine...")
         audioEngine.stop()
@@ -289,7 +299,9 @@ class AudioCaptureService {
 
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Retrieving all samples...")
         let samples = await streamingBuffer.allSamples
-        AppLogger.info(AppLogger.audio, "[\(serviceId)] Retrieved \(samples.count) samples")
+        print("[DEBUG] stopCapture: \(samples.count) samples at \(Int(nativeSampleRate))Hz")
+        fflush(stdout)
+        AppLogger.info(AppLogger.audio, "[\(serviceId)] Retrieved \(samples.count) samples at \(Int(nativeSampleRate))Hz")
 
         // Clear state
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] Clearing state...")
@@ -298,7 +310,7 @@ class AudioCaptureService {
         self.isCapturing = false
         AppLogger.debug(AppLogger.audio, "[\(serviceId)] State cleared")
 
-        return samples
+        return (samples, nativeSampleRate)
     }
 }
 

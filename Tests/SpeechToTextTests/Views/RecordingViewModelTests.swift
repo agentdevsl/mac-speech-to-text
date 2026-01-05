@@ -644,9 +644,9 @@ class MockAudioCaptureServiceForRecording: AudioCaptureService {
         }
     }
 
-    override func stopCapture() async throws -> [Int16] {
+    override func stopCapture() async throws -> (samples: [Int16], sampleRate: Double) {
         stopCaptureCalled = true
-        return mockSamples
+        return (samples: mockSamples, sampleRate: 48000.0)
     }
 }
 
@@ -668,7 +668,7 @@ actor MockFluidAudioServiceForRecording: FluidAudioServiceProtocol {
         isInitialized = true
     }
 
-    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+    func transcribe(samples: [Int16], sampleRate: Double) async throws -> TranscriptionResult {
         transcribeCalled = true
         return mockResult
     }

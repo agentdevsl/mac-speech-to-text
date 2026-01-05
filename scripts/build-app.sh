@@ -44,7 +44,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "${SCRIPT_DIR}")"
 BUILD_DIR="${PROJECT_ROOT}/build"
 APP_BUNDLE="${BUILD_DIR}/${APP_NAME}.app"
-ENTITLEMENTS_FILE="${PROJECT_ROOT}/SpeechToText.entitlements"
+# Entitlements: use debug entitlements (with get-task-allow) for debug builds
+# Release builds use production entitlements (no get-task-allow - App Store requirement)
+ENTITLEMENTS_FILE_DEBUG="${PROJECT_ROOT}/SpeechToText.debug.entitlements"
+ENTITLEMENTS_FILE_RELEASE="${PROJECT_ROOT}/SpeechToText.entitlements"
+ENTITLEMENTS_FILE="${ENTITLEMENTS_FILE_DEBUG}"  # Will be set based on BUILD_CONFIG
 
 # Terminal colors
 RED='\033[0;31m'
@@ -398,27 +402,50 @@ check_signing_configuration() {
         has_issues=true
     fi
 
-    # Check entitlements file
-    if [ -f "${ENTITLEMENTS_FILE}" ]; then
-        print_success "Entitlements file found: ${ENTITLEMENTS_FILE}"
+    # Check release entitlements file (production)
+    if [ -f "${ENTITLEMENTS_FILE_RELEASE}" ]; then
+        print_success "Release entitlements found: ${ENTITLEMENTS_FILE_RELEASE}"
 
         # Verify key entitlements
-        if grep -q "com.apple.security.device.microphone" "${ENTITLEMENTS_FILE}"; then
+        if grep -q "com.apple.security.device.microphone" "${ENTITLEMENTS_FILE_RELEASE}"; then
             print_success "  Microphone entitlement present"
         else
             print_warning "  Microphone entitlement MISSING"
             has_issues=true
         fi
 
-        if grep -q "com.apple.security.personal-information.accessibility" "${ENTITLEMENTS_FILE}"; then
+        if grep -q "com.apple.security.personal-information.accessibility" "${ENTITLEMENTS_FILE_RELEASE}"; then
             print_success "  Accessibility entitlement present"
         else
             print_warning "  Accessibility entitlement MISSING"
             has_issues=true
         fi
+
+        # Verify NO get-task-allow in release (App Store requirement)
+        if grep -q "com.apple.security.get-task-allow" "${ENTITLEMENTS_FILE_RELEASE}"; then
+            print_warning "  get-task-allow present (should be removed for App Store)"
+        else
+            print_success "  get-task-allow correctly absent (App Store compatible)"
+        fi
     else
-        print_error "Entitlements file not found: ${ENTITLEMENTS_FILE}"
+        print_error "Release entitlements file not found: ${ENTITLEMENTS_FILE_RELEASE}"
         has_issues=true
+    fi
+
+    # Check debug entitlements file
+    if [ -f "${ENTITLEMENTS_FILE_DEBUG}" ]; then
+        print_success "Debug entitlements found: ${ENTITLEMENTS_FILE_DEBUG}"
+
+        # Verify get-task-allow is present for debugging
+        if grep -q "com.apple.security.get-task-allow" "${ENTITLEMENTS_FILE_DEBUG}"; then
+            print_success "  get-task-allow present (enables debugger attach)"
+        else
+            print_warning "  get-task-allow MISSING (may affect debugger attachment)"
+            has_issues=true
+        fi
+    else
+        print_warning "Debug entitlements file not found: ${ENTITLEMENTS_FILE_DEBUG}"
+        echo "  Debug builds will use release entitlements (no get-task-allow)"
     fi
 
     echo ""
@@ -506,6 +533,31 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# =============================================================================
+# Select entitlements file based on build configuration
+# =============================================================================
+# Debug builds get get-task-allow (allows debugger attach, matches Xcode behavior)
+# Release builds strip get-task-allow (required for App Store / notarization)
+
+if [ "$BUILD_CONFIG" = "release" ]; then
+    ENTITLEMENTS_FILE="${ENTITLEMENTS_FILE_RELEASE}"
+    print_info "Using release entitlements (no get-task-allow)"
+else
+    ENTITLEMENTS_FILE="${ENTITLEMENTS_FILE_DEBUG}"
+    print_info "Using debug entitlements (with get-task-allow for debugger attach)"
+fi
+
+# Verify entitlements file exists
+if [ ! -f "${ENTITLEMENTS_FILE}" ]; then
+    print_error "Entitlements file not found: ${ENTITLEMENTS_FILE}"
+    echo ""
+    echo "  Expected entitlements files:"
+    echo "    Debug:   ${ENTITLEMENTS_FILE_DEBUG}"
+    echo "    Release: ${ENTITLEMENTS_FILE_RELEASE}"
+    echo ""
+    exit 1
+fi
 
 # =============================================================================
 # Handle --check-signing flag (T012)
@@ -678,46 +730,66 @@ fi
 # Create build directory
 mkdir -p "${BUILD_DIR}"
 
-# Resolve dependencies
-print_info "Resolving Swift package dependencies..."
-swift package resolve
-print_success "Dependencies resolved"
+# =============================================================================
+# Build with xcodebuild
+# =============================================================================
 
-# Build executable
-print_info "Building ${BUILD_CONFIG} configuration..."
+DERIVED_DATA="${BUILD_DIR}/DerivedData"
+XCODE_CONFIG="Debug"
 if [ "$BUILD_CONFIG" = "release" ]; then
-    swift build -c release 2>&1 | tee "${BUILD_DIR}/build.log"
-    EXECUTABLE_PATH=".build/release/${APP_NAME}"
-else
-    swift build 2>&1 | tee "${BUILD_DIR}/build.log"
-    EXECUTABLE_PATH=".build/debug/${APP_NAME}"
+    XCODE_CONFIG="Release"
 fi
 
-if [ ! -f "${EXECUTABLE_PATH}" ]; then
+print_info "Building ${BUILD_CONFIG} configuration with xcodebuild..."
+
+# Build using xcodebuild with the workspace
+# Pass our entitlements so xcodebuild signs with them directly
+xcodebuild \
+    -workspace "${PROJECT_ROOT}/SpeechToText.xcworkspace" \
+    -scheme "SpeechToText" \
+    -configuration "${XCODE_CONFIG}" \
+    -derivedDataPath "${DERIVED_DATA}" \
+    -destination "platform=macOS" \
+    CODE_SIGN_IDENTITY="${SIGN_IDENTITY:-"-"}" \
+    CODE_SIGN_STYLE="Manual" \
+    CODE_SIGN_ENTITLEMENTS="${ENTITLEMENTS_FILE}" \
+    DEVELOPMENT_TEAM="" \
+    2>&1 | tee "${BUILD_DIR}/build.log"
+
+BUILD_RESULT=${PIPESTATUS[0]}
+if [ $BUILD_RESULT -ne 0 ]; then
     print_error "Build failed. Check ${BUILD_DIR}/build.log"
     exit 1
 fi
 print_success "Build completed successfully"
 
 # =============================================================================
-# Create App Bundle
+# Create App Bundle from Executable
 # =============================================================================
 
 print_header "Creating App Bundle"
 
-# Remove old bundle
-rm -rf "${APP_BUNDLE}"
+# xcodebuild with SPM produces an executable, not an .app bundle
+# We need to manually create the bundle structure
+XCODE_EXECUTABLE="${DERIVED_DATA}/Build/Products/${XCODE_CONFIG}/SpeechToText"
+if [ ! -f "${XCODE_EXECUTABLE}" ]; then
+    print_error "Built executable not found at ${XCODE_EXECUTABLE}"
+    exit 1
+fi
+print_success "Found executable: ${XCODE_EXECUTABLE}"
 
-# Create bundle structure
+# Remove old bundle and create new structure
+rm -rf "${APP_BUNDLE}"
 mkdir -p "${APP_BUNDLE}/Contents/MacOS"
 mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
 # Copy executable
-cp "${EXECUTABLE_PATH}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
+cp "${XCODE_EXECUTABLE}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 chmod +x "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
-print_success "Copied executable"
+print_success "Copied executable to app bundle"
 
 # Create Info.plist
+COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 cat > "${APP_BUNDLE}/Contents/Info.plist" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -727,83 +799,74 @@ cat > "${APP_BUNDLE}/Contents/Info.plist" << EOF
     <string>en</string>
     <key>CFBundleExecutable</key>
     <string>${APP_NAME}</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>${BUNDLE_ID}</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>${APP_NAME}</string>
-    <key>CFBundleDisplayName</key>
-    <string>Speech to Text</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>${BUILD_NUMBER}</string>
+    <string>${BUILD_NUMBER}.${COMMIT_HASH}</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
-    <key>LSUIElement</key>
-    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024. All rights reserved.</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>SpeechToText needs microphone access to convert your speech to text.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Speech-to-Text needs microphone access to capture your voice for transcription.</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Speech-to-Text needs automation access to insert transcribed text into other applications.</string>
-    <key>CFBundleIconFile</key>
-    <string>AppIcon</string>
+    <key>LSUIElement</key>
+    <true/>
 </dict>
 </plist>
 EOF
 print_success "Created Info.plist"
 
-# Copy entitlements (for reference, not applied without code signing)
-if [ -f "${ENTITLEMENTS_FILE}" ]; then
-    cp "${ENTITLEMENTS_FILE}" "${APP_BUNDLE}/Contents/Resources/"
-    print_success "Copied entitlements"
-fi
-
-# Copy icon if available
-ICON_SOURCE="${PROJECT_ROOT}/Resources/Assets.xcassets/AppIcon.appiconset"
-if [ -d "${ICON_SOURCE}" ]; then
-    # Check for existing .icns file or PNG icons
-    if [ -f "${PROJECT_ROOT}/Resources/AppIcon.icns" ]; then
-        cp "${PROJECT_ROOT}/Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
-        print_success "Copied app icon"
-    elif [ -f "${PROJECT_ROOT}/app_icon.png" ]; then
-        # Convert PNG to icns using sips (built-in macOS tool)
-        print_info "Converting app icon to .icns format..."
-        ICONSET_DIR="${BUILD_DIR}/AppIcon.iconset"
-        mkdir -p "${ICONSET_DIR}"
-
-        # Create icon sizes
-        sips -z 16 16     "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null || true
-        sips -z 32 32     "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null || true
-        sips -z 32 32     "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null || true
-        sips -z 64 64     "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null || true
-        sips -z 128 128   "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null || true
-        sips -z 256 256   "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null || true
-        sips -z 256 256   "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null || true
-        sips -z 512 512   "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null || true
-        sips -z 512 512   "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null || true
-        sips -z 1024 1024 "${PROJECT_ROOT}/app_icon.png" --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null || true
-
-        # Create .icns file
-        iconutil -c icns "${ICONSET_DIR}" -o "${APP_BUNDLE}/Contents/Resources/AppIcon.icns" 2>/dev/null || {
-            print_warning "Could not create .icns file (iconutil may not be available)"
-        }
-
-        rm -rf "${ICONSET_DIR}"
-        print_success "Created app icon"
-    else
-        print_warning "No app icon found, using default"
-    fi
-fi
-
 # Create PkgInfo
 echo -n "APPL????" > "${APP_BUNDLE}/Contents/PkgInfo"
 print_success "Created PkgInfo"
+
+# Copy app icon if exists
+if [ -f "${PROJECT_ROOT}/Resources/AppIcon.icns" ]; then
+    cp "${PROJECT_ROOT}/Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/"
+    print_success "Copied app icon"
+elif [ -f "${PROJECT_ROOT}/Sources/SpeechToTextApp/Resources/AppIcon.icns" ]; then
+    cp "${PROJECT_ROOT}/Sources/SpeechToTextApp/Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/"
+    print_success "Copied app icon"
+elif [ -f "${PROJECT_ROOT}/app_logov2.png" ]; then
+    # Convert PNG to icns using sips (built-in macOS tool)
+    print_info "Converting app icon to .icns format..."
+    ICONSET_DIR="${BUILD_DIR}/AppIcon.iconset"
+    mkdir -p "${ICONSET_DIR}"
+
+    # Create icon sizes
+    sips -z 16 16     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null || true
+    sips -z 32 32     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null || true
+    sips -z 32 32     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null || true
+    sips -z 64 64     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null || true
+    sips -z 128 128   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null || true
+    sips -z 256 256   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null || true
+    sips -z 256 256   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null || true
+    sips -z 512 512   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null || true
+    sips -z 512 512   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null || true
+    sips -z 1024 1024 "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null || true
+
+    # Create .icns file
+    iconutil -c icns "${ICONSET_DIR}" -o "${APP_BUNDLE}/Contents/Resources/AppIcon.icns" 2>/dev/null || {
+        print_warning "Could not create .icns file (iconutil may not be available)"
+    }
+
+    rm -rf "${ICONSET_DIR}"
+    print_success "Created app icon from app_logov2.png"
+fi
 
 # Set permissions
 chmod -R 755 "${APP_BUNDLE}"
@@ -870,6 +933,17 @@ if [ -n "${SIGN_IDENTITY}" ] && [ "${SIGN_IDENTITY}" != "ad-hoc" ]; then
         exit 1
     fi
 fi
+
+# =============================================================================
+# Gatekeeper bypass for development (free developer account workaround)
+# =============================================================================
+# Apps signed with free/personal team certificates are not notarized and will be
+# blocked by Gatekeeper on first launch. Remove quarantine flag to bypass this.
+# This is safe for local development and matches Xcode's behavior.
+
+print_info "Removing Gatekeeper quarantine flag (development build)..."
+xattr -rd com.apple.quarantine "${APP_BUNDLE}" 2>/dev/null || true
+print_success "Gatekeeper bypass applied (local development only)"
 
 # =============================================================================
 # Create DMG (if requested)

@@ -9,6 +9,10 @@ import SwiftUI
 
 /// GeneralSection provides configuration for recording behavior and general app settings
 struct GeneralSection: View {
+    // MARK: - Environment
+
+    @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Dependencies
 
     let settingsService: SettingsService
@@ -23,7 +27,16 @@ struct GeneralSection: View {
 
     init(settingsService: SettingsService) {
         self.settingsService = settingsService
-        self._settings = State(initialValue: settingsService.load())
+        let loadedSettings = settingsService.load()
+        AppLogger.system.info(
+            """
+            GeneralSection init: Loaded settings - \
+            launchAtLogin=\(loadedSettings.general.launchAtLogin), \
+            autoInsertText=\(loadedSettings.general.autoInsertText), \
+            copyToClipboard=\(loadedSettings.general.copyToClipboard)
+            """
+        )
+        self._settings = State(initialValue: loadedSettings)
     }
 
     // MARK: - Body
@@ -70,6 +83,19 @@ struct GeneralSection: View {
             .animation(.easeInOut(duration: 0.3), value: saveError)
         }
         .accessibilityIdentifier("generalSection")
+        .onAppear {
+            // Reload settings when view appears to ensure fresh state
+            let loadedSettings = settingsService.load()
+            AppLogger.system.info(
+                """
+                GeneralSection onAppear: Reloading settings - \
+                launchAtLogin=\(loadedSettings.general.launchAtLogin), \
+                autoInsertText=\(loadedSettings.general.autoInsertText), \
+                copyToClipboard=\(loadedSettings.general.copyToClipboard)
+                """
+            )
+            settings = loadedSettings
+        }
     }
 
     // MARK: - Section Header
@@ -189,48 +215,52 @@ struct GeneralSection: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
+            // Shortcut display row
             HStack {
-                // Current hotkey display
-                HStack(spacing: 4) {
-                    ForEach(settings.hotkey.modifiers, id: \.self) { modifier in
-                        KeyBadge(text: modifier.displayName)
+                HStack(spacing: 12) {
+                    Image(systemName: "keyboard")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.warmAmber)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hold-to-Record")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+
+                        Text("Default: ⌃⇧Space")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    KeyBadge(text: hotkeyKeyName)
                 }
 
                 Spacer()
 
-                // Change button (placeholder - would open hotkey recorder)
-                Button("Change") {
-                    // Would open hotkey recorder modal
-                    AppLogger.system.info("Hotkey change requested")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .accessibilityIdentifier("changeHotkeyButton")
+                // Display current shortcut
+                ShortcutDisplayView()
+                    .accessibilityIdentifier("hotkeyDisplay")
             }
             .padding(16)
-            .background(Color.warmGray.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.1)
+                            : Color.black.opacity(0.08),
+                        lineWidth: 1
+                    )
+            )
 
             // Hotkey hint
-            Text("Use a unique key combination to avoid conflicts with other apps")
+            Text("Use a unique key combination to avoid conflicts with other apps.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .accessibilityIdentifier("hotkeySection")
-    }
-
-    // MARK: - Computed Properties
-
-    private var hotkeyKeyName: String {
-        switch settings.hotkey.keyCode {
-        case 49: return "Space"
-        case 36: return "Return"
-        case 53: return "Escape"
-        case 51: return "Delete"
-        default: return "Key \(settings.hotkey.keyCode)"
-        }
     }
 
     // MARK: - Private Methods
@@ -246,7 +276,16 @@ struct GeneralSection: View {
         isSaving = true
         saveError = nil
         do {
+            AppLogger.system.info(
+                """
+                GeneralSection: Saving settings - \
+                launchAtLogin=\(settings.general.launchAtLogin), \
+                autoInsertText=\(settings.general.autoInsertText), \
+                copyToClipboard=\(settings.general.copyToClipboard)
+                """
+            )
             try settingsService.save(settings)
+            AppLogger.system.info("GeneralSection: Settings saved successfully")
         } catch {
             AppLogger.service.error("Failed to save settings: \(error.localizedDescription)")
             saveError = "Failed to save settings. Please try again."
@@ -302,16 +341,16 @@ private struct RecordingModeCard: View {
                     .foregroundStyle(isSelected ? Color.warmAmber : Color.warmGrayDark)
                     .frame(width: 40)
 
-                // Text content
+                // Text content - use explicit colors for white card background
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(.body)
                         .fontWeight(.medium)
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(Color.textPrimary)
 
                     Text(description)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textSecondary)
                         .lineLimit(2)
                 }
 
@@ -375,29 +414,92 @@ private struct GeneralToggleRow: View {
                 }
             }
         }
-        .toggleStyle(.switch)
-        .tint(Color.warmAmber)
+        .toggleStyle(BlueToggleStyle())
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Blue Toggle Style
+
+/// Custom toggle style that shows blue when ON in both light and dark modes
+private struct BlueToggleStyle: ToggleStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack {
+            configuration.label
+            Spacer()
+            RoundedRectangle(cornerRadius: 11)
+                .fill(configuration.isOn ? Color.blue : Color(white: 0.3))
+                .frame(width: 38, height: 22)
+                .overlay(
+                    Circle()
+                        .fill(Color.white)
+                        .shadow(radius: 1)
+                        .padding(2)
+                        .offset(x: configuration.isOn ? 8 : -8)
+                )
+                .onTapGesture {
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        configuration.isOn.toggle()
+                    }
+                }
+        }
+    }
+}
+
+// MARK: - Shortcut Display View
+
+/// Displays the keyboard shortcut as a static value
+/// NOTE: We cannot call ANY KeyboardShortcuts methods that might access Bundle.module
+/// as it crashes in executable targets (SPM resource bundle issue)
+private struct ShortcutDisplayView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        // Display the default shortcut - we can't read the actual value safely
+        // The shortcut is hardcoded as Ctrl+Shift+Space in ShortcutNames.swift
+        Text("⌃⇧Space")
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color(white: 0.95))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1),
+                        lineWidth: 1
+                    )
+            )
     }
 }
 
 // MARK: - Key Badge
 
-/// Styled badge for displaying keyboard keys
+/// Styled keyboard key badge - matches GlassKeyboardKey from HomeSection
 private struct KeyBadge: View {
+    @Environment(\.colorScheme) private var colorScheme
     let text: String
 
     var body: some View {
         Text(text)
-            .font(.system(.caption, design: .rounded, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
             .foregroundStyle(.primary)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background(Color.warmGray)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
+                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.warmGrayMedium, lineWidth: 1)
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1),
+                        lineWidth: 1
+                    )
             )
     }
 }

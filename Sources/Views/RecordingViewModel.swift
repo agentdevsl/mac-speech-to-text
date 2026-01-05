@@ -209,12 +209,14 @@ final class RecordingViewModel {
             throw RecordingError.alreadyRecording
         }
 
+        // Set transition flag with defer to ensure it's always reset (fixes race condition)
+        isTransitioning = true
+        defer { isTransitioning = false }
+
         // Reset stale state if needed (defensive - handles edge cases where state wasn't cleaned up)
         if isRecording {
             AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] startRecording: found stale recording state, resetting")
-            isTransitioning = true
             await cancelRecording()
-            isTransitioning = false
         }
 
         // Clear ALL previous state (bug fix: previously missed permission prompts)
@@ -297,8 +299,8 @@ final class RecordingViewModel {
             isAudioCaptureActive = false
 
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Stopping audio capture...")
-            let samples = try await audioService.stopCapture()
-            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples")
+            let (samples, sampleRate) = try await audioService.stopCapture()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples at \(Int(sampleRate))Hz")
 
             guard !samples.isEmpty else {
                 AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] No audio captured")
@@ -315,7 +317,7 @@ final class RecordingViewModel {
 
             // Transcribe audio
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription...")
-            try await transcribe(samples: samples)
+            try await transcribe(samples: samples, sampleRate: sampleRate)
 
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] stopRecording error: \(error.localizedDescription)")
@@ -408,8 +410,8 @@ final class RecordingViewModel {
             isAudioCaptureActive = false
 
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Stopping audio capture...")
-            let samples = try await audioService.stopCapture()
-            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples")
+            let (samples, sampleRate) = try await audioService.stopCapture()
+            AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Audio capture stopped, got \(samples.count) samples at \(Int(sampleRate))Hz")
 
             guard !samples.isEmpty else {
                 AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] No audio captured")
@@ -425,8 +427,10 @@ final class RecordingViewModel {
             }
 
             // Transcribe audio
+            print("[DEBUG] onHotkeyReleased: Starting transcription with \(samples.count) samples at \(Int(sampleRate))Hz...")
+            fflush(stdout)
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription...")
-            try await transcribeWithFallback(samples: samples)
+            try await transcribeWithFallback(samples: samples, sampleRate: sampleRate)
 
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] onHotkeyReleased error: \(error.localizedDescription)")
@@ -547,8 +551,8 @@ final class RecordingViewModel {
     // MARK: - Private Methods
 
     /// Transcribe audio samples using FluidAudio
-    private func transcribe(samples: [Int16]) async throws {
-        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribe() called with \(samples.count) samples")
+    private func transcribe(samples: [Int16], sampleRate: Double) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribe() called with \(samples.count) samples at \(Int(sampleRate))Hz")
 
         guard var session = currentSession else {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] transcribe: no active session")
@@ -576,25 +580,29 @@ final class RecordingViewModel {
                 throw RecordingError.noActiveSession
             }
 
-            // Transcribe
+            // Transcribe (samples are at native rate, FluidAudio will resample to 16kHz)
+            print("[DEBUG] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
+            fflush(stdout)
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
-            let result = try await fluidAudioService.transcribe(samples: samples)
+            let result = try await fluidAudioService.transcribe(samples: samples, sampleRate: sampleRate)
+            print("[DEBUG] FluidAudio result: text='\(result.text)', confidence=\(result.confidence), durationMs=\(result.durationMs)")
+            fflush(stdout)
             AppLogger.info(
                 AppLogger.viewModel,
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
             )
 
             // Check for session cancellation after await (bug fix: staleness detection)
-            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+            guard currentSessionId == startSessionId, var updatedSession = currentSession else {
                 AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during transcription")
                 isTranscribing = false
                 throw RecordingError.noActiveSession
             }
 
             // Update session - re-fetch to avoid stale copy issues
-            currentSession.transcribedText = result.text
-            currentSession.confidenceScore = Double(result.confidence)
-            self.currentSession = currentSession
+            updatedSession.transcribedText = result.text
+            updatedSession.confidenceScore = Double(result.confidence)
+            self.currentSession = updatedSession
 
             // Update local state
             transcribedText = result.text
@@ -612,10 +620,10 @@ final class RecordingViewModel {
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             // Re-fetch session to avoid overwriting concurrent changes (bug fix)
-            if var currentSession = currentSession, currentSessionId == startSessionId {
-                currentSession.errorMessage = error.localizedDescription
-                currentSession.state = .cancelled
-                self.currentSession = currentSession
+            if var updatedSession = currentSession, currentSessionId == startSessionId {
+                updatedSession.errorMessage = error.localizedDescription
+                updatedSession.state = .cancelled
+                self.currentSession = updatedSession
             }
             throw RecordingError.transcriptionFailed(error.localizedDescription)
         }
@@ -645,33 +653,33 @@ final class RecordingViewModel {
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text insertion successful")
 
             // Check for session cancellation after await (bug fix: staleness detection)
-            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+            guard currentSessionId == startSessionId, var updatedSession = currentSession else {
                 AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during text insertion")
                 isInserting = false
                 throw RecordingError.noActiveSession
             }
 
-            currentSession.insertionSuccess = true
-            currentSession.state = .completed
-            self.currentSession = currentSession
+            updatedSession.insertionSuccess = true
+            updatedSession.state = .completed
+            self.currentSession = updatedSession
 
             AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
             isInserting = false
 
             // Save statistics
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
-            await saveStatistics(session: currentSession)
+            await saveStatistics(session: updatedSession)
 
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Text insertion failed: \(error.localizedDescription)")
             isInserting = false
             errorMessage = "Text insertion failed: \(error.localizedDescription)"
             // Re-fetch session to avoid overwriting concurrent changes (bug fix)
-            if var currentSession = currentSession, currentSessionId == startSessionId {
-                currentSession.errorMessage = error.localizedDescription
-                currentSession.insertionSuccess = false
-                currentSession.state = .cancelled
-                self.currentSession = currentSession
+            if var updatedSession = currentSession, currentSessionId == startSessionId {
+                updatedSession.errorMessage = error.localizedDescription
+                updatedSession.insertionSuccess = false
+                updatedSession.state = .cancelled
+                self.currentSession = updatedSession
             }
             throw RecordingError.textInsertionFailed(error.localizedDescription)
         }
@@ -681,8 +689,11 @@ final class RecordingViewModel {
     ///
     /// This method is used by hold-to-record mode to handle the full workflow
     /// with graceful degradation when accessibility permission is not granted.
-    private func transcribeWithFallback(samples: [Int16]) async throws {
-        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribeWithFallback() called with \(samples.count) samples")
+    /// - Parameters:
+    ///   - samples: Audio samples at native sample rate
+    ///   - sampleRate: Native sample rate of the audio (e.g., 48000.0)
+    private func transcribeWithFallback(samples: [Int16], sampleRate: Double) async throws {
+        AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] transcribeWithFallback() called with \(samples.count) samples at \(Int(sampleRate))Hz")
 
         guard var session = currentSession else {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] transcribeWithFallback: no active session")
@@ -710,25 +721,29 @@ final class RecordingViewModel {
                 throw RecordingError.noActiveSession
             }
 
-            // Transcribe
+            // Transcribe (samples are at native rate, FluidAudio will resample to 16kHz)
+            print("[DEBUG] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
+            fflush(stdout)
             AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
-            let result = try await fluidAudioService.transcribe(samples: samples)
+            let result = try await fluidAudioService.transcribe(samples: samples, sampleRate: sampleRate)
+            print("[DEBUG] FluidAudio result: text='\(result.text)', confidence=\(result.confidence), durationMs=\(result.durationMs)")
+            fflush(stdout)
             AppLogger.info(
                 AppLogger.viewModel,
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
             )
 
             // Check for session cancellation after await (bug fix: staleness detection)
-            guard currentSessionId == startSessionId, var currentSession = currentSession else {
+            guard currentSessionId == startSessionId, var updatedSession = currentSession else {
                 AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during transcription")
                 isTranscribing = false
                 throw RecordingError.noActiveSession
             }
 
             // Update session - re-fetch to avoid stale copy issues
-            currentSession.transcribedText = result.text
-            currentSession.confidenceScore = Double(result.confidence)
-            self.currentSession = currentSession
+            updatedSession.transcribedText = result.text
+            updatedSession.confidenceScore = Double(result.confidence)
+            self.currentSession = updatedSession
 
             // Update local state
             transcribedText = result.text
@@ -746,10 +761,10 @@ final class RecordingViewModel {
             isTranscribing = false
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             // Re-fetch session to avoid overwriting concurrent changes (bug fix)
-            if var currentSession = currentSession, currentSessionId == startSessionId {
-                currentSession.errorMessage = error.localizedDescription
-                currentSession.state = .cancelled
-                self.currentSession = currentSession
+            if var updatedSession = currentSession, currentSessionId == startSessionId {
+                updatedSession.errorMessage = error.localizedDescription
+                updatedSession.state = .cancelled
+                self.currentSession = updatedSession
             }
             throw RecordingError.transcriptionFailed(error.localizedDescription)
         }
@@ -757,9 +772,13 @@ final class RecordingViewModel {
 
     /// Insert text with fallback to clipboard and show accessibility prompt if needed
     private func insertTextWithFallback(_ text: String) async throws {
+        print("[DEBUG] insertTextWithFallback() called with \(text.count) chars")
+        fflush(stdout)
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback() called, textLength=\(text.count)")
 
         guard var session = currentSession else {
+            print("[DEBUG] insertTextWithFallback: no active session!")
+            fflush(stdout)
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback: no active session")
             throw RecordingError.noActiveSession
         }
@@ -773,10 +792,14 @@ final class RecordingViewModel {
         currentSession = session
 
         // Use fallback-aware insertion
+        print("[DEBUG] Calling textInsertionService.insertTextWithFallback...")
+        fflush(stdout)
         let insertionResult = await textInsertionService.insertTextWithFallback(text)
+        print("[DEBUG] insertionResult: \(insertionResult)")
+        fflush(stdout)
 
         // Check for session cancellation after await (bug fix: staleness detection)
-        guard currentSessionId == startSessionId, var currentSession = currentSession else {
+        guard currentSessionId == startSessionId, var updatedSession = currentSession else {
             AppLogger.warning(AppLogger.viewModel, "[\(viewModelId)] Session cancelled during text insertion")
             isInserting = false
             throw RecordingError.noActiveSession
@@ -785,12 +808,12 @@ final class RecordingViewModel {
         switch insertionResult {
         case .insertedViaAccessibility:
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text inserted via accessibility")
-            currentSession.insertionSuccess = true
+            updatedSession.insertionSuccess = true
             lastTranscriptionCopiedToClipboard = false
 
         case .copiedToClipboardOnly(let reason):
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Text copied to clipboard: \(String(describing: reason))")
-            currentSession.insertionSuccess = true // Clipboard copy is still a success
+            updatedSession.insertionSuccess = true // Clipboard copy is still a success
             lastTranscriptionCopiedToClipboard = true
 
             // Don't show prompt for user preference or if already dismissed
@@ -805,20 +828,20 @@ final class RecordingViewModel {
 
         case .requiresAccessibilityPermission:
             AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] Showing accessibility permission prompt")
-            currentSession.insertionSuccess = true // Clipboard copy is still a success
+            updatedSession.insertionSuccess = true // Clipboard copy is still a success
             lastTranscriptionCopiedToClipboard = true
             showAccessibilityPrompt = true
         }
 
-        currentSession.state = .completed
-        self.currentSession = currentSession
+        updatedSession.state = .completed
+        self.currentSession = updatedSession
 
         AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isInserting")
         isInserting = false
 
         // Save statistics
         AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Saving session statistics...")
-        await saveStatistics(session: currentSession)
+        await saveStatistics(session: updatedSession)
     }
 
     /// Handle audio level update - detect talking and manage inactivity timer

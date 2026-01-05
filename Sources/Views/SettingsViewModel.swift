@@ -6,6 +6,7 @@
 
 import AppKit
 import Foundation
+import KeyboardShortcuts
 import Observation
 
 /// SettingsViewModel manages all app settings and their validation
@@ -32,16 +33,13 @@ final class SettingsViewModel {
     // MARK: - Dependencies
 
     private let settingsService: SettingsService
-    private let hotkeyService: HotkeyService
 
     // MARK: - Initialization
 
     init(
-        settingsService: SettingsService = SettingsService(),
-        hotkeyService: HotkeyService = HotkeyService()
+        settingsService: SettingsService = SettingsService()
     ) {
         self.settingsService = settingsService
-        self.hotkeyService = hotkeyService
         self.settings = settingsService.load()
     }
 
@@ -80,6 +78,8 @@ final class SettingsViewModel {
     }
 
     /// Update hotkey configuration
+    /// Note: With KeyboardShortcuts library, hotkey registration is handled automatically
+    /// by the KeyboardShortcuts.Recorder in the UI. This method is kept for programmatic updates.
     func updateHotkey(keyCode: Int, modifiers: [UserSettings.HotkeyModifier]) async {
         // Check for conflicts (T055)
         if let conflict = detectHotkeyConflict(keyCode: keyCode, modifiers: modifiers) {
@@ -92,22 +92,8 @@ final class SettingsViewModel {
 
         await saveSettings()
 
-        // Only register hotkey if settings were saved successfully
-        if validationError == nil {
-            // Register the new hotkey with the system
-            // Note: UserSettings.HotkeyModifier is a typealias for KeyModifier, so direct cast works
-            do {
-                try await hotkeyService.registerHotkey(
-                    keyCode: keyCode,
-                    modifiers: modifiers // KeyModifier array is compatible directly
-                ) {
-                    // Hotkey triggered - post notification to show recording modal
-                    NotificationCenter.default.post(name: .showRecordingModal, object: nil)
-                }
-            } catch {
-                validationError = "Failed to register hotkey: \(error.localizedDescription)"
-            }
-        }
+        // Note: KeyboardShortcuts handles registration automatically via the Recorder UI
+        // The shortcut is stored in UserDefaults by the library and applied on next app launch
     }
 
     /// Update selected language and trigger model download if needed

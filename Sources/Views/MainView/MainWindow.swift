@@ -26,8 +26,8 @@ final class MainWindow: NSObject, NSWindowDelegate {
     private let permissionService: PermissionService
 
     /// Window dimensions
-    private static let windowWidth: CGFloat = 720
-    private static let windowHeight: CGFloat = 560
+    private static let windowWidth: CGFloat = 820
+    private static let windowHeight: CGFloat = 720
 
     /// Window title
     private static let windowTitle = "Speech to Text"

@@ -35,10 +35,16 @@ class TextInsertionService {
 
     /// Insert text at the current cursor position
     func insertText(_ text: String) async throws {
+        print("[DEBUG-INSERT] insertText() called with \(text.count) chars: '\(text.prefix(50))...'")
+        fflush(stdout)
+
         // Check accessibility permission
         guard permissionService.checkAccessibilityPermission() else {
+            print("[DEBUG-INSERT] Accessibility permission DENIED")
+            fflush(stdout)
             throw PermissionError.accessibilityDenied
         }
+        print("[DEBUG-INSERT] Accessibility permission granted")
 
         // Get the currently focused application
         guard NSWorkspace.shared.frontmostApplication != nil else {
@@ -75,21 +81,13 @@ class TextInsertionService {
         // Note: In Swift 6, CFTypeRef to AXUIElement cast always succeeds, so we use unsafeBitCast
         let axElement = unsafeBitCast(element, to: AXUIElement.self)
 
-        // Try to insert text directly
-        let insertionResult = AXUIElementSetAttributeValue(
-            axElement,
-            kAXValueAttribute as CFString,
-            text as CFTypeRef
-        )
+        print("[DEBUG-INSERT] Got focused element, attempting insertion of \(text.count) chars")
+        fflush(stdout)
 
-        if insertionResult == .success {
-            return
-        }
-
-        // Log why direct insertion failed before falling back
-        AppLogger.service.warning("Direct insertion failed with error: \(String(describing: insertionResult), privacy: .public). Falling back to paste.")
-
-        // Try alternative: simulate paste
+        // Use Cmd+V paste - more reliable across all applications including Electron apps (VSCode, Slack, etc.)
+        // kAXSelectedTextAttribute often reports success but doesn't actually insert in these apps
+        print("[DEBUG-INSERT] Using Cmd+V paste for reliable insertion")
+        fflush(stdout)
         try await simulatePaste(text)
     }
 
@@ -105,8 +103,13 @@ class TextInsertionService {
 
     /// Simulate paste operation (alternative insertion method)
     private func simulatePaste(_ text: String) async throws {
+        print("[DEBUG-PASTE] simulatePaste called with \(text.count) chars")
+        fflush(stdout)
+
         // Copy to clipboard first
         try await copyToClipboard(text)
+        print("[DEBUG-PASTE] Copied to clipboard")
+        fflush(stdout)
 
         // Small delay to ensure clipboard content is fully committed
         // This prevents race condition where keyboard events execute before pasteboard is ready
@@ -114,8 +117,11 @@ class TextInsertionService {
 
         // Simulate Cmd+V
         guard let source = CGEventSource(stateID: .hidSystemState) else {
+            print("[DEBUG-PASTE] Failed to create CGEventSource")
+            fflush(stdout)
             throw TextInsertionError.eventSourceCreationFailed
         }
+        print("[DEBUG-PASTE] CGEventSource created, posting Cmd+V events")
 
         // Press Cmd
         guard let cmdDown = CGEvent(keyboardEventSource: source, virtualKey: 0x37, keyDown: true) else {
@@ -148,6 +154,9 @@ class TextInsertionService {
         vUp.post(tap: .cghidEventTap)
         try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
         cmdUp.post(tap: .cghidEventTap)
+
+        print("[DEBUG-PASTE] Cmd+V events posted successfully")
+        fflush(stdout)
     }
 
     // MARK: - Fallback-Aware Insertion
@@ -163,7 +172,12 @@ class TextInsertionService {
     /// - Parameter text: The text to insert
     /// - Returns: Result indicating how the text was handled
     func insertTextWithFallback(_ text: String) async -> TextInsertionResult {
+        print("[DEBUG-INSERT] insertTextWithFallback() called with \(text.count) chars")
+        fflush(stdout)
+
         let settings = settingsService.load()
+        print("[DEBUG-INSERT] clipboardOnlyMode=\(settings.general.clipboardOnlyMode)")
+        fflush(stdout)
 
         // Check if user prefers clipboard-only mode
         if settings.general.clipboardOnlyMode {
@@ -179,7 +193,13 @@ class TextInsertionService {
         }
 
         // Check accessibility permission
-        guard permissionService.checkAccessibilityPermission() else {
+        let hasAccessibility = permissionService.checkAccessibilityPermission()
+        print("[DEBUG-INSERT] hasAccessibility=\(hasAccessibility)")
+        fflush(stdout)
+
+        guard hasAccessibility else {
+            print("[DEBUG-INSERT] Accessibility NOT granted, falling back to clipboard")
+            fflush(stdout)
             AppLogger.service.info("Accessibility not granted, falling back to clipboard")
             do {
                 try await copyToClipboardPublic(text)
@@ -195,11 +215,17 @@ class TextInsertionService {
             }
         }
 
-        // Try to insert via accessibility
+        // Try to insert via Cmd+V paste (more reliable than kAXSelectedTextAttribute)
+        print("[DEBUG-INSERT] Attempting Cmd+V paste insertion...")
+        fflush(stdout)
         do {
             try await insertText(text)
+            print("[DEBUG-INSERT] Cmd+V paste insertion SUCCEEDED!")
+            fflush(stdout)
             return .insertedViaAccessibility
         } catch {
+            print("[DEBUG-INSERT] Accessibility insertion FAILED: \(error)")
+            fflush(stdout)
             AppLogger.service.warning("Accessibility insertion failed, falling back to clipboard: \(error.localizedDescription, privacy: .public)")
             // Already copied to clipboard as part of simulatePaste fallback in insertText
             // But if that also failed, try explicit clipboard copy

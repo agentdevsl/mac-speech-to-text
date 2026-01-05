@@ -18,13 +18,18 @@ let package = Package(
         .package(
             url: "https://github.com/nalexn/ViewInspector.git",
             from: "0.10.0"
+        ),
+        .package(
+            url: "https://github.com/sindresorhus/KeyboardShortcuts",
+            from: "2.0.0"
         )
     ],
     targets: [
         .executableTarget(
             name: "SpeechToText",
             dependencies: [
-                .product(name: "FluidAudio", package: "FluidAudio")
+                .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "KeyboardShortcuts", package: "KeyboardShortcuts")
             ],
             path: "Sources",
             exclude: [],

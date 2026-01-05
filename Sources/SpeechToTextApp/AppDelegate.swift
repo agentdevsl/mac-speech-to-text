@@ -4,13 +4,23 @@ import SwiftUI
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var hotkeyService: HotkeyService?
+    private var hotkeyManager: HotkeyManager?
     private var onboardingWindow: NSWindow?
     private let settingsService = SettingsService()
     private let permissionService = PermissionService()
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var mainViewObserver: NSObjectProtocol?
+
+    // MARK: - Hold-to-Record Recording
+
+    /// RecordingViewModel for hold-to-record mode - handles actual audio capture and transcription
+    private lazy var holdToRecordViewModel: RecordingViewModel = {
+        RecordingViewModel()
+    }()
+
+    /// Session-level guard to prevent overlay/ViewModel state desynchronization during async operations
+    private var isHoldToRecordSessionActive: Bool = false
 
     // MARK: - Glass Overlay
 
@@ -47,10 +57,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup main menu with keyboard shortcuts (Cmd+, for Settings)
         setupMainMenu()
 
-        // Initialize global hotkey
-        Task {
-            await setupGlobalHotkey()
-        }
+        // Initialize global hotkey using KeyboardShortcuts
+        setupGlobalHotkey()
 
         // Check for app identity change (bundle ID / signing) and reset if needed
         // This handles the case where app is rebuilt with different signing, invalidating permissions
@@ -134,15 +142,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Stop and cleanup audio level simulation timer
+        // CRITICAL: Perform synchronous cleanup first to prevent new operations
+        // This ensures no new recording sessions can start during shutdown
+
+        // 1. Stop audio level timer immediately (prevents further updates)
         audioLevelTimer?.invalidate()
         audioLevelTimer = nil
 
-        // Close and cleanup recording window
-        recordingWindow?.close()
-        recordingWindow = nil
+        // 2. Release hotkey manager to prevent new recording triggers
+        hotkeyManager = nil
 
-        // Cleanup NotificationCenter observers
+        // 3. Remove notification observers to prevent menu-triggered operations
         if let observer = recordingModalObserver {
             NotificationCenter.default.removeObserver(observer)
             recordingModalObserver = nil
@@ -156,12 +166,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             mainViewObserver = nil
         }
 
-        // Cleanup hotkey service (unregisters Carbon hotkeys on deinit)
-        hotkeyService = nil
+        // 4. Mark session inactive to prevent async operations from proceeding
+        isHoldToRecordSessionActive = false
 
-        // Cleanup singleton window controllers
+        // 5. Close and cleanup windows
+        recordingWindow?.close()
+        recordingWindow = nil
         GlassOverlayWindowController.shared.hideOverlay()
         MainWindowController.shared.closeWindow()
+
+        // 6. Cancel active recording session (best-effort async cleanup)
+        // Use semaphore with timeout to give async cleanup a chance to complete
+        let cleanupSemaphore = DispatchSemaphore(value: 0)
+        Task.detached { [holdToRecordViewModel] in
+            await holdToRecordViewModel.cancelRecording()
+            cleanupSemaphore.signal()
+        }
+        // Wait up to 500ms for cleanup, then proceed with termination
+        _ = cleanupSemaphore.wait(timeout: .now() + 0.5)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -256,112 +278,151 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Global Hotkey Setup
 
-    private func setupGlobalHotkey() async {
-        hotkeyService = HotkeyService()
+    /// Setup global hotkey using KeyboardShortcuts library
+    /// The shortcut is user-configurable via Settings > General > Hotkey
+    private func setupGlobalHotkey() {
+        hotkeyManager = HotkeyManager()
 
-        let settings = settingsService.load()
-
-        // Check recording mode from settings
-        if settings.ui.recordingMode == .holdToRecord {
-            await setupHoldToRecordHotkey(settings: settings)
-        } else {
-            await setupToggleHotkey(settings: settings)
+        // Configure callbacks for hold-to-record
+        hotkeyManager?.onRecordingStart = { [weak self] in
+            await self?.startHoldToRecordSession()
         }
+
+        hotkeyManager?.onRecordingStop = { [weak self] duration in
+            await self?.stopHoldToRecordSession(holdDuration: duration)
+        }
+
+        hotkeyManager?.onRecordingCancel = { [weak self] in
+            await self?.cancelHoldToRecordSession()
+        }
+
+        AppLogger.app.info("Global hotkey initialized via KeyboardShortcuts")
     }
 
-    /// Setup hotkey for hold-to-record mode
-    private func setupHoldToRecordHotkey(settings: UserSettings) async {
-        do {
-            try await hotkeyService?.registerHoldHotkey(
-                keyCode: settings.hotkey.keyCode,
-                modifiers: settings.hotkey.modifiers,
-                onKeyDown: { [weak self] in
-                    // Key pressed - start recording and show overlay
-                    Task { @MainActor in
-                        await self?.startHoldToRecordSession()
-                    }
-                },
-                onKeyUp: { [weak self] duration in
-                    // Key released - stop recording, transcribe, and paste
-                    Task { @MainActor in
-                        await self?.stopHoldToRecordSession(holdDuration: duration)
-                    }
-                }
-            )
-            AppLogger.app.info("Registered hold-to-record hotkey: keyCode=\(settings.hotkey.keyCode)")
-        } catch {
-            AppLogger.app.error("Failed to register hold-to-record hotkey: \(error.localizedDescription, privacy: .public)")
-        }
-    }
+    /// Cancel hold-to-record session (e.g., when hold duration is too short)
+    private func cancelHoldToRecordSession() async {
+        guard isHoldToRecordSessionActive else { return }
 
-    /// Setup hotkey for toggle mode (legacy behavior)
-    private func setupToggleHotkey(settings: UserSettings) async {
-        do {
-            try await hotkeyService?.registerHotkey(
-                keyCode: settings.hotkey.keyCode,
-                modifiers: settings.hotkey.modifiers
-            ) { [weak self] in
-                // Hotkey triggered - show recording modal
-                Task { @MainActor in
-                    self?.showRecordingModal()
-                }
-            }
-            AppLogger.app.info("Registered toggle hotkey: keyCode=\(settings.hotkey.keyCode)")
-        } catch {
-            AppLogger.app.error("Failed to register global hotkey: \(error.localizedDescription, privacy: .public)")
-        }
+        AppLogger.app.debug("Cancelling hold-to-record session (duration too short)")
+
+        // Stop audio level updates
+        stopRealAudioLevelUpdates()
+
+        // Cancel the recording
+        await holdToRecordViewModel.cancelRecording()
+
+        // Hide overlay and end session
+        glassOverlayController.hideOverlay()
+        isHoldToRecordSessionActive = false
     }
 
     // MARK: - Hold-to-Record Session Management
 
     /// Start a hold-to-record session
     private func startHoldToRecordSession() async {
+        // Session guard: prevent concurrent session operations
+        guard !isHoldToRecordSessionActive else {
+            print("[DEBUG] START IGNORED: session already active")
+            fflush(stdout)
+            AppLogger.app.warning("Hold-to-record session already active, ignoring start request")
+            return
+        }
+        print("[DEBUG] Starting new session...")
+        fflush(stdout)
+        isHoldToRecordSessionActive = true
         AppLogger.app.debug("Starting hold-to-record session")
 
-        // Show glass overlay in recording state
+        // Cancel any previous pending recording (handles stuck state)
+        await holdToRecordViewModel.cancelRecording()
+
+        // Show glass overlay in recording state (auto-resets if stuck)
         glassOverlayController.showRecording()
 
-        // NOTE: Integrate with actual audio recording service in future
-        // Currently simulating audio levels for visual feedback
-        startAudioLevelSimulation()
+        // Start actual audio recording via RecordingViewModel
+        do {
+            print("[DEBUG] Calling startRecording...")
+            try await holdToRecordViewModel.startRecording()
+            print("[DEBUG] startRecording succeeded!")
+
+            // Connect real audio levels to overlay visualization
+            startRealAudioLevelUpdates()
+            AppLogger.app.debug("Hold-to-record session started successfully")
+        } catch {
+            print("[DEBUG] startRecording FAILED: \(error)")
+            AppLogger.app.error("Failed to start hold-to-record: \(error.localizedDescription, privacy: .public)")
+            glassOverlayController.hideOverlay()
+            isHoldToRecordSessionActive = false
+        }
     }
 
     /// Stop hold-to-record session and process audio
     private func stopHoldToRecordSession(holdDuration: TimeInterval) async {
+        // Session guard: ignore stop if no session is active
+        guard isHoldToRecordSessionActive else {
+            print("[DEBUG] STOP IGNORED: no active session")
+            fflush(stdout)
+            AppLogger.app.warning("No hold-to-record session active, ignoring stop request")
+            return
+        }
+        print("[DEBUG] Stopping session (duration: \(holdDuration)s)...")
+        fflush(stdout)
         AppLogger.app.debug("Stopping hold-to-record session (duration: \(holdDuration)s)")
 
-        // Stop audio simulation
-        stopAudioLevelSimulation()
+        // Stop real audio level updates
+        stopRealAudioLevelUpdates()
+
+        // Check if recording is actually active
+        guard holdToRecordViewModel.isRecording else {
+            AppLogger.app.warning("Stop requested but recording not active - cancelling session")
+            glassOverlayController.hideOverlay()
+            isHoldToRecordSessionActive = false
+            return
+        }
 
         // Transition to transcribing state
         glassOverlayController.showTranscribing()
 
-        // NOTE: Integrate with actual transcription service in future
-        // Currently simulating brief transcription delay
-        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s
+        // Stop recording and perform actual transcription via RecordingViewModel
+        do {
+            print("[DEBUG] Calling onHotkeyReleased...")
+            try await holdToRecordViewModel.onHotkeyReleased()
+            print("[DEBUG] onHotkeyReleased completed successfully!")
+            print("[DEBUG] Transcribed text: '\(holdToRecordViewModel.transcribedText)'")
+            AppLogger.app.info("Hold-to-record transcription completed successfully")
+        } catch {
+            print("[DEBUG] onHotkeyReleased FAILED: \(error)")
+            AppLogger.app.error("Hold-to-record transcription failed: \(error.localizedDescription, privacy: .public)")
+            // Ensure recording is cancelled on failure
+            await holdToRecordViewModel.cancelRecording()
+        }
 
-        // Hide overlay after transcription completes
+        // Hide overlay and end session
         glassOverlayController.hideOverlay()
+        isHoldToRecordSessionActive = false
     }
 
-    // MARK: - Audio Level Simulation (Temporary)
+    // MARK: - Real Audio Level Updates
 
     private var audioLevelTimer: Timer?
 
-    /// Simulate audio levels for waveform visualization (temporary until real audio integration)
-    private func startAudioLevelSimulation() {
+    /// Start updating overlay with real audio levels from RecordingViewModel
+    private func startRealAudioLevelUpdates() {
         audioLevelTimer?.invalidate()
+        // Timer callback runs on main thread (RunLoop.main), and AppDelegate is @MainActor,
+        // so we can safely call MainActor-isolated methods directly without spawning a Task.
         audioLevelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                // Simulate varying audio levels
-                let level = Float.random(in: 0.1...0.8)
-                self?.glassOverlayController.updateAudioLevel(level)
+            guard let self else { return }
+            // Must dispatch to main actor since Timer closure is not actor-isolated
+            MainActor.assumeIsolated {
+                guard self.holdToRecordViewModel.isRecording else { return }
+                let level = Float(self.holdToRecordViewModel.audioLevel)
+                self.glassOverlayController.updateAudioLevel(level)
             }
         }
     }
 
-    /// Stop audio level simulation
-    private func stopAudioLevelSimulation() {
+    /// Stop real audio level updates
+    private func stopRealAudioLevelUpdates() {
         audioLevelTimer?.invalidate()
         audioLevelTimer = nil
     }
