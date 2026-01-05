@@ -124,7 +124,7 @@ struct KeywordEditorSheet: View {
             // Footer buttons
             footerView
         }
-        .frame(width: 420, height: 480)
+        .frame(width: 580, height: 680)
         .background(sheetBackground)
         .onAppear {
             loadKeywordData()
