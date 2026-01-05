@@ -12,7 +12,6 @@ final class SettingsViewModelTests: XCTestCase {
 
     var sut: SettingsViewModel!
     var mockSettingsService: MockSettingsServiceForSettingsVM!
-    var mockHotkeyService: MockHotkeyServiceForSettingsVM!
 
     // MARK: - Setup & Teardown
 
@@ -20,18 +19,15 @@ final class SettingsViewModelTests: XCTestCase {
         try await super.setUp()
 
         mockSettingsService = MockSettingsServiceForSettingsVM()
-        mockHotkeyService = MockHotkeyServiceForSettingsVM()
 
         sut = SettingsViewModel(
-            settingsService: mockSettingsService,
-            hotkeyService: mockHotkeyService
+            settingsService: mockSettingsService
         )
     }
 
     override func tearDown() async throws {
         sut = nil
         mockSettingsService = nil
-        mockHotkeyService = nil
         try await super.tearDown()
     }
 
@@ -45,8 +41,7 @@ final class SettingsViewModelTests: XCTestCase {
 
         // When
         let viewModel = SettingsViewModel(
-            settingsService: mockSettingsService,
-            hotkeyService: mockHotkeyService
+            settingsService: mockSettingsService
         )
 
         // Then
@@ -237,7 +232,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(sut.settings.hotkey.modifiers, modifiers)
     }
 
-    func test_updateHotkey_registersNewHotkeyWithService() async {
+    func test_updateHotkey_savesSettingsAfterUpdate() async {
         // Given
         let keyCode = 36
         let modifiers: [UserSettings.HotkeyModifier] = [.command, .shift]
@@ -245,23 +240,9 @@ final class SettingsViewModelTests: XCTestCase {
         // When
         await sut.updateHotkey(keyCode: keyCode, modifiers: modifiers)
 
-        // Then
-        XCTAssertTrue(mockHotkeyService.registerHotkeyCalled)
-        XCTAssertEqual(mockHotkeyService.lastRegisteredKeyCode, keyCode)
-    }
-
-    func test_updateHotkey_setsErrorWhenRegistrationFails() async {
-        // Given
-        mockHotkeyService.shouldFailRegistration = true
-        let keyCode = 36
-        let modifiers: [UserSettings.HotkeyModifier] = [.command, .control]
-
-        // When
-        await sut.updateHotkey(keyCode: keyCode, modifiers: modifiers)
-
-        // Then
-        XCTAssertNotNil(sut.validationError)
-        XCTAssertTrue(sut.validationError?.contains("Failed to register hotkey") == true)
+        // Then - KeyboardShortcuts handles registration automatically via UI
+        // We just verify settings were saved
+        XCTAssertTrue(mockSettingsService.saveWasCalled)
     }
 
     // MARK: - updateLanguage Tests
@@ -345,31 +326,5 @@ class MockSettingsServiceForSettingsVM: SettingsService {
         saveWasCalled = true
         lastSavedSettings = settings
         mockSettings = settings
-    }
-}
-
-@MainActor
-class MockHotkeyServiceForSettingsVM: HotkeyService {
-    var registerHotkeyCalled = false
-    var lastRegisteredKeyCode: Int?
-    var lastRegisteredModifiers: [KeyModifier]?
-    var shouldFailRegistration = false
-
-    override func registerHotkey(
-        keyCode: Int,
-        modifiers: [KeyModifier],
-        callback: @escaping @Sendable () -> Void
-    ) async throws {
-        registerHotkeyCalled = true
-        lastRegisteredKeyCode = keyCode
-        lastRegisteredModifiers = modifiers
-
-        if shouldFailRegistration {
-            throw NSError(
-                domain: "TestError",
-                code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Registration failed"]
-            )
-        }
     }
 }

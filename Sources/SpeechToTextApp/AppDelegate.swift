@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var hotkeyService: HotkeyService?
+    private var hotkeyManager: HotkeyManager?
     private var onboardingWindow: NSWindow?
     private let settingsService = SettingsService()
     private let permissionService = PermissionService()
@@ -57,10 +57,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup main menu with keyboard shortcuts (Cmd+, for Settings)
         setupMainMenu()
 
-        // Initialize global hotkey
-        Task {
-            await setupGlobalHotkey()
-        }
+        // Initialize global hotkey using KeyboardShortcuts
+        setupGlobalHotkey()
 
         // Check for app identity change (bundle ID / signing) and reset if needed
         // This handles the case where app is rebuilt with different signing, invalidating permissions
@@ -151,8 +149,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioLevelTimer?.invalidate()
         audioLevelTimer = nil
 
-        // 2. Unregister hotkeys to prevent new recording triggers
-        hotkeyService = nil
+        // 2. Release hotkey manager to prevent new recording triggers
+        hotkeyManager = nil
 
         // 3. Remove notification observers to prevent menu-triggered operations
         if let observer = recordingModalObserver {
@@ -280,78 +278,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Global Hotkey Setup
 
-    private func setupGlobalHotkey() async {
-        hotkeyService = HotkeyService()
+    /// Setup global hotkey using KeyboardShortcuts library
+    /// The shortcut is user-configurable via Settings > General > Hotkey
+    private func setupGlobalHotkey() {
+        hotkeyManager = HotkeyManager()
 
-        let settings = settingsService.load()
-
-        // Check recording mode from settings
-        print("[DEBUG] Recording mode: \(settings.ui.recordingMode)")
-        fflush(stdout)
-        if settings.ui.recordingMode == .holdToRecord {
-            print("[DEBUG] Setting up HOLD-TO-RECORD hotkey")
-            fflush(stdout)
-            await setupHoldToRecordHotkey(settings: settings)
-        } else {
-            print("[DEBUG] Setting up TOGGLE hotkey")
-            fflush(stdout)
-            await setupToggleHotkey(settings: settings)
+        // Configure callbacks for hold-to-record
+        hotkeyManager?.onRecordingStart = { [weak self] in
+            await self?.startHoldToRecordSession()
         }
-    }
 
-    /// Setup hotkey for hold-to-record mode
-    private func setupHoldToRecordHotkey(settings: UserSettings) async {
-        do {
-            try await hotkeyService?.registerHoldHotkey(
-                keyCode: settings.hotkey.keyCode,
-                modifiers: settings.hotkey.modifiers,
-                onKeyDown: { [weak self] in
-                    // Key pressed - start recording and show overlay
-                    print("[DEBUG-SYNC] onKeyDown callback fired!")
-                    fflush(stdout)
-                    Task { @MainActor in
-                        print("[DEBUG-ASYNC] onKeyDown Task starting...")
-                        fflush(stdout)
-                        await self?.startHoldToRecordSession()
-                    }
-                },
-                onKeyUp: { [weak self] duration in
-                    // Key released - stop recording, transcribe, and paste
-                    print("[DEBUG-SYNC] onKeyUp callback fired! duration=\(duration)")
-                    fflush(stdout)
-                    Task { @MainActor in
-                        print("[DEBUG-ASYNC] onKeyUp Task starting...")
-                        fflush(stdout)
-                        await self?.stopHoldToRecordSession(holdDuration: duration)
-                    }
-                }
-            )
-            print("[DEBUG] Hold-to-record hotkey registered successfully! keyCode=\(settings.hotkey.keyCode), modifiers=\(settings.hotkey.modifiers)")
-            fflush(stdout)
-            AppLogger.app.info("Registered hold-to-record hotkey: keyCode=\(settings.hotkey.keyCode)")
-        } catch {
-            print("[DEBUG] Failed to register hold-to-record hotkey: \(error)")
-            fflush(stdout)
-            AppLogger.app.error("Failed to register hold-to-record hotkey: \(error.localizedDescription, privacy: .public)")
+        hotkeyManager?.onRecordingStop = { [weak self] duration in
+            await self?.stopHoldToRecordSession(holdDuration: duration)
         }
-    }
 
-    /// Setup hotkey for toggle mode (legacy behavior)
-    private func setupToggleHotkey(settings: UserSettings) async {
-        do {
-            try await hotkeyService?.registerHotkey(
-                keyCode: settings.hotkey.keyCode,
-                modifiers: settings.hotkey.modifiers
-            ) { [weak self] in
-                // Hotkey triggered - show recording modal
-                Task { @MainActor in
-                    self?.showRecordingModal()
-                }
-            }
-            AppLogger.app.info("Registered toggle hotkey: keyCode=\(settings.hotkey.keyCode)")
-        } catch {
-            AppLogger.app.error("Failed to register global hotkey: \(error.localizedDescription, privacy: .public)")
-        }
+        AppLogger.app.info("Global hotkey initialized via KeyboardShortcuts")
     }
 
     // MARK: - Hold-to-Record Session Management

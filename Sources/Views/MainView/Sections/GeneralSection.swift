@@ -4,6 +4,7 @@
 // Main View - General Settings Section
 // Recording mode, startup, text insertion, and hotkey configuration
 
+import KeyboardShortcuts
 import ServiceManagement
 import SwiftUI
 
@@ -22,7 +23,6 @@ struct GeneralSection: View {
     @State private var settings: UserSettings
     @State private var isSaving: Bool = false
     @State private var saveError: String?
-    @State private var showHotkeyAlert: Bool = false
 
     // MARK: - Initialization
 
@@ -96,11 +96,6 @@ struct GeneralSection: View {
                 """
             )
             settings = loadedSettings
-        }
-        .alert("Custom Hotkey", isPresented: $showHotkeyAlert) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Custom hotkey configuration is coming in a future update. The current hotkey is ⌃⇧Space (Control + Shift + Space).")
         }
     }
 
@@ -221,43 +216,30 @@ struct GeneralSection: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
+            // Shortcut recorder row
             HStack {
-                // Current hotkey display
-                HStack(spacing: 4) {
-                    ForEach(settings.hotkey.modifiers, id: \.self) { modifier in
-                        KeyBadge(text: modifier.displayName)
+                HStack(spacing: 12) {
+                    Image(systemName: "keyboard")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.warmAmber)
+                        .frame(width: 24)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hold-to-Record")
+                            .font(.body)
+                            .foregroundStyle(.primary)
+
+                        Text("Click to record a new shortcut")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    KeyBadge(text: hotkeyKeyName)
                 }
 
                 Spacer()
 
-                // Change button with amber gradient (matches Home page style)
-                Button {
-                    showHotkeyAlert = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Change")
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.amberLight, .amberPrimary],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                    )
-                    .shadow(color: Color.amberPrimary.opacity(0.3), radius: 4, x: 0, y: 2)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("changeHotkeyButton")
+                // KeyboardShortcuts recorder - styled to match app aesthetic
+                KeyboardShortcuts.Recorder(for: .holdToRecord)
+                    .accessibilityIdentifier("hotkeyRecorder")
             }
             .padding(16)
             .background(
@@ -275,23 +257,11 @@ struct GeneralSection: View {
             )
 
             // Hotkey hint
-            Text("Use a unique key combination to avoid conflicts with other apps")
+            Text("Use a unique key combination to avoid conflicts with other apps. Default: Control + Shift + Space")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .accessibilityIdentifier("hotkeySection")
-    }
-
-    // MARK: - Computed Properties
-
-    private var hotkeyKeyName: String {
-        switch settings.hotkey.keyCode {
-        case 49: return "Space"
-        case 36: return "Return"
-        case 53: return "Escape"
-        case 51: return "Delete"
-        default: return "Key \(settings.hotkey.keyCode)"
-        }
     }
 
     // MARK: - Private Methods

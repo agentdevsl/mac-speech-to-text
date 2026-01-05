@@ -487,3 +487,102 @@ Transcription now works correctly:
 - Resampled to 81,600 samples at 16kHz (3:1 ratio)
 - FluidAudio transcription: 0.957 confidence
 - Text correctly transcribed and ready for insertion
+
+---
+
+## Progress Update 6 (Text Insertion Fix - 2026-01-05)
+
+### Issue: Text Replacing Instead of Inserting
+
+The original code used `kAXValueAttribute` which **replaces the entire text field content** instead of inserting at cursor.
+
+### Fix: Use kAXSelectedTextAttribute
+
+Changed `TextInsertionService.swift` line 85:
+
+**Before:**
+
+```swift
+let insertionResult = AXUIElementSetAttributeValue(
+    axElement,
+    kAXValueAttribute as CFString,  // WRONG - replaces all text
+    text as CFTypeRef
+)
+```
+
+**After:**
+
+```swift
+let insertionResult = AXUIElementSetAttributeValue(
+    axElement,
+    kAXSelectedTextAttribute as CFString,  // CORRECT - inserts at cursor
+    text as CFTypeRef
+)
+```
+
+### Fix: Carbon Event Timing Race Condition
+
+The duration calculation was wrong because `startTime` was set when the MainActor Task ran (after Carbon event), not when the actual key was pressed.
+
+**Solution:** Use `GetEventTime(event)` from the Carbon event itself:
+
+```swift
+// In carbonHotkeyCallback:
+let carbonEventTime = GetEventTime(event)
+
+// Pass to handler:
+service.handleHotkeyPressed(carbonEventTime: carbonEventTime)
+
+// Calculate accurate duration:
+let duration = releaseEventTime - pressEventTime  // Carbon event times
+```
+
+### Test Results (Latest)
+
+```
+[DEBUG] FluidAudio result: text='This is a test one, two, three, four, five, six', confidence=0.95196855
+[DEBUG-INSERT] insertText() called with 47 chars
+[DEBUG-INSERT] kAXSelectedTextAttribute result: 0
+[DEBUG-INSERT] Insertion via kAXSelectedTextAttribute succeeded!
+[DEBUG] insertionResult: insertedViaAccessibility
+```
+
+Status: TEXT INSERTION WORKING ✓
+
+---
+
+## Known Issue: Task Interleaving on Rapid Key Presses
+
+### Symptom
+
+When pressing the hotkey rapidly (before previous transcription completes), Tasks interleave and sessions overlap:
+
+```
+[DEBUG-CARBON] carbonHotkeyCallback called! eventKind=5  # Press 1
+[DEBUG-CARBON] carbonHotkeyCallback called! eventKind=6  # Release 1
+[DEBUG-CARBON] carbonHotkeyCallback called! eventKind=5  # Press 2
+[DEBUG-CARBON] carbonHotkeyCallback called! eventKind=6  # Release 2
+[DEBUG-ASYNC] onKeyDown Task starting...      # Task 1
+[DEBUG] startRecording succeeded!
+[DEBUG-ASYNC] onKeyUp Task starting...        # Task 2 (interleaves!)
+[DEBUG] Stopping session...
+[DEBUG-ASYNC] onKeyDown Task starting...      # Task 3
+[DEBUG] START IGNORED: session already active  # Guard works
+[DEBUG-ASYNC] onKeyUp Task starting...        # Task 4
+[DEBUG] stopCapture: 0 samples                # No audio!
+```
+
+### Cause
+
+1. Carbon events queue up rapidly
+2. All MainActor Tasks get scheduled nearly simultaneously
+3. When one Task awaits (e.g., `startRecording()`), others run
+4. Session guards catch some but not all conflicts
+
+### Workaround
+
+**Wait for transcription to complete** before pressing hotkey again. Single clean press/release works correctly.
+
+### Future Fix
+
+Consider VoiceInk's approach: simpler clipboard+paste without accessibility insertion, or add proper session locking with async mutexes.
