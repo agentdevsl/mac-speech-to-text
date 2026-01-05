@@ -4,6 +4,7 @@
 // Main View - General Settings Section
 // Recording mode, startup, text insertion, and hotkey configuration
 
+import KeyboardShortcuts
 import ServiceManagement
 import SwiftUI
 
@@ -240,7 +241,7 @@ struct GeneralSection: View {
                             .font(.body)
                             .foregroundStyle(.primary)
 
-                        Text("Default: ⌃⇧Space")
+                        Text("Click to change")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -248,9 +249,9 @@ struct GeneralSection: View {
 
                 Spacer()
 
-                // Display current shortcut
-                ShortcutDisplayView()
-                    .accessibilityIdentifier("hotkeyDisplay")
+                // Shortcut recorder
+                KeyboardShortcuts.Recorder(for: .holdToRecord)
+                    .accessibilityIdentifier("hotkeyRecorder")
             }
             .padding(16)
             .background(
@@ -267,12 +268,60 @@ struct GeneralSection: View {
                     )
             )
 
+            // Toggle recording shortcut (only shown in toggle mode)
+            if settings.ui.recordingMode == .toggle {
+                toggleRecordingShortcutRow
+            }
+
             // Hotkey hint
             Text("Use a unique key combination to avoid conflicts with other apps.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
         .accessibilityIdentifier("hotkeySection")
+    }
+
+    // MARK: - Toggle Recording Shortcut Row
+
+    @ViewBuilder
+    private var toggleRecordingShortcutRow: some View {
+        HStack {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.warmAmber)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Toggle Recording")
+                        .font(.body)
+                        .foregroundStyle(.primary)
+
+                    Text("Press once to start, again to stop")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            KeyboardShortcuts.Recorder(for: .toggleRecording)
+                .accessibilityIdentifier("toggleRecordingRecorder")
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    colorScheme == .dark
+                        ? Color.white.opacity(0.1)
+                        : Color.black.opacity(0.08),
+                    lineWidth: 1
+                )
+        )
     }
 
     // MARK: - Private Methods
@@ -493,36 +542,6 @@ private struct BlueToggleStyle: ToggleStyle {
                     }
                 }
         }
-    }
-}
-
-// MARK: - Shortcut Display View
-
-/// Displays the keyboard shortcut as a static value
-/// NOTE: We cannot call ANY KeyboardShortcuts methods that might access Bundle.module
-/// as it crashes in executable targets (SPM resource bundle issue)
-private struct ShortcutDisplayView: View {
-    @Environment(\.colorScheme) private var colorScheme
-
-    var body: some View {
-        // Display the default shortcut - we can't read the actual value safely
-        // The shortcut is hardcoded as Ctrl+Shift+Space in ShortcutNames.swift
-        Text("⌃⇧Space")
-            .font(.system(size: 13, weight: .medium, design: .rounded))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color(white: 0.95))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1),
-                        lineWidth: 1
-                    )
-            )
     }
 }
 

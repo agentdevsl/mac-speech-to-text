@@ -89,7 +89,7 @@ final class MainViewModelTests: XCTestCase {
     // MARK: - SidebarSection Enum Tests
 
     func test_sidebarSection_allCasesCount() {
-        XCTAssertEqual(SidebarSection.allCases.count, 6)
+        XCTAssertEqual(SidebarSection.allCases.count, 7)
     }
 
     func test_sidebarSection_hasCorrectTitles() {
@@ -97,6 +97,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.general.title, "General")
         XCTAssertEqual(SidebarSection.audio.title, "Audio")
         XCTAssertEqual(SidebarSection.language.title, "Language")
+        XCTAssertEqual(SidebarSection.theme.title, "Theme")
         XCTAssertEqual(SidebarSection.privacy.title, "Privacy")
         XCTAssertEqual(SidebarSection.about.title, "About")
     }
@@ -106,6 +107,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.general.icon, "gear")
         XCTAssertEqual(SidebarSection.audio.icon, "waveform")
         XCTAssertEqual(SidebarSection.language.icon, "globe")
+        XCTAssertEqual(SidebarSection.theme.icon, "paintbrush")
         XCTAssertEqual(SidebarSection.privacy.icon, "lock.shield")
         XCTAssertEqual(SidebarSection.about.icon, "info.circle")
     }
@@ -115,6 +117,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.general.accessibilityLabel, "General section")
         XCTAssertEqual(SidebarSection.audio.accessibilityLabel, "Audio section")
         XCTAssertEqual(SidebarSection.language.accessibilityLabel, "Language section")
+        XCTAssertEqual(SidebarSection.theme.accessibilityLabel, "Theme section")
         XCTAssertEqual(SidebarSection.privacy.accessibilityLabel, "Privacy section")
         XCTAssertEqual(SidebarSection.about.accessibilityLabel, "About section")
     }
@@ -124,6 +127,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.general.rawValue, "general")
         XCTAssertEqual(SidebarSection.audio.rawValue, "audio")
         XCTAssertEqual(SidebarSection.language.rawValue, "language")
+        XCTAssertEqual(SidebarSection.theme.rawValue, "theme")
         XCTAssertEqual(SidebarSection.privacy.rawValue, "privacy")
         XCTAssertEqual(SidebarSection.about.rawValue, "about")
     }

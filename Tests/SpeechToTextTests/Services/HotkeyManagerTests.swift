@@ -404,4 +404,155 @@ final class HotkeyManagerTests: XCTestCase {
         XCTAssertEqual(lastStopDuration!, 300.0, accuracy: 0.01)
         XCTAssertEqual(recordingStopCallCount, 1)
     }
+
+    // MARK: - Toggle Mode Tests
+
+    func test_handleToggleKeyPress_startsRecordingWhenNotRecording() async {
+        // Given
+        var startCalled = false
+        sut.onRecordingStart = { startCalled = true }
+
+        // When
+        await sut.handleToggleKeyPress()
+
+        // Then
+        XCTAssertTrue(startCalled, "onRecordingStart should be called")
+        XCTAssertTrue(sut.isCurrentlyInToggleMode, "Should be in toggle mode")
+        XCTAssertTrue(sut.isCurrentlyProcessing, "Should be processing")
+    }
+
+    func test_handleToggleKeyPress_stopsRecordingWhenRecording() async {
+        // Given
+        var stopCalled = false
+        var stopDuration: TimeInterval = -1
+        sut.onRecordingStart = { }
+        sut.onRecordingStop = { duration in stopDuration = duration; stopCalled = true }
+
+        // Start recording first
+        await sut.handleToggleKeyPress()
+        XCTAssertTrue(sut.isCurrentlyInToggleMode)
+
+        // When - press again to stop
+        await sut.handleToggleKeyPress()
+
+        // Then
+        XCTAssertTrue(stopCalled, "onRecordingStop should be called")
+        XCTAssertEqual(stopDuration, 0, "Duration should be 0 for toggle mode")
+        XCTAssertFalse(sut.isCurrentlyInToggleMode, "Should no longer be in toggle mode")
+        XCTAssertFalse(sut.isCurrentlyProcessing, "Should no longer be processing")
+    }
+
+    func test_handleToggleKeyPress_ignoresWhenProcessingHoldMode() async {
+        // Given - simulate hold mode in progress
+        var toggleStartCalled = false
+        sut.onRecordingStart = { toggleStartCalled = true }
+        await sut.handleKeyDown() // Start hold mode
+
+        // Reset flag after hold mode started
+        toggleStartCalled = false
+
+        // When - try to start toggle mode while hold mode is active
+        await sut.handleToggleKeyPress()
+
+        // Then - toggle should be ignored because isProcessing is true
+        XCTAssertFalse(toggleStartCalled, "Toggle start should not be called while processing")
+        XCTAssertFalse(sut.isCurrentlyInToggleMode, "Should not enter toggle mode while processing")
+    }
+
+    func test_handleKeyUp_ignoredWhenInToggleMode() async {
+        // Given - start toggle recording
+        var stopCalled = false
+        sut.onRecordingStart = { }
+        sut.onRecordingStop = { _ in stopCalled = true }
+        await sut.handleToggleKeyPress()
+        XCTAssertTrue(sut.isCurrentlyInToggleMode)
+
+        // When - keyUp is triggered (simulating stray event)
+        await sut.handleKeyUp()
+
+        // Then - toggle mode should still be active, stop should not be called
+        XCTAssertTrue(sut.isCurrentlyInToggleMode, "Toggle mode should not be affected by keyUp")
+        XCTAssertFalse(stopCalled, "Stop should not be called from keyUp in toggle mode")
+    }
+
+    func test_cancel_resetsToggleModeState() async {
+        // Given - start toggle recording
+        sut.onRecordingStart = { }
+        await sut.handleToggleKeyPress()
+        XCTAssertTrue(sut.isCurrentlyInToggleMode)
+        XCTAssertTrue(sut.isCurrentlyProcessing)
+
+        // When
+        sut.cancel()
+
+        // Then
+        XCTAssertFalse(sut.isCurrentlyInToggleMode, "Toggle mode should be reset")
+        XCTAssertFalse(sut.isCurrentlyProcessing, "Processing should be reset")
+    }
+
+    func test_toggleModeCycle_startsAndStopsCorrectly() async {
+        // Given
+        var startCount = 0
+        var stopCount = 0
+        sut.onRecordingStart = { startCount += 1 }
+        sut.onRecordingStop = { _ in stopCount += 1 }
+
+        // When - complete 3 full cycles
+        for _ in 0..<3 {
+            await sut.handleToggleKeyPress() // Start
+            XCTAssertTrue(sut.isCurrentlyInToggleMode)
+            await sut.handleToggleKeyPress() // Stop
+            XCTAssertFalse(sut.isCurrentlyInToggleMode)
+        }
+
+        // Then
+        XCTAssertEqual(startCount, 3, "Should have started 3 times")
+        XCTAssertEqual(stopCount, 3, "Should have stopped 3 times")
+    }
+
+    func test_toggleMode_worksWhenCallbacksAreNil() async {
+        // Given - nil callbacks
+        sut.onRecordingStart = nil
+        sut.onRecordingStop = nil
+
+        // When/Then - should not crash
+        await sut.handleToggleKeyPress()
+        XCTAssertTrue(sut.isCurrentlyInToggleMode)
+        XCTAssertTrue(sut.isCurrentlyProcessing)
+
+        await sut.handleToggleKeyPress()
+        XCTAssertFalse(sut.isCurrentlyInToggleMode)
+        XCTAssertFalse(sut.isCurrentlyProcessing)
+    }
+
+    func test_toggleMode_doesNotAffectCooldown() async {
+        // Given - complete a toggle cycle (use default callbacks to track counts)
+        await sut.handleToggleKeyPress() // Start
+        await sut.handleToggleKeyPress() // Stop
+
+        // When - try to start hold mode immediately (toggle mode doesn't set cooldown)
+        await sut.handleKeyDown()
+
+        // Then - should succeed (no cooldown from toggle mode)
+        // recordingStartCallCount = 2: once from toggle start, once from hold mode start
+        XCTAssertEqual(recordingStartCallCount, 2)
+        XCTAssertTrue(sut.isCurrentlyProcessing)
+    }
+
+    func test_holdMode_preventsToggleMode() async {
+        // Given - start hold mode
+        await sut.handleKeyDown()
+        XCTAssertTrue(sut.isCurrentlyProcessing)
+        XCTAssertFalse(sut.isCurrentlyInToggleMode)
+
+        // When - try to start toggle mode
+        var toggleStartCalled = false
+        sut.onRecordingStart = { toggleStartCalled = true }
+        await sut.handleToggleKeyPress()
+
+        // Then - toggle mode should be rejected
+        XCTAssertFalse(toggleStartCalled)
+        XCTAssertFalse(sut.isCurrentlyInToggleMode)
+        XCTAssertTrue(sut.isCurrentlyProcessing) // Hold mode still active
+    }
 }

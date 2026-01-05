@@ -126,9 +126,19 @@ struct GeneralConfiguration: Codable, Sendable {
 }
 
 struct HotkeyConfiguration: Codable, Sendable {
+    /// Whether hotkey functionality is enabled
     var enabled: Bool
+
+    /// @deprecated - Shortcuts are now managed by KeyboardShortcuts library.
+    /// This field is kept for backward compatibility but should not be relied upon.
+    /// Use KeyboardShortcuts.getShortcut(for:) to read the current shortcut.
     var keyCode: Int
+
+    /// @deprecated - Shortcuts are now managed by KeyboardShortcuts library.
+    /// This field is kept for backward compatibility but should not be relied upon.
     var modifiers: [KeyModifier]
+
+    /// Whether a conflict with system shortcuts was detected
     var conflictDetected: Bool
     // Note: alternativeHotkey removed to avoid recursive type definition
     // Consider using enum with indirect case if alternative hotkey needed
