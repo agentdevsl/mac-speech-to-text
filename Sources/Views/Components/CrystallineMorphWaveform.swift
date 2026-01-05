@@ -152,13 +152,9 @@ struct CrystallineMorphWaveform: View {
         let glowRadius = radius * (1.1 + audioLevel * 0.3)
         let glowIntensity = 0.2 + audioLevel * 0.4
 
-        let colors = isRecording ? [
-            Color.liquidRecordingCore.opacity(glowIntensity),
-            Color.liquidRecordingMid.opacity(glowIntensity * 0.5),
-            Color.clear
-        ] : [
-            Color.liquidGlassAccent.opacity(glowIntensity),
-            Color.liquidGlassAccent.opacity(glowIntensity * 0.4),
+        let colors = [
+            Color.amberPrimary.opacity(glowIntensity),
+            Color.amberLight.opacity(glowIntensity * 0.4),
             Color.clear
         ]
 
@@ -354,7 +350,7 @@ struct CrystallineMorphWaveform: View {
         path.closeSubpath()
 
         // Core glow
-        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent.opacity(0.8)
+        let coreColor = Color.amberPrimary
 
         var glowContext = context
         glowContext.blendMode = .plusLighter
@@ -377,16 +373,11 @@ struct CrystallineMorphWaveform: View {
             y: center.y - CGFloat(sin(gradientAngle)) * gradientRadius
         )
 
-        let lissajousColors: [Color] = isRecording ? [
-            Color.liquidRecordingCore,
-            Color.white.opacity(0.4),
-            Color.liquidRecordingMid,
-            Color.liquidRecordingCore
-        ] : [
-            Color.liquidGlassAccent.opacity(0.8),
-            Color.liquidGlassAccent,
-            Color.liquidGlassAccent.opacity(0.7),
-            Color.liquidGlassAccent.opacity(0.8)
+        let lissajousColors: [Color] = [
+            Color.amberPrimary,
+            Color.amberLight,
+            Color.amberPrimary.opacity(0.8),
+            Color.amberPrimary
         ]
 
         context.stroke(
@@ -434,12 +425,7 @@ struct CrystallineMorphWaveform: View {
             rayPath.addLine(to: outerPoint)
 
             // Color alternates based on index
-            let rayColor: Color
-            if isRecording {
-                rayColor = index % 2 == 0 ? Color.liquidRecordingMid : Color.white.opacity(0.4)
-            } else {
-                rayColor = index % 2 == 0 ? Color.liquidGlassAccent.opacity(0.8) : Color.liquidGlassAccent
-            }
+            let rayColor = index % 2 == 0 ? Color.amberPrimary : Color.amberLight
 
             context.stroke(
                 rayPath,
@@ -459,71 +445,36 @@ struct CrystallineMorphWaveform: View {
     // MARK: - Color Helpers
 
     private func crystallineColors(for layer: Int, audioLevel: Float) -> [Color] {
-        if isRecording {
-            // Warm crystalline palette: red core with white frost accents
-            switch layer {
-            case 0:
-                return [
-                    Color.liquidRecordingMid,
-                    Color.white.opacity(0.4),
-                    Color.liquidRecordingCore,
-                    Color.liquidRecordingMid,
-                    Color.liquidRecordingMid
-                ]
-            case 1:
-                return [
-                    Color.liquidRecordingCore,
-                    Color.white.opacity(0.4),
-                    Color.liquidRecordingMid,
-                    Color.white.opacity(0.3),
-                    Color.liquidRecordingCore
-                ]
-            case 2:
-                return [
-                    Color.white.opacity(0.4),
-                    Color.liquidRecordingMid,
-                    Color.liquidRecordingMid,
-                    Color.white.opacity(0.4)
-                ]
-            default:
-                return [
-                    Color.liquidRecordingCore,
-                    Color.white.opacity(0.4),
-                    Color.liquidRecordingCore
-                ]
-            }
-        } else {
-            // Cool crystalline palette: accent blue with white frost variations
-            switch layer {
-            case 0:
-                return [
-                    Color.liquidGlassAccent,
-                    Color.liquidGlassAccent.opacity(0.8),
-                    Color.liquidGlassAccent.opacity(0.7),
-                    Color.liquidGlassAccent,
-                    Color.white.opacity(0.5)
-                ]
-            case 1:
-                return [
-                    Color.liquidGlassAccent.opacity(0.8),
-                    Color.liquidGlassAccent,
-                    Color.liquidGlassAccent.opacity(0.7),
-                    Color.liquidGlassAccent.opacity(0.8)
-                ]
-            case 2:
-                return [
-                    Color.liquidGlassAccent.opacity(0.7),
-                    Color.liquidGlassAccent,
-                    Color.white.opacity(0.5),
-                    Color.liquidGlassAccent.opacity(0.7)
-                ]
-            default:
-                return [
-                    Color.liquidGlassAccent,
-                    Color.white.opacity(0.5),
-                    Color.liquidGlassAccent
-                ]
-            }
+        // Warm Minimalism palette - always amber
+        switch layer {
+        case 0:
+            return [
+                Color.amberPrimary,
+                Color.amberLight,
+                Color.amberPrimary.opacity(0.8),
+                Color.amberPrimary,
+                Color.white.opacity(0.5)
+            ]
+        case 1:
+            return [
+                Color.amberPrimary.opacity(0.9),
+                Color.amberLight,
+                Color.amberPrimary.opacity(0.8),
+                Color.amberPrimary.opacity(0.9)
+            ]
+        case 2:
+            return [
+                Color.amberLight,
+                Color.amberPrimary,
+                Color.white.opacity(0.5),
+                Color.amberLight
+            ]
+        default:
+            return [
+                Color.amberPrimary,
+                Color.white.opacity(0.5),
+                Color.amberPrimary
+            ]
         }
     }
 }

@@ -159,7 +159,7 @@ struct ThemeSection: View {
         WaveformVisualization(
             style: settings.ui.waveformStyle,
             audioLevel: previewAudioLevel,
-            isRecording: true
+            isRecording: false  // Show idle state (amber) in preview
         )
     }
 

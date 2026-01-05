@@ -210,7 +210,7 @@ struct ParticleVortexWaveform: View {
         let glowRadius = radius * (1.2 + level * 0.3)
         let glowOpacity = 0.15 + Double(level) * 0.15
 
-        let baseColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent
+        let baseColor = Color.amberPrimary
 
         context.fill(
             Circle().path(in: CGRect(
@@ -337,21 +337,15 @@ struct ParticleVortexWaveform: View {
     }
 
     private func calculateHue(for particle: Particle, time: Double) -> Double {
-        // Simplified Apple Liquid Glass palette - single hue with slight variation
+        // Warm Minimalism palette - always amber
         // Base hue from particle's offset (subtle variation)
-        var hueVariation = particle.hueOffset * 0.05
+        var hueVariation = particle.hueOffset * 0.03
 
         // Add subtle time-based variation
-        hueVariation += sin(time * 0.3) * 0.02
+        hueVariation += sin(time * 0.3) * 0.015
 
-        // Shift hue range based on recording state
-        if isRecording {
-            // Warm: red-orange range (hue ~0.0-0.05)
-            return (0.0 + hueVariation).truncatingRemainder(dividingBy: 1.0)
-        } else {
-            // Cool: blue range (hue ~0.6-0.65) - matches liquidGlassAccent #667eea
-            return (0.63 + hueVariation).truncatingRemainder(dividingBy: 1.0)
-        }
+        // Warm amber-orange range (hue ~0.08-0.11) - matches amberPrimary #FAC061
+        return (0.09 + hueVariation).truncatingRemainder(dividingBy: 1.0)
     }
 
     private func drawCenterOrb(
@@ -361,8 +355,8 @@ struct ParticleVortexWaveform: View {
     ) {
         let orbRadius: CGFloat = 8 + level * 4
 
-        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent
-        let midColor = isRecording ? Color.liquidRecordingMid : Color.liquidGlassAccent.opacity(0.7)
+        let coreColor = Color.amberPrimary
+        let midColor = Color.amberLight
 
         // Outer glow
         let glowRadius = orbRadius * 3

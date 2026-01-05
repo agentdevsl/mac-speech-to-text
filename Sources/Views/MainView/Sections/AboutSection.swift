@@ -57,13 +57,13 @@ struct AboutSection: View {
 
     /// Load app logo from various sources with fallback
     private static func loadAppLogo() -> NSImage {
-        // Try Bundle.module first (SPM resources)
-        if let url = Bundle.module.url(forResource: "app_logov2", withExtension: "png"),
+        // Try main bundle Resources folder first (xcodebuild copies resources here)
+        if let url = Bundle.main.url(forResource: "app_logov2", withExtension: "png"),
            let image = NSImage(contentsOf: url) {
             return image
         }
 
-        // Try main bundle (xcassets)
+        // Try xcassets
         if let image = NSImage(named: "AppLogo") {
             return image
         }

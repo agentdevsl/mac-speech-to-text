@@ -492,7 +492,7 @@ struct LiquidGlassRecordingModal: View {
                         colors: [
                             Color.liquidPrismaticPink.opacity(0.08),
                             Color.liquidPrismaticBlue.opacity(0.06),
-                            Color.liquidPrismaticCyan.opacity(0.08),
+                            Color.liquidPrismaticCyan.opacity(0.08)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing

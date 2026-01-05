@@ -190,23 +190,12 @@ struct AuroraWaveform: View {
     }
 
     private func waveColors(for layer: Int, isRecording: Bool, audioLevel: Float) -> WaveColors {
-        // Simplified Apple Liquid Glass palette
-        // Uses single accent color with white/frost variations
-        if isRecording {
-            // Recording: warm red with soft coral accents
-            let opacity = 1.0 - Double(layer) * 0.15
-            return WaveColors(
-                primary: Color.liquidRecordingCore.opacity(opacity),
-                secondary: Color.liquidRecordingMid.opacity(opacity * 0.8)
-            )
-        } else {
-            // Idle: refined ice blue with white frost
-            let opacity = 1.0 - Double(layer) * 0.15
-            return WaveColors(
-                primary: Color.liquidGlassAccent.opacity(opacity),
-                secondary: Color.white.opacity(opacity * 0.6)
-            )
-        }
+        // Warm Minimalism palette - always amber
+        let opacity = 1.0 - Double(layer) * 0.15
+        return WaveColors(
+            primary: Color.amberPrimary.opacity(opacity),
+            secondary: Color.amberLight.opacity(opacity * 0.7)
+        )
     }
 }
 
@@ -239,7 +228,7 @@ struct LiquidOrbWaveform: View {
 
                 context.stroke(
                     ringPath,
-                    with: .color((isRecording ? Color.liquidRecordingMid : Color.liquidGlassAccent).opacity(opacity)),
+                    with: .color(Color.amberPrimary.opacity(opacity)),
                     lineWidth: 1
                 )
             }
@@ -253,14 +242,10 @@ struct LiquidOrbWaveform: View {
                 detail: 64
             )
 
-            // Gradient fill - simplified Apple Liquid Glass palette
-            let gradient = Gradient(colors: isRecording ? [
-                Color.liquidRecordingCore,
-                Color.liquidRecordingMid,
-                Color.white.opacity(0.3)
-            ] : [
-                Color.liquidGlassAccent,
-                Color.liquidGlassAccent.opacity(0.6),
+            // Gradient fill - warm amber theme
+            let gradient = Gradient(colors: [
+                Color.amberPrimary,
+                Color.amberLight.opacity(0.6),
                 Color.white.opacity(0.3)
             ])
 
@@ -269,7 +254,7 @@ struct LiquidOrbWaveform: View {
                 orbPath,
                 with: .radialGradient(
                     Gradient(colors: [
-                        (isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent).opacity(0.4),
+                        Color.amberPrimary.opacity(0.4),
                         .clear
                     ]),
                     center: center,
@@ -320,7 +305,7 @@ struct LiquidOrbWaveform: View {
 
                 context.stroke(
                     levelPath,
-                    with: .color((isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent).opacity(Double(smoothLevel) * 0.5)),
+                    with: .color(Color.amberPrimary.opacity(Double(smoothLevel) * 0.5)),
                     lineWidth: 2
                 )
             }
@@ -474,14 +459,10 @@ struct FlowingRibbonWaveform: View {
         }
         fillPath.closeSubpath()
 
-        // Colors - simplified Apple Liquid Glass palette
-        let colors: [Color] = isRecording ? [
-            Color.liquidRecordingCore,
-            Color.liquidRecordingMid,
-            Color.white.opacity(0.5)
-        ] : [
-            Color.liquidGlassAccent,
-            Color.liquidGlassAccent.opacity(0.7),
+        // Colors - warm amber theme
+        let colors: [Color] = [
+            Color.amberPrimary,
+            Color.amberLight,
             Color.white.opacity(0.4)
         ]
 

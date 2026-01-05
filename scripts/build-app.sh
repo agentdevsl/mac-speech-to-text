@@ -868,6 +868,15 @@ elif [ -f "${PROJECT_ROOT}/app_logov2.png" ]; then
     print_success "Created app icon from app_logov2.png"
 fi
 
+# Copy app logo PNG for About section (used by AboutSection.loadAppLogo())
+if [ -f "${PROJECT_ROOT}/Sources/Resources/app_logov2.png" ]; then
+    cp "${PROJECT_ROOT}/Sources/Resources/app_logov2.png" "${APP_BUNDLE}/Contents/Resources/"
+    print_success "Copied app logo to Resources"
+elif [ -f "${PROJECT_ROOT}/app_logov2.png" ]; then
+    cp "${PROJECT_ROOT}/app_logov2.png" "${APP_BUNDLE}/Contents/Resources/"
+    print_success "Copied app logo to Resources"
+fi
+
 # Set permissions
 chmod -R 755 "${APP_BUNDLE}"
 
