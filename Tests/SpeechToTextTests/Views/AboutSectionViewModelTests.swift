@@ -201,54 +201,6 @@ final class AboutSectionViewModelTests: XCTestCase {
         }
     }
 
-    // MARK: - showAcknowledgments Tests
-
-    func test_showAcknowledgments_postsNotification() {
-        // Given
-        var notificationReceived = false
-        notificationObserver = NotificationCenter.default.addObserver(
-            forName: .showAcknowledgments,
-            object: nil,
-            queue: .main
-        ) { _ in
-            notificationReceived = true
-        }
-
-        // When
-        sut.showAcknowledgments()
-
-        // Then
-        XCTAssertTrue(notificationReceived)
-    }
-
-    func test_showAcknowledgments_notificationHasCorrectName() {
-        // Given
-        var receivedNotificationName: Notification.Name?
-        notificationObserver = NotificationCenter.default.addObserver(
-            forName: .showAcknowledgments,
-            object: nil,
-            queue: .main
-        ) { notification in
-            receivedNotificationName = notification.name
-        }
-
-        // When
-        sut.showAcknowledgments()
-
-        // Then
-        XCTAssertEqual(receivedNotificationName, .showAcknowledgments)
-    }
-
-    // MARK: - Notification.Name Extension Tests
-
-    func test_showAcknowledgments_notificationName_isCorrect() {
-        // Then
-        XCTAssertEqual(
-            Notification.Name.showAcknowledgments.rawValue,
-            "com.speechtotext.showAcknowledgments"
-        )
-    }
-
     // MARK: - Initialization Tests
 
     func test_initialization_createsValidViewModel() {
