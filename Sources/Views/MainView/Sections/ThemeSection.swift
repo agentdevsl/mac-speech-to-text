@@ -90,18 +90,33 @@ struct ThemeSection: View {
             Text("App Theme")
                 .font(.headline)
 
-            Picker("Theme", selection: Binding(
-                get: { settings.ui.theme },
-                set: { newValue in
-                    settings.ui.theme = newValue
-                    saveSettings()
+            HStack(spacing: 12) {
+                Image(systemName: "circle.lefthalf.filled")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.iconPrimaryAdaptive)
+                    .frame(width: 24)
+
+                Text("Theme")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Picker("Theme", selection: Binding(
+                    get: { settings.ui.theme },
+                    set: { newValue in
+                        settings.ui.theme = newValue
+                        saveSettings()
+                    }
+                )) {
+                    ForEach([Theme.system, .light, .dark], id: \.self) { theme in
+                        Text(theme.displayName).tag(theme)
+                    }
                 }
-            )) {
-                ForEach([Theme.system, .light, .dark], id: \.self) { theme in
-                    Text(theme.displayName).tag(theme)
-                }
+                .pickerStyle(.segmented)
+                .frame(width: 200)
+                .labelsHidden()
             }
-            .pickerStyle(.segmented)
         }
         .padding()
         .background {
@@ -137,7 +152,7 @@ struct ThemeSection: View {
                 .fill(.ultraThinMaterial)
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.liquidPrismaticCyan.opacity(0.3), lineWidth: 1)
+                        .stroke(Color.cardBorderAdaptive, lineWidth: 1)
                 }
 
             VStack(spacing: 8) {
@@ -147,11 +162,11 @@ struct ThemeSection: View {
 
                 Text(settings.ui.waveformStyle.displayName)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textTertiaryAdaptive)
             }
         }
         .frame(height: 130)
-        .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
 
     @ViewBuilder
@@ -234,6 +249,7 @@ struct ThemeSection: View {
         do {
             try settingsService.save(settings)
             saveError = nil
+            NotificationCenter.default.post(name: .themeDidChange, object: nil)
         } catch {
             saveError = "Failed to save settings"
             AppLogger.service.error("Failed to save theme settings: \(error.localizedDescription)")
@@ -253,11 +269,11 @@ private struct WaveformStyleCard: View {
             VStack(spacing: 8) {
                 Image(systemName: style.iconName)
                     .font(.system(size: 24))
-                    .foregroundStyle(isSelected ? Color.liquidPrismaticCyan : .secondary)
+                    .foregroundStyle(isSelected ? Color.iconPrimaryAdaptive : Color.textTertiaryAdaptive)
 
                 Text(style.displayName)
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .foregroundStyle(isSelected ? .primary : Color.textTertiaryAdaptive)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
@@ -266,11 +282,11 @@ private struct WaveformStyleCard: View {
             .padding(.horizontal, 12)
             .background {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.liquidPrismaticBlue.opacity(0.15) : Color(nsColor: .controlBackgroundColor))
+                    .fill(isSelected ? Color.iconPrimaryAdaptive.opacity(0.12) : Color(nsColor: .controlBackgroundColor))
                     .overlay {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .stroke(
-                                isSelected ? Color.liquidPrismaticCyan : Color.gray.opacity(0.2),
+                                isSelected ? Color.iconPrimaryAdaptive : Color.cardBorderAdaptive,
                                 lineWidth: isSelected ? 2 : 1
                             )
                     }

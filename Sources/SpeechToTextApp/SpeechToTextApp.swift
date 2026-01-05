@@ -12,9 +12,4 @@ struct SpeechToTextApp: App {
         }
         .menuBarExtraStyle(.window)
     }
-
-    init() {
-        // FluidAudio initialization moved to onAppear in MenuBarView
-        // to avoid capturing mutating self in init()
-    }
 }
