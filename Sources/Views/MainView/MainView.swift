@@ -282,6 +282,8 @@ struct MainView: View {
             GeneralSection(settingsService: settingsService)
         case .audio:
             AudioSection(settingsService: settingsService)
+        case .voiceTrigger:
+            VoiceTriggerSection(settingsService: settingsService)
         case .language:
             if let languageVM = languageViewModel {
                 LanguageSection(viewModel: languageVM)
