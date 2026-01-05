@@ -217,6 +217,50 @@ extension Color {
 
     /// Dark mode card surface
     static let cardBackgroundDark = Color(white: 0.15)
+
+    // MARK: - Adaptive UI Colors (Light/Dark Mode Aware)
+
+    /// Adaptive card background - white in light mode, dark gray in dark mode
+    static let cardBackgroundAdaptive = adaptive(
+        light: .white,
+        dark: Color(white: 0.15)
+    )
+
+    /// Adaptive card border - visible in both light and dark modes
+    static let cardBorderAdaptive = adaptive(
+        light: Color(hex: "D4D2D0"),  // warmGrayMedium - visible on white
+        dark: Color.white.opacity(0.12)
+    )
+
+    /// Adaptive subtle border - for secondary elements
+    static let subtleBorderAdaptive = adaptive(
+        light: Color.black.opacity(0.12),  // More visible than 0.05
+        dark: Color.white.opacity(0.08)
+    )
+
+    /// Adaptive icon color - darker in light mode for contrast
+    static let iconPrimaryAdaptive = adaptive(
+        light: Color(hex: "C68B2C"),  // Darker amber for light mode
+        dark: amberPrimary  // Standard amber for dark mode
+    )
+
+    /// Adaptive secondary background - more contrast in light mode
+    static let secondaryBackgroundAdaptive = adaptive(
+        light: Color(hex: "F0EDE8"),  // Warmer, more visible off-white
+        dark: Color(white: 0.12)
+    )
+
+    /// Adaptive tertiary text - darker in light mode for readability
+    static let textTertiaryAdaptive = adaptive(
+        light: Color(hex: "7A7875"),  // Darker than #9C9A97 for better contrast
+        dark: Color(hex: "9C9A97")
+    )
+
+    /// Adaptive muted text for hints and placeholders
+    static let textMutedAdaptive = adaptive(
+        light: Color(hex: "8A8784"),  // Visible on white backgrounds
+        dark: Color(hex: "A0A0A0")
+    )
 }
 
 // MARK: - Adaptive Colors

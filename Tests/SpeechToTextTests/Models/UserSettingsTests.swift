@@ -1,3 +1,5 @@
+import AppKit
+import SwiftUI
 import XCTest
 @testable import SpeechToText
 
@@ -98,6 +100,34 @@ final class UserSettingsTests: XCTestCase {
         XCTAssertEqual(Theme.light.displayName, "Light")
         XCTAssertEqual(Theme.dark.displayName, "Dark")
         XCTAssertEqual(Theme.system.displayName, "System")
+    }
+
+    func test_theme_nsAppearance_light_returnsAquaAppearance() {
+        let appearance = Theme.light.nsAppearance
+        XCTAssertNotNil(appearance)
+        XCTAssertEqual(appearance?.name, .aqua)
+    }
+
+    func test_theme_nsAppearance_dark_returnsDarkAquaAppearance() {
+        let appearance = Theme.dark.nsAppearance
+        XCTAssertNotNil(appearance)
+        XCTAssertEqual(appearance?.name, .darkAqua)
+    }
+
+    func test_theme_nsAppearance_system_returnsNil() {
+        XCTAssertNil(Theme.system.nsAppearance)
+    }
+
+    func test_theme_colorScheme_light_returnsLightScheme() {
+        XCTAssertEqual(Theme.light.colorScheme, .light)
+    }
+
+    func test_theme_colorScheme_dark_returnsDarkScheme() {
+        XCTAssertEqual(Theme.dark.colorScheme, .dark)
+    }
+
+    func test_theme_colorScheme_system_returnsNil() {
+        XCTAssertNil(Theme.system.colorScheme)
     }
 
     // MARK: - ModalPosition Tests

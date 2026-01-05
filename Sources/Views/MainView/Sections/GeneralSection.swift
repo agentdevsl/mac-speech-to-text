@@ -233,7 +233,7 @@ struct GeneralSection: View {
                 HStack(spacing: 12) {
                     Image(systemName: "keyboard")
                         .font(.system(size: 16))
-                        .foregroundStyle(Color.warmAmber)
+                        .foregroundStyle(Color.iconPrimaryAdaptive)
                         .frame(width: 24)
 
                     Text("Hold-to-Record")
@@ -289,7 +289,7 @@ struct GeneralSection: View {
             HStack(spacing: 12) {
                 Image(systemName: "arrow.triangle.2.circlepath")
                     .font(.system(size: 16))
-                    .foregroundStyle(Color.warmAmber)
+                    .foregroundStyle(Color.iconPrimaryAdaptive)
                     .frame(width: 24)
 
                 Text("Toggle Recording")
@@ -399,7 +399,7 @@ private struct RecordingModeCard: View {
                 // Icon
                 Image(systemName: icon)
                     .font(.system(size: 24))
-                    .foregroundStyle(isSelected ? Color.warmAmber : Color.warmGrayDark)
+                    .foregroundStyle(isSelected ? Color.iconPrimaryAdaptive : Color.textTertiaryAdaptive)
                     .frame(width: 40)
 
                 // Text content - use explicit colors for white card background
@@ -407,11 +407,11 @@ private struct RecordingModeCard: View {
                     Text(title)
                         .font(.body)
                         .fontWeight(.medium)
-                        .foregroundStyle(Color.textPrimary)
+                        .foregroundStyle(.primary)
 
                     Text(description)
                         .font(.caption)
-                        .foregroundStyle(Color.textSecondary)
+                        .foregroundStyle(Color.textTertiaryAdaptive)
                         .lineLimit(2)
                 }
 
@@ -420,12 +420,12 @@ private struct RecordingModeCard: View {
                 // Selection indicator
                 ZStack {
                     Circle()
-                        .stroke(isSelected ? Color.warmAmber : Color.warmGrayMedium, lineWidth: 2)
+                        .stroke(isSelected ? Color.iconPrimaryAdaptive : Color.cardBorderAdaptive, lineWidth: 2)
                         .frame(width: 22, height: 22)
 
                     if isSelected {
                         Circle()
-                            .fill(Color.warmAmber)
+                            .fill(Color.iconPrimaryAdaptive)
                             .frame(width: 14, height: 14)
                     }
                 }
@@ -433,12 +433,12 @@ private struct RecordingModeCard: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.cardBackground)
+                    .fill(Color.cardBackgroundAdaptive)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
                     .stroke(
-                        isSelected ? Color.warmAmber : Color.warmGrayMedium.opacity(0.5),
+                        isSelected ? Color.iconPrimaryAdaptive : Color.cardBorderAdaptive,
                         lineWidth: isSelected ? 2 : 1
                     )
             )
@@ -461,7 +461,7 @@ private struct GeneralToggleRow: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16))
-                    .foregroundStyle(Color.warmAmber)
+                    .foregroundStyle(Color.iconPrimaryAdaptive)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -471,7 +471,7 @@ private struct GeneralToggleRow: View {
 
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.textTertiaryAdaptive)
                 }
             }
         }
@@ -491,7 +491,7 @@ private struct PasteBehaviorRow: View {
         HStack(spacing: 12) {
             Image(systemName: "return")
                 .font(.system(size: 16))
-                .foregroundStyle(Color.warmAmber)
+                .foregroundStyle(Color.iconPrimaryAdaptive)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -501,7 +501,7 @@ private struct PasteBehaviorRow: View {
 
                 Text("What to do after inserting text")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textTertiaryAdaptive)
             }
 
             Spacer()
