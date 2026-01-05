@@ -114,7 +114,7 @@ struct MainView: View {
 
             // Subtle divider
             Rectangle()
-                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08))
+                .fill(colorScheme == .dark ? Color.white.opacity(0.08) : Color.lightCardBorder)
                 .frame(width: 1)
 
             // Detail content area
@@ -159,26 +159,26 @@ struct MainView: View {
                 ZStack {
                     if isSelected {
                         Circle()
-                            .fill(Color.amberPrimary.opacity(0.2))
+                            .fill(Color.selectionBackgroundAdaptive)
                             .frame(width: 24, height: 24)
                     }
 
                     Image(systemName: section.icon)
                         .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Color.amberPrimary : .secondary)
+                        .foregroundStyle(isSelected ? Color.iconPrimaryAdaptive : Color.textTertiaryAdaptive)
                 }
                 .frame(width: 24)
 
                 Text(section.title)
                     .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? .primary : .secondary)
+                    .foregroundStyle(isSelected ? .primary : Color.textSecondaryAdaptive)
 
                 Spacer()
 
                 // Selection indicator bar
                 if isSelected {
                     RoundedRectangle(cornerRadius: 1.5)
-                        .fill(Color.amberPrimary)
+                        .fill(Color.iconPrimaryAdaptive)
                         .frame(width: 3, height: 14)
                 }
             }
@@ -188,12 +188,10 @@ struct MainView: View {
                 Group {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(colorScheme == .dark
-                                ? Color.amberPrimary.opacity(0.12)
-                                : Color.amberPrimary.opacity(0.1))
+                            .fill(Color.selectionBackgroundAdaptive)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.amberPrimary.opacity(0.2), lineWidth: 1)
+                                    .stroke(Color.selectionBorderAdaptive, lineWidth: 1)
                             )
                     }
                 }
@@ -210,7 +208,7 @@ struct MainView: View {
         LinearGradient(
             colors: colorScheme == .dark
                 ? [Color(white: 0.08), Color(white: 0.05)]
-                : [Color(hex: "FDFBF9"), Color(hex: "F5F0EB")],
+                : [Color.lightRecessedBg, Color(hex: "EDE8E2")],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -221,14 +219,14 @@ struct MainView: View {
     private var sidebarBackground: some View {
         colorScheme == .dark
             ? Color(white: 0.12)
-            : Color(white: 0.96)
+            : Color(hex: "FAF8F5")
     }
 
     /// Clean background for detail area
     private var detailBackground: some View {
         colorScheme == .dark
             ? Color(white: 0.08)
-            : Color(white: 0.98)
+            : Color(hex: "FDFCFB")
     }
 
     // MARK: - Keyboard Navigation

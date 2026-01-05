@@ -227,7 +227,7 @@ struct HomeSection: View {
         VStack(spacing: 10) {
             Text("Press")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.textSecondaryAdaptive)
 
             HStack(spacing: 6) {
                 ForEach(settings.hotkey.modifiers, id: \.self) { modifier in
@@ -239,15 +239,18 @@ struct HomeSection: View {
 
             Text("anywhere to record")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.textSecondaryAdaptive)
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 24)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.7))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                .fill(Color.cardBackgroundAdaptive)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+                )
+                .shadow(color: Color.cardShadowAdaptive, radius: 12, x: 0, y: 4)
         )
         .accessibilityIdentifier("hotkeyHint")
     }
@@ -271,7 +274,7 @@ struct HomeSection: View {
             HStack {
                 Text("PERMISSIONS")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
 
                 Spacer()
@@ -334,7 +337,7 @@ struct HomeSection: View {
             HStack {
                 Text("PREVIEW")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
                 Spacer()
             }
@@ -348,7 +351,7 @@ struct HomeSection: View {
 
                 // Animated cursor
                 Rectangle()
-                    .fill(Color.amberPrimary)
+                    .fill(Color.iconPrimaryAdaptive)
                     .frame(width: 2, height: 20)
                     .opacity(isPulsing ? 1.0 : 0.3)
                     .animation(
@@ -362,19 +365,13 @@ struct HomeSection: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.06) : Color.white.opacity(0.8))
-                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                    .fill(Color.cardBackgroundAdaptive)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(
-                                colorScheme == .dark
-                                    ? Color.white.opacity(0.1)
-                                    : Color.black.opacity(0.05),
-                                lineWidth: 1
-                            )
+                            .stroke(Color.cardBorderAdaptive, lineWidth: 1)
                     )
             )
-            .shadow(color: .black.opacity(0.03), radius: 8, x: 0, y: 2)
+            .shadow(color: Color.cardShadowAdaptive, radius: 10, x: 0, y: 3)
         }
         .accessibilityIdentifier("typingPreview")
     }
@@ -476,7 +473,6 @@ struct HomeSection: View {
 /// A glassmorphism styled keyboard key
 private struct GlassKeyboardKey: View {
     let symbol: String
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Text(symbol)
@@ -486,15 +482,12 @@ private struct GlassKeyboardKey: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
-                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+                    .fill(Color.cardBackgroundAdaptive)
+                    .shadow(color: Color.cardShadowAdaptive, radius: 3, x: 0, y: 1)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6)
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1),
-                        lineWidth: 1
-                    )
+                    .stroke(Color.cardBorderAdaptive, lineWidth: 1)
             )
     }
 }
@@ -572,41 +565,38 @@ private struct GlassPermissionCard: View {
         } else if isGranted {
             return Color.successGreen
         } else {
-            return Color.amberPrimary
+            return Color.iconPrimaryAdaptive
         }
     }
 
     private var iconBackgroundColor: Color {
         if errorMessage != nil {
-            return Color.errorRed.opacity(0.15)
+            return Color.errorRed.opacity(0.12)
         } else if isGranted {
-            return Color.successGreen.opacity(0.15)
+            return Color.successGreen.opacity(0.12)
         } else {
-            return Color.amberPrimary.opacity(0.15)
+            return Color.selectionBackgroundAdaptive
         }
     }
 
     private var iconGlowColor: Color {
         if errorMessage != nil {
-            return Color.errorRed.opacity(0.2)
+            return Color.errorRed.opacity(0.15)
         } else if isGranted {
-            return Color.successGreen.opacity(0.2)
+            return Color.successGreen.opacity(0.15)
         } else {
-            return Color.amberPrimary.opacity(0.2)
+            return Color.cardShadowAdaptive
         }
     }
 
     private var cardBackground: some View {
         Group {
             if isFocused {
-                Color.amberPrimary.opacity(0.08)
-            } else if colorScheme == .dark {
-                Color.white.opacity(0.06)
+                Color.selectionBackgroundAdaptive
             } else {
-                Color.white.opacity(0.85)
+                Color.cardBackgroundAdaptive
             }
         }
-        .background(.ultraThinMaterial)
     }
 
     private var cardBorder: some View {
@@ -616,13 +606,13 @@ private struct GlassPermissionCard: View {
 
     private var borderColor: Color {
         if isFocused {
-            return Color.amberPrimary.opacity(0.6)
+            return Color.selectionBorderAdaptive
         } else if errorMessage != nil {
             return Color.errorRed.opacity(0.4)
         } else if isGranted {
             return Color.successGreen.opacity(0.3)
         } else {
-            return colorScheme == .dark ? Color.white.opacity(0.1) : Color.black.opacity(0.05)
+            return Color.cardBorderAdaptive
         }
     }
 
@@ -632,7 +622,7 @@ private struct GlassPermissionCard: View {
         } else if errorMessage != nil {
             return Color.errorRed.opacity(0.1)
         } else {
-            return Color.black.opacity(0.05)
+            return Color.cardShadowAdaptive
         }
     }
 
@@ -646,7 +636,7 @@ private struct GlassPermissionCard: View {
                     .scaleEffect(0.7)
                 Text("Checking...")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.textTertiaryAdaptive)
             }
             .accessibilityLabel("Checking permission status")
         } else if isGranted {
@@ -660,7 +650,7 @@ private struct GlassPermissionCard: View {
                     Image(systemName: "arrow.clockwise")
                 }
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.amberPrimary)
+                .foregroundStyle(Color.iconPrimaryAdaptive)
             }
             .buttonStyle(.plain)
         } else {
@@ -677,13 +667,15 @@ private struct GlassPermissionCard: View {
                     Capsule()
                         .fill(
                             LinearGradient(
-                                colors: [.amberLight, .amberPrimary],
+                                colors: colorScheme == .dark
+                                    ? [.amberLight, .amberPrimary]
+                                    : [Color(hex: "C4891A"), Color(hex: "9A6A10")],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                 )
-                .shadow(color: Color.amberPrimary.opacity(0.3), radius: 4, x: 0, y: 2)
+                .shadow(color: Color.cardShadowAdaptive, radius: 4, x: 0, y: 2)
             }
             .buttonStyle(.plain)
         }
