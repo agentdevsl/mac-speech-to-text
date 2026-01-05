@@ -95,5 +95,53 @@ enum Constants {
         static let sampleRate: Int = 16000
         /// State polling interval for UI updates (seconds)
         static let statePollingInterval: TimeInterval = 0.1
+
+        // MARK: - Model File Names
+        /// Encoder ONNX model file name
+        static let encoderFileName = "encoder-epoch-12-avg-2-chunk-16-left-64.onnx"
+        /// Decoder ONNX model file name
+        static let decoderFileName = "decoder-epoch-12-avg-2-chunk-16-left-64.onnx"
+        /// Joiner ONNX model file name
+        static let joinerFileName = "joiner-epoch-12-avg-2-chunk-16-left-64.onnx"
+        /// Tokens file name
+        static let tokensFileName = "tokens.txt"
+        /// BPE model file name
+        static let bpeModelFileName = "bpe.model"
+        /// Keywords file name
+        static let keywordsFileName = "keywords.txt"
+
+        // MARK: - Model Path Helper
+
+        /// Returns the path to the sherpa-onnx keyword spotting model directory in the app bundle
+        /// Uses Bundle.module for SPM resource bundles, with fallback to Bundle.main for app bundles
+        static var modelPath: String? {
+            // First try SPM module bundle (for development builds)
+            if let path = Bundle.module.path(forResource: modelName, ofType: nil, inDirectory: modelDirectory) {
+                return path
+            }
+            // Fallback to main bundle (for app bundles built with Xcode)
+            return Bundle.main.path(forResource: modelName, ofType: nil, inDirectory: modelDirectory)
+        }
+
+        /// Returns the full path to a specific model file within the model directory
+        /// - Parameter fileName: The name of the model file (e.g., "encoder-epoch-12-avg-2-chunk-16-left-64.onnx")
+        /// - Returns: The full path to the file, or nil if not found
+        static func modelFilePath(_ fileName: String) -> String? {
+            guard let basePath = modelPath else { return nil }
+            let fullPath = (basePath as NSString).appendingPathComponent(fileName)
+            return FileManager.default.fileExists(atPath: fullPath) ? fullPath : nil
+        }
+
+        /// Returns paths to all required model files, or nil if any are missing
+        static var allModelFilePaths: (encoder: String, decoder: String, joiner: String, tokens: String, bpeModel: String)? {
+            guard let encoder = modelFilePath(encoderFileName),
+                  let decoder = modelFilePath(decoderFileName),
+                  let joiner = modelFilePath(joinerFileName),
+                  let tokens = modelFilePath(tokensFileName),
+                  let bpeModel = modelFilePath(bpeModelFileName) else {
+                return nil
+            }
+            return (encoder: encoder, decoder: decoder, joiner: joiner, tokens: tokens, bpeModel: bpeModel)
+        }
     }
 }

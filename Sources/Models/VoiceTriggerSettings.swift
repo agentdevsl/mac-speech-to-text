@@ -71,9 +71,14 @@ struct TriggerKeyword: Codable, Sendable, Identifiable, Equatable {
         phrase.isEmpty ? "(empty)" : phrase
     }
 
+    // MARK: - Preset Keywords (with fixed UUIDs for stable equality)
+
+    /// Fixed UUID namespace for preset keywords
+    private static let presetNamespace = UUID(uuidString: "A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D")!
+
     /// Default "Hey Claude" keyword
     static let heyClaudeDefault = TriggerKeyword(
-        id: UUID(),
+        id: UUID(uuidString: "00000001-0000-0000-0000-000000000001")!,
         phrase: "Hey Claude",
         boostingScore: 1.5,
         triggerThreshold: 0.35,
@@ -82,7 +87,7 @@ struct TriggerKeyword: Codable, Sendable, Identifiable, Equatable {
 
     /// Preset for "Claude" keyword
     static let claudePreset = TriggerKeyword(
-        id: UUID(),
+        id: UUID(uuidString: "00000001-0000-0000-0000-000000000002")!,
         phrase: "Claude",
         boostingScore: 1.3,
         triggerThreshold: 0.4,
@@ -91,7 +96,7 @@ struct TriggerKeyword: Codable, Sendable, Identifiable, Equatable {
 
     /// Preset for "Opus" keyword
     static let opusPreset = TriggerKeyword(
-        id: UUID(),
+        id: UUID(uuidString: "00000001-0000-0000-0000-000000000003")!,
         phrase: "Opus",
         boostingScore: 1.3,
         triggerThreshold: 0.4,
@@ -100,12 +105,14 @@ struct TriggerKeyword: Codable, Sendable, Identifiable, Equatable {
 
     /// Preset for "Sonnet" keyword
     static let sonnetPreset = TriggerKeyword(
-        id: UUID(),
+        id: UUID(uuidString: "00000001-0000-0000-0000-000000000004")!,
         phrase: "Sonnet",
         boostingScore: 1.3,
         triggerThreshold: 0.4,
         isEnabled: false
     )
+
+    // MARK: - Initializers
 
     init(
         id: UUID = UUID(),
@@ -119,6 +126,19 @@ struct TriggerKeyword: Codable, Sendable, Identifiable, Equatable {
         self.boostingScore = boostingScore.clamped(to: 1.0...2.0)
         self.triggerThreshold = triggerThreshold.clamped(to: 0.0...1.0)
         self.isEnabled = isEnabled
+    }
+
+    /// Custom decoder that applies value clamping (matches init behavior)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        phrase = try container.decode(String.self, forKey: .phrase)
+        // Apply clamping during decode to prevent out-of-range persisted values
+        let rawBoostingScore = try container.decode(Float.self, forKey: .boostingScore)
+        boostingScore = rawBoostingScore.clamped(to: 1.0...2.0)
+        let rawTriggerThreshold = try container.decode(Float.self, forKey: .triggerThreshold)
+        triggerThreshold = rawTriggerThreshold.clamped(to: 0.0...1.0)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
     }
 
     /// Validation check

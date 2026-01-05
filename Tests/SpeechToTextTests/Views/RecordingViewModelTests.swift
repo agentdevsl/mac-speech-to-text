@@ -3,6 +3,7 @@
 //
 // Unit tests for RecordingViewModel
 
+import AVFoundation
 import XCTest
 @testable import SpeechToText
 
@@ -637,7 +638,10 @@ class MockAudioCaptureServiceForRecording: AudioCaptureService {
     var shouldFailStartCapture = false
     var mockSamples: [Int16] = [100, 200, 300, 400, 500]
 
-    override func startCapture(levelCallback: @escaping (Double) -> Void) async throws {
+    override func startCapture(
+        levelCallback: @escaping @Sendable (Double) -> Void,
+        bufferCallback: (@Sendable (AVAudioPCMBuffer) -> Void)? = nil
+    ) async throws {
         startCaptureCalled = true
         if shouldFailStartCapture {
             throw AudioCaptureError.engineStartFailed("Mock engine start failed")

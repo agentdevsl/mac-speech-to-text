@@ -1,7 +1,7 @@
 import Foundation
 
 /// Error types for voice trigger operations
-enum VoiceTriggerError: Error, Sendable, Equatable {
+enum VoiceTriggerError: Error, LocalizedError, Sendable, Equatable {
     case wakeWordInitFailed(String)
     case noKeywordsConfigured
     case audioCaptureFailed(String)
@@ -27,6 +27,10 @@ enum VoiceTriggerError: Error, Sendable, Equatable {
         case .maxDurationExceeded:
             return "Maximum recording duration exceeded"
         }
+    }
+
+    var errorDescription: String? {
+        description
     }
 }
 

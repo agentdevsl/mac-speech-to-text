@@ -99,6 +99,10 @@ struct KeywordEditorSheet: View {
         .onAppear {
             loadKeywordData()
         }
+        .onChange(of: keyword) { _, _ in
+            // Reload data when the keyword binding changes (e.g., switching from one keyword to another)
+            loadKeywordData()
+        }
     }
 
     // MARK: - View Components
@@ -120,6 +124,7 @@ struct KeywordEditorSheet: View {
             }
             .buttonStyle(.plain)
             .help("Close")
+            .accessibilityIdentifier("keywordEditorCloseButton")
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)
@@ -141,6 +146,7 @@ struct KeywordEditorSheet: View {
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(textFieldBorder, lineWidth: 1)
                 )
+                .accessibilityIdentifier("keywordPhraseTextField")
 
             Text("Any words or phrase (e.g., \"Hey Claude\", \"Computer\", \"Start Recording\")")
                 .font(.caption)
@@ -170,6 +176,7 @@ struct KeywordEditorSheet: View {
 
             Slider(value: $boostingScore, in: 1.0...2.0, step: 0.1)
                 .tint(Color.amberPrimary)
+                .accessibilityIdentifier("keywordBoostingScoreSlider")
 
             HStack {
                 Text("1.0")
@@ -209,6 +216,7 @@ struct KeywordEditorSheet: View {
 
             Slider(value: $triggerThreshold, in: 0.0...1.0, step: 0.05)
                 .tint(Color.amberPrimary)
+                .accessibilityIdentifier("keywordThresholdSlider")
 
             HStack {
                 Text("0%")
@@ -243,6 +251,7 @@ struct KeywordEditorSheet: View {
             Toggle("", isOn: $isEnabled)
                 .toggleStyle(.switch)
                 .tint(Color.amberPrimary)
+                .accessibilityIdentifier("keywordEnabledToggle")
         }
         .padding(16)
         .background(
@@ -260,6 +269,7 @@ struct KeywordEditorSheet: View {
             .foregroundStyle(.secondary)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .accessibilityIdentifier("keywordEditorCancelButton")
 
             Spacer()
 
@@ -272,6 +282,7 @@ struct KeywordEditorSheet: View {
             .buttonStyle(.borderedProminent)
             .tint(Color.amberPrimary)
             .disabled(!canSave)
+            .accessibilityIdentifier("keywordEditorSaveButton")
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 16)

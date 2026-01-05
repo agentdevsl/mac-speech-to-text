@@ -327,15 +327,15 @@ struct VoiceTriggerSection: View {
                         .foregroundStyle(.tertiary)
 
                     Slider(
-                        value: Binding(
-                            get: { settings.voiceTrigger.silenceThresholdSeconds },
-                            set: { newValue in
-                                settings.voiceTrigger.silenceThresholdSeconds = newValue
+                        value: $settings.voiceTrigger.silenceThresholdSeconds,
+                        in: 1...10,
+                        step: 1,
+                        onEditingChanged: { isEditing in
+                            // Only save when user finishes dragging to avoid excessive disk writes
+                            if !isEditing {
                                 saveSettings()
                             }
-                        ),
-                        in: 1...10,
-                        step: 1
+                        }
                     )
                     .tint(Color.warmAmber)
                     .accessibilityIdentifier("silenceThresholdSlider")
@@ -462,6 +462,24 @@ struct VoiceTriggerSection: View {
     private func addKeyword() {
         let trimmedPhrase = newKeywordPhrase.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedPhrase.isEmpty else { return }
+
+        // Check for duplicate phrase (case-insensitive)
+        let isDuplicate = settings.voiceTrigger.keywords.contains {
+            $0.phrase.lowercased() == trimmedPhrase.lowercased()
+        }
+        guard !isDuplicate else {
+            saveError = "A keyword with this phrase already exists."
+            newKeywordPhrase = ""
+            showAddKeyword = false
+            // Clear error after 3 seconds
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                if saveError == "A keyword with this phrase already exists." {
+                    saveError = nil
+                }
+            }
+            return
+        }
 
         let newKeyword = TriggerKeyword(
             phrase: trimmedPhrase,

@@ -2,6 +2,7 @@
 /// Copyright (c)  2023  Xiaomi Corporation
 
 import Foundation  // For NSString
+import sherpa_onnx  // C API from xcframework
 
 /// Convert a String from swift to a `const char*` so that we can pass it to
 /// the C language.
@@ -10,7 +11,7 @@ import Foundation  // For NSString
 ///   - s: The String to convert.
 /// - Returns: A pointer that can be passed to C as `const char*`
 
-func toCPointer(_ s: String) -> UnsafePointer<Int8>! {
+public func toCPointer(_ s: String) -> UnsafePointer<Int8>! {
   let cs = (s as NSString).utf8String
   return UnsafePointer<Int8>(cs)
 }
@@ -27,7 +28,7 @@ func toCPointer(_ s: String) -> UnsafePointer<Int8>! {
 ///   - joiner: Path to joiner.onnx
 ///
 /// - Returns: Return an instance of SherpaOnnxOnlineTransducerModelConfig
-func sherpaOnnxOnlineTransducerModelConfig(
+public func sherpaOnnxOnlineTransducerModelConfig(
   encoder: String = "",
   decoder: String = "",
   joiner: String = ""
@@ -50,7 +51,7 @@ func sherpaOnnxOnlineTransducerModelConfig(
 ///   - decoder: Path to decoder.onnx
 ///
 /// - Returns: Return an instance of SherpaOnnxOnlineParaformerModelConfig
-func sherpaOnnxOnlineParaformerModelConfig(
+public func sherpaOnnxOnlineParaformerModelConfig(
   encoder: String = "",
   decoder: String = ""
 ) -> SherpaOnnxOnlineParaformerModelConfig {
@@ -60,7 +61,7 @@ func sherpaOnnxOnlineParaformerModelConfig(
   )
 }
 
-func sherpaOnnxOnlineZipformer2CtcModelConfig(
+public func sherpaOnnxOnlineZipformer2CtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOnlineZipformer2CtcModelConfig {
   return SherpaOnnxOnlineZipformer2CtcModelConfig(
@@ -68,7 +69,7 @@ func sherpaOnnxOnlineZipformer2CtcModelConfig(
   )
 }
 
-func sherpaOnnxOnlineNemoCtcModelConfig(
+public func sherpaOnnxOnlineNemoCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOnlineNemoCtcModelConfig {
   return SherpaOnnxOnlineNemoCtcModelConfig(
@@ -76,7 +77,7 @@ func sherpaOnnxOnlineNemoCtcModelConfig(
   )
 }
 
-func sherpaOnnxOnlineToneCtcModelConfig(
+public func sherpaOnnxOnlineToneCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOnlineToneCtcModelConfig {
   return SherpaOnnxOnlineToneCtcModelConfig(
@@ -95,7 +96,7 @@ func sherpaOnnxOnlineToneCtcModelConfig(
 ///   - numThreads:  Number of threads to use for neural network computation.
 ///
 /// - Returns: Return an instance of SherpaOnnxOnlineTransducerModelConfig
-func sherpaOnnxOnlineModelConfig(
+public func sherpaOnnxOnlineModelConfig(
   tokens: String,
   transducer: SherpaOnnxOnlineTransducerModelConfig = sherpaOnnxOnlineTransducerModelConfig(),
   paraformer: SherpaOnnxOnlineParaformerModelConfig = sherpaOnnxOnlineParaformerModelConfig(),
@@ -130,7 +131,7 @@ func sherpaOnnxOnlineModelConfig(
   )
 }
 
-func sherpaOnnxFeatureConfig(
+public func sherpaOnnxFeatureConfig(
   sampleRate: Int = 16000,
   featureDim: Int = 80
 ) -> SherpaOnnxFeatureConfig {
@@ -139,7 +140,7 @@ func sherpaOnnxFeatureConfig(
     feature_dim: Int32(featureDim))
 }
 
-func sherpaOnnxOnlineCtcFstDecoderConfig(
+public func sherpaOnnxOnlineCtcFstDecoderConfig(
   graph: String = "",
   maxActive: Int = 3000
 ) -> SherpaOnnxOnlineCtcFstDecoderConfig {
@@ -148,7 +149,7 @@ func sherpaOnnxOnlineCtcFstDecoderConfig(
     max_active: Int32(maxActive))
 }
 
-func sherpaOnnxHomophoneReplacerConfig(
+public func sherpaOnnxHomophoneReplacerConfig(
   dictDir: String = "",
   lexicon: String = "",
   ruleFsts: String = ""
@@ -159,7 +160,7 @@ func sherpaOnnxHomophoneReplacerConfig(
     rule_fsts: toCPointer(ruleFsts))
 }
 
-func sherpaOnnxOnlineRecognizerConfig(
+public func sherpaOnnxOnlineRecognizerConfig(
   featConfig: SherpaOnnxFeatureConfig,
   modelConfig: SherpaOnnxOnlineModelConfig,
   enableEndpoint: Bool = false,
@@ -206,7 +207,7 @@ func sherpaOnnxOnlineRecognizerConfig(
 ///  let result = recognizer.getResult()
 ///  print("text: \(result.text)")
 ///
-class SherpaOnnxOnlineRecongitionResult {
+public class SherpaOnnxOnlineRecongitionResult {
   /// A pointer to the underlying counterpart in C
   private let result: UnsafePointer<SherpaOnnxOnlineRecognizerResult>
 
@@ -248,7 +249,7 @@ class SherpaOnnxOnlineRecongitionResult {
   var timestamps: [Float] { _timestamps }
 }
 
-class SherpaOnnxRecognizer {
+public class SherpaOnnxRecognizer {
   /// A pointer to the underlying counterpart in C
   private let recognizer: OpaquePointer
   private var stream: OpaquePointer
@@ -332,7 +333,7 @@ class SherpaOnnxRecognizer {
 
 // For offline APIs
 
-func sherpaOnnxOfflineTransducerModelConfig(
+public func sherpaOnnxOfflineTransducerModelConfig(
   encoder: String = "",
   decoder: String = "",
   joiner: String = ""
@@ -344,7 +345,7 @@ func sherpaOnnxOfflineTransducerModelConfig(
   )
 }
 
-func sherpaOnnxOfflineParaformerModelConfig(
+public func sherpaOnnxOfflineParaformerModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineParaformerModelConfig {
   return SherpaOnnxOfflineParaformerModelConfig(
@@ -352,7 +353,7 @@ func sherpaOnnxOfflineParaformerModelConfig(
   )
 }
 
-func sherpaOnnxOfflineZipformerCtcModelConfig(
+public func sherpaOnnxOfflineZipformerCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineZipformerCtcModelConfig {
   return SherpaOnnxOfflineZipformerCtcModelConfig(
@@ -360,7 +361,7 @@ func sherpaOnnxOfflineZipformerCtcModelConfig(
   )
 }
 
-func sherpaOnnxOfflineWenetCtcModelConfig(
+public func sherpaOnnxOfflineWenetCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineWenetCtcModelConfig {
   return SherpaOnnxOfflineWenetCtcModelConfig(
@@ -368,7 +369,7 @@ func sherpaOnnxOfflineWenetCtcModelConfig(
   )
 }
 
-func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
+public func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineOmnilingualAsrCtcModelConfig {
   return SherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
@@ -376,7 +377,7 @@ func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
   )
 }
 
-func sherpaOnnxOfflineMedAsrCtcModelConfig(
+public func sherpaOnnxOfflineMedAsrCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineMedAsrCtcModelConfig {
   return SherpaOnnxOfflineMedAsrCtcModelConfig(
@@ -384,7 +385,35 @@ func sherpaOnnxOfflineMedAsrCtcModelConfig(
   )
 }
 
-func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
+public func sherpaOnnxOfflineFunASRNanoModelConfig(
+  encoderAdaptor: String = "",
+  llmPrefill: String = "",
+  llmDecode: String = "",
+  embedding: String = "",
+  tokenizer: String = "",
+  systemPrompt: String = "",
+  userPrompt: String = "",
+  maxNewTokens: Int = 200,
+  temperature: Float = 0.6,
+  topP: Float = 0.9,
+  seed: Int = 0
+) -> SherpaOnnxOfflineFunASRNanoModelConfig {
+  return SherpaOnnxOfflineFunASRNanoModelConfig(
+    encoder_adaptor: toCPointer(encoderAdaptor),
+    llm_prefill: toCPointer(llmPrefill),
+    llm_decode: toCPointer(llmDecode),
+    embedding: toCPointer(embedding),
+    tokenizer: toCPointer(tokenizer),
+    system_prompt: toCPointer(systemPrompt),
+    user_prompt: toCPointer(userPrompt),
+    max_new_tokens: Int32(maxNewTokens),
+    temperature: temperature,
+    top_p: topP,
+    seed: Int32(seed)
+  )
+}
+
+public func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineNemoEncDecCtcModelConfig {
   return SherpaOnnxOfflineNemoEncDecCtcModelConfig(
@@ -392,7 +421,7 @@ func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
   )
 }
 
-func sherpaOnnxOfflineDolphinModelConfig(
+public func sherpaOnnxOfflineDolphinModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineDolphinModelConfig {
   return SherpaOnnxOfflineDolphinModelConfig(
@@ -400,7 +429,7 @@ func sherpaOnnxOfflineDolphinModelConfig(
   )
 }
 
-func sherpaOnnxOfflineWhisperModelConfig(
+public func sherpaOnnxOfflineWhisperModelConfig(
   encoder: String = "",
   decoder: String = "",
   language: String = "",
@@ -416,7 +445,7 @@ func sherpaOnnxOfflineWhisperModelConfig(
   )
 }
 
-func sherpaOnnxOfflineCanaryModelConfig(
+public func sherpaOnnxOfflineCanaryModelConfig(
   encoder: String = "",
   decoder: String = "",
   srcLang: String = "en",
@@ -432,7 +461,7 @@ func sherpaOnnxOfflineCanaryModelConfig(
   )
 }
 
-func sherpaOnnxOfflineFireRedAsrModelConfig(
+public func sherpaOnnxOfflineFireRedAsrModelConfig(
   encoder: String = "",
   decoder: String = ""
 ) -> SherpaOnnxOfflineFireRedAsrModelConfig {
@@ -442,7 +471,7 @@ func sherpaOnnxOfflineFireRedAsrModelConfig(
   )
 }
 
-func sherpaOnnxOfflineMoonshineModelConfig(
+public func sherpaOnnxOfflineMoonshineModelConfig(
   preprocessor: String = "",
   encoder: String = "",
   uncachedDecoder: String = "",
@@ -456,7 +485,7 @@ func sherpaOnnxOfflineMoonshineModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTdnnModelConfig(
+public func sherpaOnnxOfflineTdnnModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineTdnnModelConfig {
   return SherpaOnnxOfflineTdnnModelConfig(
@@ -464,7 +493,7 @@ func sherpaOnnxOfflineTdnnModelConfig(
   )
 }
 
-func sherpaOnnxOfflineSenseVoiceModelConfig(
+public func sherpaOnnxOfflineSenseVoiceModelConfig(
   model: String = "",
   language: String = "",
   useInverseTextNormalization: Bool = false
@@ -476,7 +505,7 @@ func sherpaOnnxOfflineSenseVoiceModelConfig(
   )
 }
 
-func sherpaOnnxOfflineLMConfig(
+public func sherpaOnnxOfflineLMConfig(
   model: String = "",
   scale: Float = 1.0
 ) -> SherpaOnnxOfflineLMConfig {
@@ -486,7 +515,7 @@ func sherpaOnnxOfflineLMConfig(
   )
 }
 
-func sherpaOnnxOfflineModelConfig(
+public func sherpaOnnxOfflineModelConfig(
   tokens: String,
   transducer: SherpaOnnxOfflineTransducerModelConfig = sherpaOnnxOfflineTransducerModelConfig(),
   paraformer: SherpaOnnxOfflineParaformerModelConfig = sherpaOnnxOfflineParaformerModelConfig(),
@@ -511,6 +540,8 @@ func sherpaOnnxOfflineModelConfig(
     sherpaOnnxOfflineWenetCtcModelConfig(),
   omnilingual: SherpaOnnxOfflineOmnilingualAsrCtcModelConfig =
     sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(),
+  funasrNano: SherpaOnnxOfflineFunASRNanoModelConfig =
+    sherpaOnnxOfflineFunASRNanoModelConfig(),
   medasr: SherpaOnnxOfflineMedAsrCtcModelConfig =
     sherpaOnnxOfflineMedAsrCtcModelConfig()
 ) -> SherpaOnnxOfflineModelConfig {
@@ -536,11 +567,12 @@ func sherpaOnnxOfflineModelConfig(
     canary: canary,
     wenet_ctc: wenetCtc,
     omnilingual: omnilingual,
+    funasr_nano: funasrNano,
     medasr: medasr
   )
 }
 
-func sherpaOnnxOfflineRecognizerConfig(
+public func sherpaOnnxOfflineRecognizerConfig(
   featConfig: SherpaOnnxFeatureConfig,
   modelConfig: SherpaOnnxOfflineModelConfig,
   lmConfig: SherpaOnnxOfflineLMConfig = sherpaOnnxOfflineLMConfig(),
@@ -568,7 +600,7 @@ func sherpaOnnxOfflineRecognizerConfig(
   )
 }
 
-class SherpaOnnxOfflineRecongitionResult {
+public class SherpaOnnxOfflineRecongitionResult {
   /// A pointer to the underlying counterpart in C
   let result: UnsafePointer<SherpaOnnxOfflineRecognizerResult>
 
@@ -635,7 +667,7 @@ class SherpaOnnxOfflineRecongitionResult {
   }
 }
 
-class SherpaOnnxOfflineRecognizer {
+public class SherpaOnnxOfflineRecognizer {
   /// A pointer to the underlying counterpart in C
   private let recognizer: OpaquePointer
 
@@ -681,7 +713,7 @@ class SherpaOnnxOfflineRecognizer {
   }
 }
 
-func sherpaOnnxSileroVadModelConfig(
+public func sherpaOnnxSileroVadModelConfig(
   model: String = "",
   threshold: Float = 0.5,
   minSilenceDuration: Float = 0.25,
@@ -699,7 +731,7 @@ func sherpaOnnxSileroVadModelConfig(
   )
 }
 
-func sherpaOnnxTenVadModelConfig(
+public func sherpaOnnxTenVadModelConfig(
   model: String = "",
   threshold: Float = 0.5,
   minSilenceDuration: Float = 0.25,
@@ -717,7 +749,7 @@ func sherpaOnnxTenVadModelConfig(
   )
 }
 
-func sherpaOnnxVadModelConfig(
+public func sherpaOnnxVadModelConfig(
   sileroVad: SherpaOnnxSileroVadModelConfig = sherpaOnnxSileroVadModelConfig(),
   sampleRate: Int32 = 16000,
   numThreads: Int = 1,
@@ -735,7 +767,7 @@ func sherpaOnnxVadModelConfig(
   )
 }
 
-class SherpaOnnxCircularBufferWrapper {
+public class SherpaOnnxCircularBufferWrapper {
   private let buffer: OpaquePointer
 
   init(capacity: Int) {
@@ -780,7 +812,7 @@ class SherpaOnnxCircularBufferWrapper {
   }
 }
 
-class SherpaOnnxSpeechSegmentWrapper {
+public class SherpaOnnxSpeechSegmentWrapper {
   private let p: UnsafePointer<SherpaOnnxSpeechSegment>
 
   init(p: UnsafePointer<SherpaOnnxSpeechSegment>) {
@@ -804,7 +836,7 @@ class SherpaOnnxSpeechSegmentWrapper {
   }()
 }
 
-class SherpaOnnxVoiceActivityDetectorWrapper {
+public class SherpaOnnxVoiceActivityDetectorWrapper {
   /// A pointer to the underlying counterpart in C
   private let vad: OpaquePointer
 
@@ -856,7 +888,7 @@ class SherpaOnnxVoiceActivityDetectorWrapper {
 }
 
 // offline tts
-func sherpaOnnxOfflineTtsVitsModelConfig(
+public func sherpaOnnxOfflineTtsVitsModelConfig(
   model: String = "",
   lexicon: String = "",
   tokens: String = "",
@@ -878,7 +910,7 @@ func sherpaOnnxOfflineTtsVitsModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsMatchaModelConfig(
+public func sherpaOnnxOfflineTtsMatchaModelConfig(
   acousticModel: String = "",
   vocoder: String = "",
   lexicon: String = "",
@@ -900,7 +932,7 @@ func sherpaOnnxOfflineTtsMatchaModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsKokoroModelConfig(
+public func sherpaOnnxOfflineTtsKokoroModelConfig(
   model: String = "",
   voices: String = "",
   tokens: String = "",
@@ -922,7 +954,7 @@ func sherpaOnnxOfflineTtsKokoroModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsKittenModelConfig(
+public func sherpaOnnxOfflineTtsKittenModelConfig(
   model: String = "",
   voices: String = "",
   tokens: String = "",
@@ -938,7 +970,7 @@ func sherpaOnnxOfflineTtsKittenModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsZipvoiceModelConfig(
+public func sherpaOnnxOfflineTtsZipvoiceModelConfig(
   tokens: String = "",
   encoder: String = "",
   decoder: String = "",
@@ -964,7 +996,7 @@ func sherpaOnnxOfflineTtsZipvoiceModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsModelConfig(
+public func sherpaOnnxOfflineTtsModelConfig(
   vits: SherpaOnnxOfflineTtsVitsModelConfig = sherpaOnnxOfflineTtsVitsModelConfig(),
   matcha: SherpaOnnxOfflineTtsMatchaModelConfig = sherpaOnnxOfflineTtsMatchaModelConfig(),
   kokoro: SherpaOnnxOfflineTtsKokoroModelConfig = sherpaOnnxOfflineTtsKokoroModelConfig(),
@@ -986,7 +1018,7 @@ func sherpaOnnxOfflineTtsModelConfig(
   )
 }
 
-func sherpaOnnxOfflineTtsConfig(
+public func sherpaOnnxOfflineTtsConfig(
   model: SherpaOnnxOfflineTtsModelConfig,
   ruleFsts: String = "",
   ruleFars: String = "",
@@ -1002,7 +1034,7 @@ func sherpaOnnxOfflineTtsConfig(
   )
 }
 
-class SherpaOnnxWaveWrapper {
+public class SherpaOnnxWaveWrapper {
   let wave: UnsafePointer<SherpaOnnxWave>!
 
   class func readWave(filename: String) -> SherpaOnnxWaveWrapper {
@@ -1037,7 +1069,7 @@ class SherpaOnnxWaveWrapper {
   }
 }
 
-class SherpaOnnxGeneratedAudioWrapper {
+public class SherpaOnnxGeneratedAudioWrapper {
   /// A pointer to the underlying counterpart in C
   let audio: UnsafePointer<SherpaOnnxGeneratedAudio>!
 
@@ -1072,7 +1104,7 @@ class SherpaOnnxGeneratedAudioWrapper {
   }
 }
 
-typealias TtsCallbackWithArg = (
+public typealias TtsCallbackWithArg = (
   @convention(c) (
     UnsafePointer<Float>?,  // const float* samples
     Int32,  // int32_t n
@@ -1080,7 +1112,7 @@ typealias TtsCallbackWithArg = (
   ) -> Int32
 )?
 
-class SherpaOnnxOfflineTtsWrapper {
+public class SherpaOnnxOfflineTtsWrapper {
   /// A pointer to the underlying counterpart in C
   let tts: OpaquePointer!
 
@@ -1118,7 +1150,7 @@ class SherpaOnnxOfflineTtsWrapper {
 
 // spoken language identification
 
-func sherpaOnnxSpokenLanguageIdentificationWhisperConfig(
+public func sherpaOnnxSpokenLanguageIdentificationWhisperConfig(
   encoder: String,
   decoder: String,
   tailPaddings: Int = -1
@@ -1129,7 +1161,7 @@ func sherpaOnnxSpokenLanguageIdentificationWhisperConfig(
     tail_paddings: Int32(tailPaddings))
 }
 
-func sherpaOnnxSpokenLanguageIdentificationConfig(
+public func sherpaOnnxSpokenLanguageIdentificationConfig(
   whisper: SherpaOnnxSpokenLanguageIdentificationWhisperConfig,
   numThreads: Int = 1,
   debug: Int = 0,
@@ -1142,7 +1174,7 @@ func sherpaOnnxSpokenLanguageIdentificationConfig(
     provider: toCPointer(provider))
 }
 
-class SherpaOnnxSpokenLanguageIdentificationResultWrapper {
+public class SherpaOnnxSpokenLanguageIdentificationResultWrapper {
   /// A pointer to the underlying counterpart in C
   let result: UnsafePointer<SherpaOnnxSpokenLanguageIdentificationResult>!
 
@@ -1167,7 +1199,7 @@ class SherpaOnnxSpokenLanguageIdentificationResultWrapper {
   }
 }
 
-class SherpaOnnxSpokenLanguageIdentificationWrapper {
+public class SherpaOnnxSpokenLanguageIdentificationWrapper {
   /// A pointer to the underlying counterpart in C
   let slid: OpaquePointer!
 
@@ -1201,19 +1233,19 @@ class SherpaOnnxSpokenLanguageIdentificationWrapper {
 
 // keyword spotting
 
-class SherpaOnnxKeywordResultWrapper {
+public class SherpaOnnxKeywordResultWrapper {
   /// A pointer to the underlying counterpart in C
-  let result: UnsafePointer<SherpaOnnxKeywordResult>!
+  public let result: UnsafePointer<SherpaOnnxKeywordResult>!
 
-  var keyword: String {
+  public var keyword: String {
     return String(cString: result.pointee.keyword)
   }
 
-  var count: Int32 {
+  public var count: Int32 {
     return result.pointee.count
   }
 
-  var tokens: [String] {
+  public var tokens: [String] {
     if let tokensPointer = result.pointee.tokens_arr {
       var tokens: [String] = []
       for index in 0..<count {
@@ -1229,7 +1261,7 @@ class SherpaOnnxKeywordResultWrapper {
     }
   }
 
-  init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
+  public init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
     self.result = result
   }
 
@@ -1240,7 +1272,7 @@ class SherpaOnnxKeywordResultWrapper {
   }
 }
 
-func sherpaOnnxKeywordSpotterConfig(
+public func sherpaOnnxKeywordSpotterConfig(
   featConfig: SherpaOnnxFeatureConfig,
   modelConfig: SherpaOnnxOnlineModelConfig,
   keywordsFile: String,
@@ -1264,12 +1296,12 @@ func sherpaOnnxKeywordSpotterConfig(
   )
 }
 
-class SherpaOnnxKeywordSpotterWrapper {
+public class SherpaOnnxKeywordSpotterWrapper {
   /// A pointer to the underlying counterpart in C
-  let spotter: OpaquePointer!
-  var stream: OpaquePointer!
+  public let spotter: OpaquePointer!
+  public var stream: OpaquePointer!
 
-  init(
+  public init(
     config: UnsafePointer<SherpaOnnxKeywordSpotterConfig>!
   ) {
     spotter = SherpaOnnxCreateKeywordSpotter(config)
@@ -1286,23 +1318,23 @@ class SherpaOnnxKeywordSpotterWrapper {
     }
   }
 
-  func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
+  public func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
     SherpaOnnxOnlineStreamAcceptWaveform(stream, Int32(sampleRate), samples, Int32(samples.count))
   }
 
-  func isReady() -> Bool {
+  public func isReady() -> Bool {
     return SherpaOnnxIsKeywordStreamReady(spotter, stream) == 1 ? true : false
   }
 
-  func decode() {
+  public func decode() {
     SherpaOnnxDecodeKeywordStream(spotter, stream)
   }
 
-  func reset() {
+  public func reset() {
     SherpaOnnxResetKeywordStream(spotter, stream)
   }
 
-  func getResult() -> SherpaOnnxKeywordResultWrapper {
+  public func getResult() -> SherpaOnnxKeywordResultWrapper {
     let result: UnsafePointer<SherpaOnnxKeywordResult>? = SherpaOnnxGetKeywordResult(
       spotter, stream)
     return SherpaOnnxKeywordResultWrapper(result: result)
@@ -1310,14 +1342,14 @@ class SherpaOnnxKeywordSpotterWrapper {
 
   /// Signal that no more audio samples would be available.
   /// After this call, you cannot call acceptWaveform() any more.
-  func inputFinished() {
+  public func inputFinished() {
     SherpaOnnxOnlineStreamInputFinished(stream)
   }
 }
 
 // Punctuation
 
-func sherpaOnnxOfflinePunctuationModelConfig(
+public func sherpaOnnxOfflinePunctuationModelConfig(
   ctTransformer: String,
   numThreads: Int = 1,
   debug: Int = 0,
@@ -1331,7 +1363,7 @@ func sherpaOnnxOfflinePunctuationModelConfig(
   )
 }
 
-func sherpaOnnxOfflinePunctuationConfig(
+public func sherpaOnnxOfflinePunctuationConfig(
   model: SherpaOnnxOfflinePunctuationModelConfig
 ) -> SherpaOnnxOfflinePunctuationConfig {
   return SherpaOnnxOfflinePunctuationConfig(
@@ -1339,7 +1371,7 @@ func sherpaOnnxOfflinePunctuationConfig(
   )
 }
 
-class SherpaOnnxOfflinePunctuationWrapper {
+public class SherpaOnnxOfflinePunctuationWrapper {
   /// A pointer to the underlying counterpart in C
   let ptr: OpaquePointer!
 
@@ -1364,7 +1396,7 @@ class SherpaOnnxOfflinePunctuationWrapper {
   }
 }
 
-func sherpaOnnxOnlinePunctuationModelConfig(
+public func sherpaOnnxOnlinePunctuationModelConfig(
   cnnBiLstm: String,
   bpeVocab: String,
   numThreads: Int = 1,
@@ -1379,13 +1411,13 @@ func sherpaOnnxOnlinePunctuationModelConfig(
     provider: toCPointer(provider))
 }
 
-func sherpaOnnxOnlinePunctuationConfig(
+public func sherpaOnnxOnlinePunctuationConfig(
   model: SherpaOnnxOnlinePunctuationModelConfig
 ) -> SherpaOnnxOnlinePunctuationConfig {
   return SherpaOnnxOnlinePunctuationConfig(model: model)
 }
 
-class SherpaOnnxOnlinePunctuationWrapper {
+public class SherpaOnnxOnlinePunctuationWrapper {
   /// A pointer to the underlying counterpart in C
   let ptr: OpaquePointer!
 
@@ -1410,13 +1442,13 @@ class SherpaOnnxOnlinePunctuationWrapper {
   }
 }
 
-func sherpaOnnxOfflineSpeakerSegmentationPyannoteModelConfig(model: String)
+public func sherpaOnnxOfflineSpeakerSegmentationPyannoteModelConfig(model: String)
   -> SherpaOnnxOfflineSpeakerSegmentationPyannoteModelConfig
 {
   return SherpaOnnxOfflineSpeakerSegmentationPyannoteModelConfig(model: toCPointer(model))
 }
 
-func sherpaOnnxOfflineSpeakerSegmentationModelConfig(
+public func sherpaOnnxOfflineSpeakerSegmentationModelConfig(
   pyannote: SherpaOnnxOfflineSpeakerSegmentationPyannoteModelConfig,
   numThreads: Int = 1,
   debug: Int = 0,
@@ -1430,13 +1462,13 @@ func sherpaOnnxOfflineSpeakerSegmentationModelConfig(
   )
 }
 
-func sherpaOnnxFastClusteringConfig(numClusters: Int = -1, threshold: Float = 0.5)
+public func sherpaOnnxFastClusteringConfig(numClusters: Int = -1, threshold: Float = 0.5)
   -> SherpaOnnxFastClusteringConfig
 {
   return SherpaOnnxFastClusteringConfig(num_clusters: Int32(numClusters), threshold: threshold)
 }
 
-func sherpaOnnxSpeakerEmbeddingExtractorConfig(
+public func sherpaOnnxSpeakerEmbeddingExtractorConfig(
   model: String,
   numThreads: Int = 1,
   debug: Int = 0,
@@ -1450,7 +1482,7 @@ func sherpaOnnxSpeakerEmbeddingExtractorConfig(
   )
 }
 
-func sherpaOnnxOfflineSpeakerDiarizationConfig(
+public func sherpaOnnxOfflineSpeakerDiarizationConfig(
   segmentation: SherpaOnnxOfflineSpeakerSegmentationModelConfig,
   embedding: SherpaOnnxSpeakerEmbeddingExtractorConfig,
   clustering: SherpaOnnxFastClusteringConfig,
@@ -1466,13 +1498,13 @@ func sherpaOnnxOfflineSpeakerDiarizationConfig(
   )
 }
 
-struct SherpaOnnxOfflineSpeakerDiarizationSegmentWrapper {
+public struct SherpaOnnxOfflineSpeakerDiarizationSegmentWrapper {
   var start: Float = 0
   var end: Float = 0
   var speaker: Int = 0
 }
 
-class SherpaOnnxOfflineSpeakerDiarizationWrapper {
+public class SherpaOnnxOfflineSpeakerDiarizationWrapper {
   /// A pointer to the underlying counterpart in C
   let impl: OpaquePointer!
 
@@ -1528,7 +1560,7 @@ class SherpaOnnxOfflineSpeakerDiarizationWrapper {
   }
 }
 
-class SherpaOnnxOnlineStreamWrapper {
+public class SherpaOnnxOnlineStreamWrapper {
   /// A pointer to the underlying counterpart in C
   let impl: OpaquePointer!
   init(impl: OpaquePointer!) {
@@ -1550,7 +1582,7 @@ class SherpaOnnxOnlineStreamWrapper {
   }
 }
 
-class SherpaOnnxSpeakerEmbeddingExtractorWrapper {
+public class SherpaOnnxSpeakerEmbeddingExtractorWrapper {
   /// A pointer to the underlying counterpart in C
   let impl: OpaquePointer!
 
@@ -1594,13 +1626,13 @@ class SherpaOnnxSpeakerEmbeddingExtractorWrapper {
   }
 }
 
-func sherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig(model: String = "")
+public func sherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig(model: String = "")
   -> SherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig
 {
   return SherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig(model: toCPointer(model))
 }
 
-func sherpaOnnxOfflineSpeechDenoiserModelConfig(
+public func sherpaOnnxOfflineSpeechDenoiserModelConfig(
   gtcrn: SherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig =
     sherpaOnnxOfflineSpeechDenoiserGtcrnModelConfig(),
   numThreads: Int = 1,
@@ -1615,7 +1647,7 @@ func sherpaOnnxOfflineSpeechDenoiserModelConfig(
   )
 }
 
-func sherpaOnnxOfflineSpeechDenoiserConfig(
+public func sherpaOnnxOfflineSpeechDenoiserConfig(
   model: SherpaOnnxOfflineSpeechDenoiserModelConfig =
     sherpaOnnxOfflineSpeechDenoiserModelConfig()
 ) -> SherpaOnnxOfflineSpeechDenoiserConfig {
@@ -1623,7 +1655,7 @@ func sherpaOnnxOfflineSpeechDenoiserConfig(
     model: model)
 }
 
-class SherpaOnnxDenoisedAudioWrapper {
+public class SherpaOnnxDenoisedAudioWrapper {
   /// A pointer to the underlying counterpart in C
   let audio: UnsafePointer<SherpaOnnxDenoisedAudio>!
 
@@ -1663,7 +1695,7 @@ class SherpaOnnxDenoisedAudioWrapper {
   }
 }
 
-class SherpaOnnxOfflineSpeechDenoiserWrapper {
+public class SherpaOnnxOfflineSpeechDenoiserWrapper {
   /// A pointer to the underlying counterpart in C
   let impl: OpaquePointer!
 
@@ -1692,14 +1724,14 @@ class SherpaOnnxOfflineSpeechDenoiserWrapper {
   }
 }
 
-func getSherpaOnnxVersion() -> String {
+public func getSherpaOnnxVersion() -> String {
   return String(cString: SherpaOnnxGetVersionStr())
 }
 
-func getSherpaOnnxGitSha1() -> String {
+public func getSherpaOnnxGitSha1() -> String {
   return String(cString: SherpaOnnxGetGitSha1())
 }
 
-func getSherpaOnnxGitDate() -> String {
+public func getSherpaOnnxGitDate() -> String {
   return String(cString: SherpaOnnxGetGitDate())
 }

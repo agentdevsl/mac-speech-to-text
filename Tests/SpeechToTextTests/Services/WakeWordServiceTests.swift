@@ -1,7 +1,20 @@
 import XCTest
 @testable import SpeechToText
+import SherpaOnnxSwift
+import AVFoundation
 
 final class WakeWordServiceTests: XCTestCase {
+
+    // MARK: - Test Helpers
+
+    /// A keyword with valid BPE mapping for use in tests
+    /// Note: "Hey Claude" doesn't have a valid BPE mapping, so we use "hey siri" instead
+    private static let validTestKeyword = TriggerKeyword(
+        phrase: "hey siri",
+        boostingScore: 1.5,
+        triggerThreshold: 0.35,
+        isEnabled: true
+    )
 
     // MARK: - Initialization Tests
 
@@ -31,7 +44,8 @@ final class WakeWordServiceTests: XCTestCase {
         let tempModelPath = createTempModelDirectory()
         defer { cleanupTempDirectory(tempModelPath) }
 
-        let keywords = [TriggerKeyword.heyClaudeDefault]
+        // Use a keyword with valid BPE mapping
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.35, isEnabled: true)]
 
         // When
         try await service.initialize(modelPath: tempModelPath, keywords: keywords)
@@ -47,28 +61,15 @@ final class WakeWordServiceTests: XCTestCase {
         let tempModelPath = createTempModelDirectory()
         defer { cleanupTempDirectory(tempModelPath) }
 
+        // Use keywords with valid BPE mappings
         let keywords = [
-            TriggerKeyword.heyClaudeDefault,
-            TriggerKeyword.claudePreset,
-            TriggerKeyword.opusPreset
+            TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.35, isEnabled: true),
+            TriggerKeyword(phrase: "hello world", boostingScore: 1.3, triggerThreshold: 0.4, isEnabled: true),
+            TriggerKeyword(phrase: "hi google", boostingScore: 1.3, triggerThreshold: 0.4, isEnabled: true)
         ]
-        // Enable all keywords
-        var enabledKeywords = keywords
-        enabledKeywords[1] = TriggerKeyword(
-            phrase: "Claude",
-            boostingScore: 1.3,
-            triggerThreshold: 0.4,
-            isEnabled: true
-        )
-        enabledKeywords[2] = TriggerKeyword(
-            phrase: "Opus",
-            boostingScore: 1.3,
-            triggerThreshold: 0.4,
-            isEnabled: true
-        )
 
         // When
-        try await service.initialize(modelPath: tempModelPath, keywords: enabledKeywords)
+        try await service.initialize(modelPath: tempModelPath, keywords: keywords)
 
         // Then
         let isInitialized = await service.isInitialized
@@ -81,7 +82,7 @@ final class WakeWordServiceTests: XCTestCase {
         // Given
         let service = WakeWordService()
         let invalidPath = "/nonexistent/path/to/model"
-        let keywords = [TriggerKeyword.heyClaudeDefault]
+        let keywords = [Self.validTestKeyword]
 
         // When/Then
         do {
@@ -102,7 +103,7 @@ final class WakeWordServiceTests: XCTestCase {
         // Given
         let service = WakeWordService()
         let emptyPath = ""
-        let keywords = [TriggerKeyword.heyClaudeDefault]
+        let keywords = [Self.validTestKeyword]
 
         // When/Then
         do {
@@ -242,7 +243,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // When
@@ -260,7 +261,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // When
@@ -281,7 +282,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         let samples: [Float] = Array(repeating: 0.3, count: 1600)
 
@@ -305,7 +306,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         let initialState = await service.isInitialized
         XCTAssertTrue(initialState)
@@ -330,7 +331,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // When/Then
@@ -350,7 +351,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         // When/Then
         do {
-            try await service.updateKeywords([TriggerKeyword.heyClaudeDefault])
+            try await service.updateKeywords([Self.validTestKeyword])
             XCTFail("Should throw initializationFailed error")
         } catch let error as WakeWordError {
             if case .initializationFailed = error {
@@ -371,7 +372,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // Process some frames
@@ -384,7 +385,8 @@ final class WakeWordServiceTests: XCTestCase {
 
         // When - updateKeywords calls shutdown which clears state, then re-initializes
         // Note: Statistics are intentionally preserved across shutdown/reinitialize cycles
-        try await service.updateKeywords([TriggerKeyword(phrase: "New Keyword", isEnabled: true)])
+        // Use a keyword with a valid BPE mapping (lowercase for BPE lookup)
+        try await service.updateKeywords([TriggerKeyword(phrase: "hello world", isEnabled: true)])
 
         // Process a frame after update
         _ = await service.processFrame(samples)
@@ -404,7 +406,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         let initialState = await service.isInitialized
         XCTAssertTrue(initialState)
@@ -425,7 +427,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // When/Then - Should not crash
@@ -445,14 +447,14 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         await service.shutdown()
 
-        // When
+        // When - use a different keyword with a valid BPE mapping
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword(phrase: "New Phrase", isEnabled: true)]
+            keywords: [TriggerKeyword(phrase: "hello world", isEnabled: true)]
         )
 
         // Then
@@ -468,7 +470,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         await service.shutdown()
         let samples: [Float] = Array(repeating: 0.5, count: 1600)
@@ -502,7 +504,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         let samples: [Float] = Array(repeating: 0.5, count: 1600)
 
@@ -524,7 +526,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
         let samples: [Float] = Array(repeating: 0.5, count: 1600)
 
@@ -552,7 +554,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         // When
@@ -643,8 +645,9 @@ final class WakeWordServiceTests: XCTestCase {
         let tempModelPath = createTempModelDirectory()
         defer { cleanupTempDirectory(tempModelPath) }
 
+        // Use a keyword with BPE mapping but with mixed case to test lowercasing
         let keyword = TriggerKeyword(
-            phrase: "Hey CLAUDE Test",
+            phrase: "Hey SIRI",  // Should lowercase to "hey siri" which has BPE mapping
             boostingScore: 1.5,
             triggerThreshold: 0.35,
             isEnabled: true
@@ -766,7 +769,7 @@ final class WakeWordServiceTests: XCTestCase {
 
         try await service.initialize(
             modelPath: tempModelPath,
-            keywords: [TriggerKeyword.heyClaudeDefault]
+            keywords: [Self.validTestKeyword]
         )
 
         let samples: [Float] = Array(repeating: 0.5, count: 1600)
@@ -801,7 +804,7 @@ final class WakeWordServiceTests: XCTestCase {
                     if i % 2 == 0 {
                         try? await service.initialize(
                             modelPath: tempModelPath,
-                            keywords: [TriggerKeyword.heyClaudeDefault]
+                            keywords: [Self.validTestKeyword]
                         )
                     } else {
                         await service.shutdown()
@@ -814,6 +817,424 @@ final class WakeWordServiceTests: XCTestCase {
         // No crash should occur
         let isInitialized = await service.isInitialized
         XCTAssertTrue(isInitialized == true || isInitialized == false)
+    }
+
+    // MARK: - Integration Tests with Real Model
+
+    /// Test that the service can initialize with the real sherpa-onnx model
+    func test_integration_initializeWithRealModel_succeeds() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            // Skip test if model not available
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+
+        // Use a keyword with BPE mapping
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+
+        // When
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        // Then
+        let isInitialized = await service.isInitialized
+        XCTAssertTrue(isInitialized, "Service should be initialized with real model")
+
+        // Cleanup
+        await service.shutdown()
+    }
+
+    /// Test that the service can process audio frames without crashing
+    func test_integration_processFrame_withRealModel_doesNotCrash() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        // Create synthetic audio frames (silence)
+        let silentFrame: [Float] = Array(repeating: 0.0, count: 1600) // 100ms at 16kHz
+
+        // When - process multiple frames
+        for _ in 0..<10 {
+            let result = await service.processFrame(silentFrame)
+            // Silent audio should not trigger detection
+            XCTAssertNil(result, "Silent audio should not trigger keyword detection")
+        }
+
+        // Then - verify statistics were updated
+        let stats = await service.getStatistics()
+        XCTAssertEqual(stats.framesProcessed, 10, "Should have processed 10 frames")
+
+        // Cleanup
+        await service.shutdown()
+    }
+
+    /// Test keyword detection with the test WAV files bundled with the model
+    func test_integration_detectKeyword_lightUp_fromTestWav() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given - use the test keywords file format which has "LIGHT UP"
+        let service = WakeWordService()
+
+        // Write keywords in the correct BPE format for "light up"
+        // From test_keywords.txt: ▁ L IGHT ▁UP
+        let keywordsContent = "▁ L IGHT ▁UP :1.5 #0.25"
+        let keywordsFilePath = try await service.writeKeywordsToTempFile(keywordsContent)
+
+        // Need to initialize the service manually since we have custom keywords file
+        // For this test, we'll use a simpler approach with direct model initialization
+
+        // First try to detect "light up" keyword using the provided test keywords
+        let testKeywordsPath = (modelPath as NSString).appendingPathComponent("test_wavs/test_keywords.txt")
+        guard FileManager.default.fileExists(atPath: testKeywordsPath) else {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Test keywords file not found")
+        }
+
+        // Read the test WAV file using AVFoundation
+        let testWavPath = (modelPath as NSString).appendingPathComponent("test_wavs/0.wav")
+        guard FileManager.default.fileExists(atPath: testWavPath) else {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Test WAV file not found")
+        }
+
+        // Read WAV file using AVFoundation
+        let testWavURL = URL(fileURLWithPath: testWavPath)
+        let audioFile: AVAudioFile
+        do {
+            audioFile = try AVAudioFile(forReading: testWavURL)
+        } catch {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Failed to read test WAV file: \(error)")
+        }
+
+        let audioFormat = audioFile.processingFormat
+        let frameCount = UInt32(audioFile.length)
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: frameCount) else {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Failed to create audio buffer")
+        }
+
+        do {
+            try audioFile.read(into: buffer)
+        } catch {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Failed to read audio into buffer: \(error)")
+        }
+
+        // Convert to Float array
+        guard let floatData = buffer.floatChannelData else {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            throw XCTSkip("Failed to get float channel data")
+        }
+        let samples = Array(UnsafeBufferPointer(start: floatData[0], count: Int(buffer.frameLength)))
+
+        // Create a spotter directly with the test keywords
+        let tokensPath = (modelPath as NSString).appendingPathComponent("tokens.txt")
+        let encoderPath = (modelPath as NSString).appendingPathComponent(
+            "encoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+        )
+        let decoderPath = (modelPath as NSString).appendingPathComponent(
+            "decoder-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+        )
+        let joinerPath = (modelPath as NSString).appendingPathComponent(
+            "joiner-epoch-12-avg-2-chunk-16-left-64.int8.onnx"
+        )
+
+        let featConfig = sherpaOnnxFeatureConfig(sampleRate: 16000, featureDim: 80)
+        let transducerConfig = sherpaOnnxOnlineTransducerModelConfig(
+            encoder: encoderPath,
+            decoder: decoderPath,
+            joiner: joinerPath
+        )
+        let modelConfig = sherpaOnnxOnlineModelConfig(
+            tokens: tokensPath,
+            transducer: transducerConfig,
+            numThreads: 2,
+            provider: "cpu",
+            debug: 0,
+            modelType: "zipformer2"
+        )
+
+        var config = sherpaOnnxKeywordSpotterConfig(
+            featConfig: featConfig,
+            modelConfig: modelConfig,
+            keywordsFile: testKeywordsPath,
+            maxActivePaths: 4,
+            numTrailingBlanks: 1,
+            keywordsScore: 1.0,
+            keywordsThreshold: 0.25
+        )
+
+        let spotter = SherpaOnnxKeywordSpotterWrapper(config: &config)
+        guard spotter.spotter != nil, spotter.stream != nil else {
+            try? FileManager.default.removeItem(atPath: keywordsFilePath)
+            XCTFail("Failed to create keyword spotter")
+            return
+        }
+
+        // When - process the audio
+        spotter.acceptWaveform(samples: samples)
+
+        // Add tail padding to ensure detection
+        let tailPadding = [Float](repeating: 0.0, count: 3200) // 200ms
+        spotter.acceptWaveform(samples: tailPadding)
+        spotter.inputFinished()
+
+        // Decode and check for detections
+        var detectedKeywords: [String] = []
+        while spotter.isReady() {
+            spotter.decode()
+            let result = spotter.getResult()
+            let keyword = result.keyword
+            if !keyword.isEmpty {
+                detectedKeywords.append(keyword)
+                spotter.reset()
+            }
+        }
+
+        // Then - should detect "light up" keyword (it's in the 0.wav file)
+        // The audio says "AFTER EARLY NIGHTFALL THE YELLOW LAMPS WOULD LIGHT UP..."
+        XCTAssertFalse(detectedKeywords.isEmpty, "Should detect at least one keyword from test audio")
+
+        // Cleanup
+        try? FileManager.default.removeItem(atPath: keywordsFilePath)
+    }
+
+    /// Test that shutdown properly releases resources after processing
+    func test_integration_shutdown_afterProcessing_releasesResources() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        // Process some audio
+        let samples: [Float] = Array(repeating: 0.1, count: 1600)
+        _ = await service.processFrame(samples)
+        _ = await service.processFrame(samples)
+
+        let statsBeforeShutdown = await service.getStatistics()
+        XCTAssertGreaterThan(statsBeforeShutdown.framesProcessed, 0)
+
+        // When
+        await service.shutdown()
+
+        // Then
+        let isInitialized = await service.isInitialized
+        XCTAssertFalse(isInitialized, "Service should not be initialized after shutdown")
+
+        // Processing should return nil after shutdown
+        let result = await service.processFrame(samples)
+        XCTAssertNil(result, "Processing should return nil after shutdown")
+    }
+
+    /// Test multiple initialize-shutdown cycles with real model
+    func test_integration_multipleInitShutdownCycles_succeeds() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+
+        // Cycle 1
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+        var isInit = await service.isInitialized
+        XCTAssertTrue(isInit)
+        await service.shutdown()
+        isInit = await service.isInitialized
+        XCTAssertFalse(isInit)
+
+        // Cycle 2
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+        isInit = await service.isInitialized
+        XCTAssertTrue(isInit)
+
+        // Process some audio in cycle 2
+        let samples: [Float] = Array(repeating: 0.0, count: 1600)
+        _ = await service.processFrame(samples)
+
+        await service.shutdown()
+        isInit = await service.isInitialized
+        XCTAssertFalse(isInit)
+
+        // Cycle 3
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+        isInit = await service.isInitialized
+        XCTAssertTrue(isInit)
+
+        await service.shutdown()
+    }
+
+    /// Test updateKeywords with real model
+    func test_integration_updateKeywords_withRealModel_succeeds() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let initialKeywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: initialKeywords)
+
+        // Process some audio
+        let samples: [Float] = Array(repeating: 0.0, count: 1600)
+        _ = await service.processFrame(samples)
+
+        // When - update to different keywords
+        let newKeywords = [
+            TriggerKeyword(phrase: "hello world", boostingScore: 1.3, triggerThreshold: 0.3, isEnabled: true),
+            TriggerKeyword(phrase: "hi google", boostingScore: 1.3, triggerThreshold: 0.3, isEnabled: true)
+        ]
+        try await service.updateKeywords(newKeywords)
+
+        // Then
+        let isInitialized = await service.isInitialized
+        XCTAssertTrue(isInitialized, "Service should remain initialized after keyword update")
+
+        // Can still process audio
+        let result = await service.processFrame(samples)
+        XCTAssertNil(result) // Silent audio, no detection expected
+
+        // Cleanup
+        await service.shutdown()
+    }
+
+    /// Test processing streaming audio chunks (simulating real-time audio)
+    func test_integration_streamingAudioProcessing_handlesChunksCorrectly() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        // Simulate streaming audio with varying chunk sizes (common in real audio pipelines)
+        let chunkSizes = [160, 320, 480, 640, 800, 1600, 3200] // Various chunk sizes
+
+        // When - process audio in varying chunk sizes
+        for chunkSize in chunkSizes {
+            let chunk: [Float] = Array(repeating: 0.0, count: chunkSize)
+            let result = await service.processFrame(chunk)
+            XCTAssertNil(result, "Silent audio should not trigger detection")
+        }
+
+        // Then - verify all chunks were processed
+        let stats = await service.getStatistics()
+        XCTAssertEqual(stats.framesProcessed, chunkSizes.count, "Should process all chunk sizes")
+
+        // Cleanup
+        await service.shutdown()
+    }
+
+    /// Test concurrent frame processing is thread-safe with real model
+    func test_integration_concurrentProcessing_isThreadSafe() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        let samples: [Float] = Array(repeating: 0.0, count: 1600)
+        let iterations = 50
+
+        // When - concurrent frame processing
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<iterations {
+                group.addTask {
+                    _ = await service.processFrame(samples)
+                }
+            }
+        }
+
+        // Then - all frames should be processed
+        let stats = await service.getStatistics()
+        XCTAssertEqual(stats.framesProcessed, iterations, "All concurrent frames should be processed")
+
+        // Cleanup
+        await service.shutdown()
+    }
+
+    /// Test that the service handles model files being present but potentially corrupted
+    func test_integration_modelValidation_checksRequiredFiles() async throws {
+        // Given - create a temp directory with only partial model files
+        let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "partial_model_\(UUID().uuidString)"
+        )
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Create only tokens.txt (missing encoder, decoder, joiner)
+        let tokensPath = tempDir.appendingPathComponent("tokens.txt")
+        try "test".write(to: tokensPath, atomically: true, encoding: .utf8)
+
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+
+        // When/Then - should fail because encoder is missing
+        do {
+            try await service.initialize(modelPath: tempDir.path, keywords: keywords)
+            XCTFail("Should throw error for missing model files")
+        } catch let error as WakeWordError {
+            if case .modelNotFound(let path) = error {
+                XCTAssertTrue(path.contains("encoder"), "Error should mention missing encoder file")
+            } else {
+                XCTFail("Expected modelNotFound error, got: \(error)")
+            }
+        }
+    }
+
+    /// Test processing a known audio pattern (synthetic tone)
+    func test_integration_syntheticAudio_processesWithoutError() async throws {
+        guard let modelPath = getRealModelDirectory() else {
+            throw XCTSkip("sherpa-onnx model not available at expected path")
+        }
+
+        // Given
+        let service = WakeWordService()
+        let keywords = [TriggerKeyword(phrase: "hey siri", boostingScore: 1.5, triggerThreshold: 0.25, isEnabled: true)]
+        try await service.initialize(modelPath: modelPath, keywords: keywords)
+
+        // Create a synthetic audio signal (440Hz sine wave at 16kHz sample rate)
+        let sampleRate: Float = 16000.0
+        let frequency: Float = 440.0
+        let duration: Float = 0.1 // 100ms
+        let numSamples = Int(sampleRate * duration)
+
+        var syntheticAudio: [Float] = []
+        for i in 0..<numSamples {
+            let t = Float(i) / sampleRate
+            let sample = 0.5 * sin(2.0 * Float.pi * frequency * t)
+            syntheticAudio.append(sample)
+        }
+
+        // When - process the synthetic audio
+        let result = await service.processFrame(syntheticAudio)
+
+        // Then - should not crash and should not detect keyword in pure tone
+        XCTAssertNil(result, "Pure tone should not trigger keyword detection")
+
+        let stats = await service.getStatistics()
+        XCTAssertEqual(stats.framesProcessed, 1)
+
+        // Cleanup
+        await service.shutdown()
     }
 
     // MARK: - TriggerKeyword Tests
@@ -879,7 +1300,7 @@ final class WakeWordServiceTests: XCTestCase {
     }
 
     func test_triggerKeyword_presets_exist() {
-        // Then
+        // Then - verify the actual presets defined in TriggerKeyword
         XCTAssertNotNil(TriggerKeyword.heyClaudeDefault)
         XCTAssertNotNil(TriggerKeyword.claudePreset)
         XCTAssertNotNil(TriggerKeyword.opusPreset)
@@ -887,7 +1308,7 @@ final class WakeWordServiceTests: XCTestCase {
     }
 
     func test_triggerKeyword_heyClaudeDefault_hasCorrectValues() {
-        // Given
+        // Given - test the actual TriggerKeyword.heyClaudeDefault preset
         let keyword = TriggerKeyword.heyClaudeDefault
 
         // Then
@@ -897,10 +1318,99 @@ final class WakeWordServiceTests: XCTestCase {
         XCTAssertTrue(keyword.isEnabled)
     }
 
+    func test_validTestKeyword_hasCorrectValues() {
+        // Given - verify test helper keyword with valid BPE mapping
+        let keyword = Self.validTestKeyword
+
+        // Then
+        XCTAssertEqual(keyword.phrase, "hey siri")
+        XCTAssertEqual(keyword.boostingScore, 1.5)
+        XCTAssertEqual(keyword.triggerThreshold, 0.35)
+        XCTAssertTrue(keyword.isEnabled)
+    }
+
     // MARK: - Helper Methods
 
-    /// Creates a temporary directory to simulate a model path
+    /// Returns the path to the real sherpa-onnx KWS model directory
+    ///
+    /// The model files are located at:
+    /// `Sources/Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/`
+    /// (or legacy location: `Resources/Models/kws/...`)
+    ///
+    /// - Note: For tests that don't require actual model initialization,
+    ///   use `createTempModelDirectory()` instead to create a mock directory.
+    private func getRealModelDirectory() -> String? {
+        // Try to find the model directory relative to the package root
+        // In tests, we may be running from different working directories
+
+        // Option 1: Check relative to current file
+        let currentFile = #file
+        let testsDir = (currentFile as NSString).deletingLastPathComponent  // Services
+        let speechToTextTestsDir = (testsDir as NSString).deletingLastPathComponent  // SpeechToTextTests
+        let testsRootDir = (speechToTextTestsDir as NSString).deletingLastPathComponent  // Tests
+        let packageRoot = (testsRootDir as NSString).deletingLastPathComponent  // package root
+
+        // Primary location: Sources/Resources/Models (SPM bundle resources)
+        let modelPathSources = (packageRoot as NSString).appendingPathComponent(
+            "Sources/Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        )
+
+        if FileManager.default.fileExists(atPath: modelPathSources) {
+            return modelPathSources
+        }
+
+        // Legacy location: Resources/Models (fallback)
+        let modelPath = (packageRoot as NSString).appendingPathComponent(
+            "Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        )
+
+        if FileManager.default.fileExists(atPath: modelPath) {
+            return modelPath
+        }
+
+        // Option 2: Try common paths when running from Xcode
+        let possiblePaths = [
+            "/Users/simon.lynch/git/mac-speech-to-text/Sources/Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+            "/Users/simon.lynch/git/mac-speech-to-text/Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+            "./Sources/Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+            "./Resources/Models/kws/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        ]
+
+        for path in possiblePaths where FileManager.default.fileExists(atPath: path) {
+            return path
+        }
+
+        return nil
+    }
+
+    /// Creates a temporary directory to simulate a model path for unit tests
+    ///
+    /// This uses the real model directory if available, which enables full integration testing.
+    /// Tests that use this method should use keywords that have valid BPE mappings
+    /// (e.g., "hey siri", "hello world", "hi google").
+    ///
+    /// - Note: Use `createMockModelDirectory()` for tests that need to use arbitrary keywords
+    ///   like "Hey Claude" which don't have valid BPE mappings in the model.
     private func createTempModelDirectory() -> String {
+        // Use real model directory to enable integration testing
+        if let realModelPath = getRealModelDirectory() {
+            return realModelPath
+        }
+
+        // Fallback to mock directory if real model not available
+        return createMockModelDirectory()
+    }
+
+    /// Creates a mock model directory for unit tests that don't need real model functionality
+    ///
+    /// This is used for tests that:
+    /// - Test error handling (invalid paths, empty keywords)
+    /// - Use arbitrary keywords that don't have valid BPE mappings
+    /// - Don't need actual sherpa-onnx model initialization
+    ///
+    /// - Note: Tests using this directory will have a stub "initialized" state but
+    ///   processFrame() will use a simulated path without real sherpa-onnx processing.
+    private func createMockModelDirectory() -> String {
         let tempDir = FileManager.default.temporaryDirectory
         let modelPath = tempDir.appendingPathComponent("test_wake_model_\(UUID().uuidString)")
 
@@ -913,8 +1423,12 @@ final class WakeWordServiceTests: XCTestCase {
         return modelPath.path
     }
 
-    /// Cleans up the temporary directory
+    /// Cleans up the temporary directory (only if it's a temp directory, not the real model path)
     private func cleanupTempDirectory(_ path: String) {
+        // Don't delete the real model directory
+        if let realPath = getRealModelDirectory(), path == realPath {
+            return
+        }
         try? FileManager.default.removeItem(atPath: path)
     }
 }

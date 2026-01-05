@@ -61,7 +61,10 @@ class AppState {
         ) { [weak self] notification in
             guard let self else { return }
             if let state = notification.userInfo?["state"] as? VoiceTriggerState {
-                self.voiceTriggerState = state
+                // Use Task to hop to MainActor for thread-safe property mutation
+                Task { @MainActor [weak self] in
+                    self?.voiceTriggerState = state
+                }
             }
         }
         voiceTriggerStateObserver = observer

@@ -171,9 +171,15 @@ final class VoiceTriggerMonitoringService {
             try await wakeWordService.initialize(modelPath: modelPath, keywords: activeKeywords)
 
             // Start audio capture for wake word processing
-            try await audioService.startCapture { @Sendable [weak self] level in
-                Task { @MainActor in self?.handleAudioLevel(level) }
-            }
+            // Pass both level callback (for visualization) and buffer callback (for wake word detection)
+            try await audioService.startCapture(
+                levelCallback: { @Sendable [weak self] level in
+                    Task { @MainActor in self?.handleAudioLevel(level) }
+                },
+                bufferCallback: { @Sendable [weak self] buffer in
+                    Task { @MainActor in self?.handleAudioBuffer(buffer) }
+                }
+            )
 
             // Transition to monitoring state
             AppLogger.stateChange(AppLogger.service, from: state, to: VoiceTriggerState.monitoring, context: "startMonitoring")
@@ -195,26 +201,46 @@ final class VoiceTriggerMonitoringService {
         if let bundlePath = Bundle.main.resourcePath {
             let modelPath = "\(bundlePath)/wake_word_model"
             if FileManager.default.fileExists(atPath: modelPath) {
+                AppLogger.debug(AppLogger.service, "[\(serviceId)] Found wake word model in bundle: \(modelPath)")
                 return modelPath
             }
+            AppLogger.warning(AppLogger.service, "[\(serviceId)] Wake word model not found in bundle at: \(modelPath)")
         }
 
         // Fall back to Application Support directory
         if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
             let modelPath = appSupport.appendingPathComponent("SpeechToText/wake_word_model").path
-            return modelPath
+            if FileManager.default.fileExists(atPath: modelPath) {
+                AppLogger.debug(AppLogger.service, "[\(serviceId)] Found wake word model in Application Support: \(modelPath)")
+                return modelPath
+            }
+            AppLogger.warning(
+                AppLogger.service,
+                "[\(serviceId)] Wake word model not found in Application Support, falling back to temp directory"
+            )
         }
 
         // Last resort: use temp directory (for development/testing)
-        return FileManager.default.temporaryDirectory.appendingPathComponent("wake_word_model").path
+        let tempPath = FileManager.default.temporaryDirectory.appendingPathComponent("wake_word_model").path
+        AppLogger.warning(
+            AppLogger.service,
+            "[\(serviceId)] Using temp directory for wake word model (development only): \(tempPath)"
+        )
+        return tempPath
     }
 
     /// Stop voice trigger monitoring
     ///
     /// Stops all monitoring activity and returns to idle state.
     /// Any in-progress capture or transcription is cancelled.
-    func stopMonitoring() {
+    func stopMonitoring() async {
         AppLogger.info(AppLogger.service, "[\(serviceId)] stopMonitoring() called, state=\(state.description)")
+
+        // Prevent double-stop
+        guard state != .idle else {
+            AppLogger.debug(AppLogger.service, "[\(serviceId)] Already idle, skipping stopMonitoring")
+            return
+        }
 
         // Stop timers
         silenceTimer?.invalidate()
@@ -224,12 +250,9 @@ final class VoiceTriggerMonitoringService {
         maxDurationTimer = nil
         deinitMaxDurationTimer = nil
 
-        // Stop services (fire and forget - we're stopping anyway)
-        Task { [weak self] in
-            guard let self else { return }
-            await self.wakeWordService.shutdown()
-            _ = try? await self.audioService.stopCapture()
-        }
+        // Stop services - await to prevent race conditions on restart
+        await wakeWordService.shutdown()
+        _ = try? await audioService.stopCapture()
 
         // Clear state
         currentKeyword = nil
@@ -250,49 +273,102 @@ final class VoiceTriggerMonitoringService {
     /// - In monitoring mode: Sends to wake word service for keyword detection
     /// - In capturing mode: Accumulates samples for transcription
     ///
+    /// Note: This method is already called from a MainActor Task dispatch in the audio callback.
+    /// We only use Task for the async wake word processing, not for the outer dispatch.
+    ///
     /// - Parameter buffer: Audio buffer from capture service
     func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
-        Task { @MainActor [weak self] in
-            guard let self else { return }
+        // Already on MainActor via caller's Task dispatch - no need for another Task wrapper
+        switch self.state {
+        case .monitoring:
+            // Convert buffer to Float samples for wake word detection
+            let floatSamples = self.convertBufferToFloatSamples(buffer)
+            guard !floatSamples.isEmpty else { return }
 
-            switch self.state {
-            case .monitoring:
-                // Convert buffer to Float samples for wake word detection
-                let floatSamples = self.convertBufferToFloatSamples(buffer)
-                guard !floatSamples.isEmpty else { return }
-
-                // Route to wake word detection
+            // Route to wake word detection (async operation requires Task)
+            Task { [weak self] in
+                guard let self else { return }
                 if let result = await self.wakeWordService.processFrame(floatSamples) {
                     self.handleWakeWordDetected(keyword: result.detectedKeyword)
                 }
-
-            case .capturing:
-                // Accumulate samples for transcription
-                self.accumulateSamples(from: buffer)
-
-            default:
-                // Ignore audio in other states
-                break
             }
+
+        case .capturing:
+            // Accumulate samples for transcription
+            self.accumulateSamples(from: buffer)
+
+        default:
+            // Ignore audio in other states
+            break
         }
     }
 
-    /// Convert AVAudioPCMBuffer to Float samples normalized to [-1.0, 1.0]
-    /// - Parameter buffer: Audio buffer to convert
-    /// - Returns: Float samples suitable for wake word processing
+    /// Convert AVAudioPCMBuffer to Float samples normalized to [-1.0, 1.0] at 16kHz
+    ///
+    /// This method converts audio from native hardware sample rate to the 16kHz rate
+    /// expected by sherpa-onnx keyword spotting.
+    ///
+    /// - Parameter buffer: Audio buffer to convert (at native sample rate)
+    /// - Returns: Float samples at 16kHz suitable for wake word processing
     private func convertBufferToFloatSamples(_ buffer: AVAudioPCMBuffer) -> [Float] {
         let frameLength = Int(buffer.frameLength)
+        let nativeSampleRate = buffer.format.sampleRate
+        let targetSampleRate = Double(Constants.VoiceTrigger.sampleRate)
 
+        // First convert to float samples at native rate
+        var floatSamples: [Float]
         if let floatData = buffer.floatChannelData {
             // Already float format
-            return Array(UnsafeBufferPointer(start: floatData[0], count: frameLength))
+            floatSamples = Array(UnsafeBufferPointer(start: floatData[0], count: frameLength))
         } else if let int16Data = buffer.int16ChannelData {
             // Convert Int16 to Float [-1.0, 1.0]
             let int16Samples = UnsafeBufferPointer(start: int16Data[0], count: frameLength)
-            return int16Samples.map { Float($0) / 32768.0 }
+            floatSamples = int16Samples.map { Float($0) / 32768.0 }
+        } else {
+            return []
         }
 
-        return []
+        // Resample to 16kHz if native rate differs
+        // sherpa-onnx keyword spotting requires exactly 16kHz audio
+        if abs(nativeSampleRate - targetSampleRate) > 1.0 {
+            floatSamples = resampleToTarget(floatSamples, from: nativeSampleRate, to: targetSampleRate)
+        }
+
+        return floatSamples
+    }
+
+    /// Resample float audio samples from source rate to target rate using linear interpolation
+    ///
+    /// This is a simple resampler suitable for real-time wake word detection.
+    /// For higher quality (transcription), FluidAudio's AudioConverter is used instead.
+    ///
+    /// - Parameters:
+    ///   - samples: Input float samples normalized to [-1.0, 1.0]
+    ///   - sourceRate: Source sample rate in Hz (e.g., 48000)
+    ///   - targetRate: Target sample rate in Hz (e.g., 16000)
+    /// - Returns: Resampled float samples at target rate
+    private func resampleToTarget(_ samples: [Float], from sourceRate: Double, to targetRate: Double) -> [Float] {
+        guard !samples.isEmpty, sourceRate > 0, targetRate > 0 else { return [] }
+
+        let ratio = sourceRate / targetRate
+        let outputLength = Int(Double(samples.count) / ratio)
+
+        guard outputLength > 0 else { return [] }
+
+        var output = [Float](repeating: 0, count: outputLength)
+
+        for outputIndex in 0..<outputLength {
+            let sourcePosition = Double(outputIndex) * ratio
+            let sourceIndex = Int(sourcePosition)
+            let fraction = Float(sourcePosition - Double(sourceIndex))
+
+            // Linear interpolation between adjacent samples
+            let sample1 = samples[sourceIndex]
+            let sample2 = sourceIndex + 1 < samples.count ? samples[sourceIndex + 1] : sample1
+            output[outputIndex] = sample1 + fraction * (sample2 - sample1)
+        }
+
+        return output
     }
 
     // MARK: - Private Methods
@@ -417,6 +493,12 @@ final class VoiceTriggerMonitoringService {
 
     /// Handle silence timeout - stop capture and transcribe
     private func handleSilenceTimeout() async {
+        // Guard against being called after stopMonitoring() or in wrong state
+        guard case .capturing = state else {
+            AppLogger.debug(AppLogger.service, "[\(serviceId)] handleSilenceTimeout ignored - not in capturing state")
+            return
+        }
+
         AppLogger.info(AppLogger.service, "[\(serviceId)] handleSilenceTimeout()")
 
         // Stop timers

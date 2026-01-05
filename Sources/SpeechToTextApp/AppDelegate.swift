@@ -181,8 +181,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 5. Stop voice trigger state observation and monitoring
         voiceTriggerStateTimer?.invalidate()
         voiceTriggerStateTimer = nil
-        voiceTriggerMonitoringService?.stopMonitoring()
+
+        // Stop voice monitoring with async cleanup using semaphore
+        let voiceCleanupSemaphore = DispatchSemaphore(value: 0)
+        let voiceService = voiceTriggerMonitoringService
         voiceTriggerMonitoringService = nil
+        Task.detached {
+            await voiceService?.stopMonitoring()
+            voiceCleanupSemaphore.signal()
+        }
+        // Wait up to 300ms for voice monitoring cleanup
+        _ = voiceCleanupSemaphore.wait(timeout: .now() + 0.3)
 
         // 6. Close and cleanup windows
         recordingWindow?.close()
@@ -413,7 +422,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Stop observing state changes
         stopObservingVoiceTriggerState()
 
-        voiceTriggerMonitoringService?.stopMonitoring()
+        await voiceTriggerMonitoringService?.stopMonitoring()
         isVoiceMonitoringActive = false
 
         // Notify AppState of the state change to idle
