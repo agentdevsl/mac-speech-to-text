@@ -113,14 +113,6 @@ struct AboutSection: View {
                 .accessibilityAddTraits(.isHeader)
 
             HStack(spacing: 12) {
-                // Support button
-                LinkButton(
-                    title: "Support",
-                    icon: "questionmark.circle",
-                    action: { viewModel.openSupport(openURL: openURL) }
-                )
-                .accessibilityIdentifier("aboutSection.supportLink")
-
                 // Privacy Policy button
                 LinkButton(
                     title: "Privacy Policy",

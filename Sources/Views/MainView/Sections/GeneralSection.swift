@@ -202,6 +202,18 @@ struct GeneralSection: View {
                     )
                 )
                 .accessibilityIdentifier("copyToClipboardToggle")
+
+                // Paste behavior
+                PasteBehaviorRow(
+                    selectedBehavior: Binding(
+                        get: { settings.general.pasteBehavior },
+                        set: { newValue in
+                            settings.general.pasteBehavior = newValue
+                            saveSettings()
+                        }
+                    )
+                )
+                .accessibilityIdentifier("pasteBehaviorPicker")
             }
         }
         .accessibilityIdentifier("behaviorSection")
@@ -415,6 +427,44 @@ private struct GeneralToggleRow: View {
             }
         }
         .toggleStyle(BlueToggleStyle())
+        .padding(.vertical, 4)
+    }
+}
+
+// MARK: - Paste Behavior Row
+
+/// Row for selecting paste behavior (paste only or paste and enter)
+private struct PasteBehaviorRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Binding var selectedBehavior: PasteBehavior
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "return")
+                .font(.system(size: 16))
+                .foregroundStyle(Color.warmAmber)
+                .frame(width: 24)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("After Paste")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+
+                Text("What to do after inserting text")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            Picker("", selection: $selectedBehavior) {
+                ForEach(PasteBehavior.allCases, id: \.self) { behavior in
+                    Text(behavior.displayName).tag(behavior)
+                }
+            }
+            .pickerStyle(.menu)
+            .frame(width: 140)
+        }
         .padding(.vertical, 4)
     }
 }
