@@ -144,20 +144,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Cancel any active recording session
-        Task { @MainActor in
-            await holdToRecordViewModel.cancelRecording()
-        }
+        // CRITICAL: Perform synchronous cleanup first to prevent new operations
+        // This ensures no new recording sessions can start during shutdown
 
-        // Stop and cleanup audio level simulation timer
+        // 1. Stop audio level timer immediately (prevents further updates)
         audioLevelTimer?.invalidate()
         audioLevelTimer = nil
 
-        // Close and cleanup recording window
-        recordingWindow?.close()
-        recordingWindow = nil
+        // 2. Unregister hotkeys to prevent new recording triggers
+        hotkeyService = nil
 
-        // Cleanup NotificationCenter observers
+        // 3. Remove notification observers to prevent menu-triggered operations
         if let observer = recordingModalObserver {
             NotificationCenter.default.removeObserver(observer)
             recordingModalObserver = nil
@@ -171,12 +168,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             mainViewObserver = nil
         }
 
-        // Cleanup hotkey service (unregisters Carbon hotkeys on deinit)
-        hotkeyService = nil
+        // 4. Mark session inactive to prevent async operations from proceeding
+        isHoldToRecordSessionActive = false
 
-        // Cleanup singleton window controllers
+        // 5. Close and cleanup windows
+        recordingWindow?.close()
+        recordingWindow = nil
         GlassOverlayWindowController.shared.hideOverlay()
         MainWindowController.shared.closeWindow()
+
+        // 6. Cancel active recording session (best-effort async cleanup)
+        // Use semaphore with timeout to give async cleanup a chance to complete
+        let cleanupSemaphore = DispatchSemaphore(value: 0)
+        Task.detached { [holdToRecordViewModel] in
+            await holdToRecordViewModel.cancelRecording()
+            cleanupSemaphore.signal()
+        }
+        // Wait up to 500ms for cleanup, then proceed with termination
+        _ = cleanupSemaphore.wait(timeout: .now() + 0.5)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -351,9 +360,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startHoldToRecordSession() async {
         // Session guard: prevent concurrent session operations
         guard !isHoldToRecordSessionActive else {
+            print("[DEBUG] START IGNORED: session already active")
+            fflush(stdout)
             AppLogger.app.warning("Hold-to-record session already active, ignoring start request")
             return
         }
+        print("[DEBUG] Starting new session...")
+        fflush(stdout)
         isHoldToRecordSessionActive = true
         AppLogger.app.debug("Starting hold-to-record session")
 
@@ -384,9 +397,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func stopHoldToRecordSession(holdDuration: TimeInterval) async {
         // Session guard: ignore stop if no session is active
         guard isHoldToRecordSessionActive else {
+            print("[DEBUG] STOP IGNORED: no active session")
+            fflush(stdout)
             AppLogger.app.warning("No hold-to-record session active, ignoring stop request")
             return
         }
+        print("[DEBUG] Stopping session (duration: \(holdDuration)s)...")
+        fflush(stdout)
         AppLogger.app.debug("Stopping hold-to-record session (duration: \(holdDuration)s)")
 
         // Stop real audio level updates
@@ -429,10 +446,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Start updating overlay with real audio levels from RecordingViewModel
     private func startRealAudioLevelUpdates() {
         audioLevelTimer?.invalidate()
+        // Timer callback runs on main thread (RunLoop.main), and AppDelegate is @MainActor,
+        // so we can safely call MainActor-isolated methods directly without spawning a Task.
         audioLevelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.holdToRecordViewModel.isRecording else { return }
-                // Get real audio level from RecordingViewModel
+            guard let self else { return }
+            // Must dispatch to main actor since Timer closure is not actor-isolated
+            MainActor.assumeIsolated {
+                guard self.holdToRecordViewModel.isRecording else { return }
                 let level = Float(self.holdToRecordViewModel.audioLevel)
                 self.glassOverlayController.updateAudioLevel(level)
             }

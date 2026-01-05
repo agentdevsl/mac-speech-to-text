@@ -7,7 +7,7 @@ import OSLog
 enum HoldState: Sendable {
     case idle
     case keyDown(startTime: Date)
-    case recording(startTime: Date)
+    case recording(startTime: Date, carbonEventTime: Double)
     case releasing
 }
 
@@ -224,13 +224,14 @@ class HotkeyService {
     // MARK: - Event Handling
 
     /// Handle hotkey pressed event from Carbon
-    func handleHotkeyPressed() {
-        print("[DEBUG-HOTKEY] handleHotkeyPressed() called, isHoldMode=\(isHoldMode)")
+    /// - Parameter carbonEventTime: The time when the Carbon event actually fired (from GetEventTime)
+    func handleHotkeyPressed(carbonEventTime: Double) {
+        print("[DEBUG-HOTKEY] handleHotkeyPressed() called, isHoldMode=\(isHoldMode), carbonEventTime=\(carbonEventTime)")
         fflush(stdout)
         if isHoldMode {
             // Hold-to-record mode: start recording
             let startTime = Date()
-            holdState = .recording(startTime: startTime)
+            holdState = .recording(startTime: startTime, carbonEventTime: carbonEventTime)
             AppLogger.service.debug("Hold hotkey: pressed")
             print("[DEBUG-HOTKEY] Calling onKeyDownCallback...")
             fflush(stdout)
@@ -244,22 +245,32 @@ class HotkeyService {
     }
 
     /// Handle hotkey released event from Carbon
-    func handleHotkeyReleased() {
+    /// - Parameter carbonEventTime: The time when the Carbon event actually fired (from GetEventTime)
+    func handleHotkeyReleased(carbonEventTime: Double) {
         guard isHoldMode else { return }
 
         switch holdState {
-        case .recording(let startTime):
-            let duration = Date().timeIntervalSince(startTime)
+        case .recording(_, let pressEventTime):
+            // Use Carbon event times for accurate duration (not affected by MainActor Task scheduling)
+            let duration = carbonEventTime - pressEventTime
+            print("[DEBUG-HOTKEY] handleHotkeyReleased: pressTime=\(pressEventTime), releaseTime=\(carbonEventTime), duration=\(duration)")
+            fflush(stdout)
             AppLogger.service.debug("Hold hotkey: released after \(duration)s")
 
             if duration >= minimumHoldDuration {
+                print("[DEBUG-HOTKEY] Duration OK, calling onKeyUpCallback...")
+                fflush(stdout)
                 onKeyUpCallback?(duration)
             } else {
+                print("[DEBUG-HOTKEY] Duration TOO SHORT: \(duration)s < \(minimumHoldDuration)s")
+                fflush(stdout)
                 AppLogger.service.debug("Hold too short (\(duration)s), minimum is \(self.minimumHoldDuration)s")
             }
             holdState = .idle
 
         default:
+            print("[DEBUG-HOTKEY] handleHotkeyReleased: holdState is not .recording, ignoring")
+            fflush(stdout)
             holdState = .idle
         }
     }
@@ -326,10 +337,12 @@ private let carbonHotkeyCallback: EventHandlerUPP = { (_: EventHandlerCallRef?, 
     }
 
     let eventKind = GetEventKind(event)
-    print("[DEBUG-CARBON] eventKind=\(eventKind), kEventHotKeyPressed=\(kEventHotKeyPressed), kEventHotKeyReleased=\(kEventHotKeyReleased)")
+    // Get the actual Carbon event time (accurate, unaffected by Task scheduling delays)
+    let carbonEventTime = GetEventTime(event)
+    print("[DEBUG-CARBON] eventKind=\(eventKind), carbonEventTime=\(carbonEventTime)")
     fflush(stdout)
 
-    // Dispatch to main actor
+    // Dispatch to main actor - capture the event time to pass to handlers
     Task { @MainActor in
         print("[DEBUG-CARBON] Inside MainActor Task, sharedInstance=\(HotkeyService.sharedInstance != nil ? "exists" : "NIL")")
         fflush(stdout)
@@ -340,13 +353,13 @@ private let carbonHotkeyCallback: EventHandlerUPP = { (_: EventHandlerCallRef?, 
         }
 
         if eventKind == UInt32(kEventHotKeyPressed) {
-            print("[DEBUG-CARBON] Calling handleHotkeyPressed")
+            print("[DEBUG-CARBON] Calling handleHotkeyPressed with carbonEventTime=\(carbonEventTime)")
             fflush(stdout)
-            service.handleHotkeyPressed()
+            service.handleHotkeyPressed(carbonEventTime: carbonEventTime)
         } else if eventKind == UInt32(kEventHotKeyReleased) {
-            print("[DEBUG-CARBON] Calling handleHotkeyReleased")
+            print("[DEBUG-CARBON] Calling handleHotkeyReleased with carbonEventTime=\(carbonEventTime)")
             fflush(stdout)
-            service.handleHotkeyReleased()
+            service.handleHotkeyReleased(carbonEventTime: carbonEventTime)
         }
     }
 

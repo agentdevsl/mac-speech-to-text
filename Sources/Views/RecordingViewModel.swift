@@ -772,9 +772,13 @@ final class RecordingViewModel {
 
     /// Insert text with fallback to clipboard and show accessibility prompt if needed
     private func insertTextWithFallback(_ text: String) async throws {
+        print("[DEBUG] insertTextWithFallback() called with \(text.count) chars")
+        fflush(stdout)
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback() called, textLength=\(text.count)")
 
         guard var session = currentSession else {
+            print("[DEBUG] insertTextWithFallback: no active session!")
+            fflush(stdout)
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback: no active session")
             throw RecordingError.noActiveSession
         }
@@ -788,7 +792,11 @@ final class RecordingViewModel {
         currentSession = session
 
         // Use fallback-aware insertion
+        print("[DEBUG] Calling textInsertionService.insertTextWithFallback...")
+        fflush(stdout)
         let insertionResult = await textInsertionService.insertTextWithFallback(text)
+        print("[DEBUG] insertionResult: \(insertionResult)")
+        fflush(stdout)
 
         // Check for session cancellation after await (bug fix: staleness detection)
         guard currentSessionId == startSessionId, var updatedSession = currentSession else {
