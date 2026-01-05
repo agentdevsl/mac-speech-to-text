@@ -44,7 +44,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Codable {
         case .home: return "house.fill"
         case .general: return "gear"
         case .audio: return "waveform"
-        case .voiceTrigger: return "mic.badge.waveform"
+        case .voiceTrigger: return "mic.circle"
         case .language: return "globe"
         case .theme: return "paintbrush"
         case .privacy: return "lock.shield"

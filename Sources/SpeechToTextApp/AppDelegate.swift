@@ -12,6 +12,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var mainViewObserver: NSObjectProtocol?
     private var themeChangeObserver: NSObjectProtocol?
+    private var voiceTriggerSettingsObserver: NSObjectProtocol?
 
     // MARK: - Hold-to-Record Recording
 
@@ -115,6 +116,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.showRecordingModal()
             }
         }
+
+        // Auto-start voice monitoring if enabled in settings
+        if settings.voiceTrigger.enabled {
+            AppLogger.app.info("Voice triggers enabled - auto-starting voice monitoring")
+            Task { @MainActor in
+                // Small delay to ensure permissions are verified
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                await self.startVoiceMonitoring()
+            }
+        }
+
+        // Observe settings changes to start/stop voice monitoring
+        setupVoiceTriggerSettingsObserver()
     }
 
     // MARK: - UI Test Configuration
@@ -181,6 +195,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let observer = themeChangeObserver {
             NotificationCenter.default.removeObserver(observer)
             themeChangeObserver = nil
+        }
+        if let observer = voiceTriggerSettingsObserver {
+            NotificationCenter.default.removeObserver(observer)
+            voiceTriggerSettingsObserver = nil
         }
 
         // 4. Mark sessions inactive to prevent async operations from proceeding
@@ -273,6 +291,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             let settings = self.settingsService.load()
             NSApp.appearance = settings.ui.theme.nsAppearance
+        }
+    }
+
+    /// Setup observer for voice trigger enabled/disabled changes
+    @MainActor
+    private func setupVoiceTriggerSettingsObserver() {
+        voiceTriggerSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .voiceTriggerEnabledDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                guard let self else { return }
+                let enabled = notification.userInfo?["enabled"] as? Bool ?? false
+
+                if enabled {
+                    AppLogger.app.info("Voice triggers enabled via settings - starting monitoring")
+                    await self.startVoiceMonitoring()
+                } else {
+                    AppLogger.app.info("Voice triggers disabled via settings - stopping monitoring")
+                    await self.stopVoiceMonitoring()
+                }
+            }
         }
     }
 

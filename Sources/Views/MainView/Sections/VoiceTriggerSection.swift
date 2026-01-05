@@ -156,6 +156,12 @@ struct VoiceTriggerSection: View {
                     set: { newValue in
                         settings.voiceTrigger.enabled = newValue
                         saveSettings()
+                        // Notify AppDelegate to start/stop voice monitoring
+                        NotificationCenter.default.post(
+                            name: .voiceTriggerEnabledDidChange,
+                            object: nil,
+                            userInfo: ["enabled": newValue]
+                        )
                     }
                 )
             )

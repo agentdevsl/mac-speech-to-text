@@ -161,10 +161,11 @@ final class VoiceTriggerMonitoringService {
                 throw VoiceTriggerError.noKeywordsConfigured
             }
 
-            // Get wake word model path from bundle or configuration
-            // swiftlint:disable:next todo
-            // TODO: Replace with actual model path from configuration when model is bundled
-            let modelPath = getWakeWordModelPath()
+            // Get wake word model path from bundle
+            guard let modelPath = Constants.VoiceTrigger.modelPath else {
+                AppLogger.error(AppLogger.service, "[\(serviceId)] Wake word model not found in bundle")
+                throw VoiceTriggerError.wakeWordInitFailed("Wake word model not found in bundle")
+            }
             wakeWordModelPath = modelPath
 
             // Initialize wake word service with model and keywords
@@ -192,41 +193,6 @@ final class VoiceTriggerMonitoringService {
             state = .error(.wakeWordInitFailed(error.localizedDescription))
             throw VoiceTriggerError.wakeWordInitFailed(error.localizedDescription)
         }
-    }
-
-    /// Get the path to the wake word model
-    /// - Returns: Path to the sherpa-onnx keyword spotting model directory
-    private func getWakeWordModelPath() -> String {
-        // Try to find model in bundle first
-        if let bundlePath = Bundle.main.resourcePath {
-            let modelPath = "\(bundlePath)/wake_word_model"
-            if FileManager.default.fileExists(atPath: modelPath) {
-                AppLogger.debug(AppLogger.service, "[\(serviceId)] Found wake word model in bundle: \(modelPath)")
-                return modelPath
-            }
-            AppLogger.warning(AppLogger.service, "[\(serviceId)] Wake word model not found in bundle at: \(modelPath)")
-        }
-
-        // Fall back to Application Support directory
-        if let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first {
-            let modelPath = appSupport.appendingPathComponent("SpeechToText/wake_word_model").path
-            if FileManager.default.fileExists(atPath: modelPath) {
-                AppLogger.debug(AppLogger.service, "[\(serviceId)] Found wake word model in Application Support: \(modelPath)")
-                return modelPath
-            }
-            AppLogger.warning(
-                AppLogger.service,
-                "[\(serviceId)] Wake word model not found in Application Support, falling back to temp directory"
-            )
-        }
-
-        // Last resort: use temp directory (for development/testing)
-        let tempPath = FileManager.default.temporaryDirectory.appendingPathComponent("wake_word_model").path
-        AppLogger.warning(
-            AppLogger.service,
-            "[\(serviceId)] Using temp directory for wake word model (development only): \(tempPath)"
-        )
-        return tempPath
     }
 
     /// Stop voice trigger monitoring
