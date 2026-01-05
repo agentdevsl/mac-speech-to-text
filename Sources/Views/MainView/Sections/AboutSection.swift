@@ -57,32 +57,27 @@ struct AboutSection: View {
 
     private var appIdentitySection: some View {
         VStack(spacing: 16) {
-            // App icon with circular border and animation (matching welcome screen)
+            // App logo with circular crop and animation (matching welcome screen)
             ZStack {
                 // Animated outer pulse ring
                 Circle()
                     .stroke(Color.amberPrimary.opacity(isPulsing ? 0.15 : 0.4), lineWidth: isPulsing ? 6 : 3)
-                    .frame(width: isPulsing ? 104 : 96, height: isPulsing ? 104 : 96)
+                    .frame(width: isPulsing ? 108 : 100, height: isPulsing ? 108 : 100)
                     .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isPulsing)
 
                 // Outer glow ring
                 Circle()
-                    .stroke(Color.amberPrimary.opacity(0.3), lineWidth: 2)
-                    .frame(width: 96, height: 96)
+                    .stroke(Color.amberPrimary.opacity(0.4), lineWidth: 2)
+                    .frame(width: 100, height: 100)
 
-                // Inner circle background
-                Circle()
-                    .fill(Color.amberPrimary.opacity(0.1))
-                    .frame(width: 88, height: 88)
-
-                // App icon
-                Image(nsImage: NSApp.applicationIconImage)
+                // App logo - circular crop
+                Image("AppLogo")
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 64, height: 64)
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: 96, height: 96)
                     .clipShape(Circle())
             }
-            .shadow(color: Color.amberPrimary.opacity(0.2), radius: 8, y: 2)
+            .shadow(color: Color.amberPrimary.opacity(0.3), radius: 10, y: 3)
             .accessibilityHidden(true)
             .onAppear {
                 isPulsing = true
