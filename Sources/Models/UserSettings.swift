@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 
 /// User configuration stored locally
 struct UserSettings: Codable, Sendable {
@@ -313,6 +315,26 @@ enum Theme: String, Codable, Sendable {
         case .light: return "Light"
         case .dark: return "Dark"
         case .system: return "System"
+        }
+    }
+}
+
+extension Theme {
+    /// Convert to NSAppearance for app-wide theming
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
+        case .system: return nil
+        }
+    }
+
+    /// Convert to SwiftUI ColorScheme
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
         }
     }
 }

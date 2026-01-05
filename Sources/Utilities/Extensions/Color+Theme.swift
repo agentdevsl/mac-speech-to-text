@@ -217,6 +217,132 @@ extension Color {
 
     /// Dark mode card surface
     static let cardBackgroundDark = Color(white: 0.15)
+
+    // MARK: - Refined Light Mode Palette ("Warm Burnished")
+    // Designed for WCAG AA contrast compliance while maintaining warmth
+
+    // MARK: Light Mode - Burnished Amber (High Contrast Icons)
+
+    /// Rich honey amber for light mode icons - 4.5:1 contrast on white
+    /// Hex: #8B6914 (burnished gold)
+    static let burnishedAmber = Color(hex: "8B6914")
+
+    /// Darker honey for hover/pressed states in light mode
+    /// Hex: #705410
+    static let burnishedAmberDark = Color(hex: "705410")
+
+    /// Warm bronze for secondary icons in light mode
+    /// Hex: #7A6B52
+    static let warmBronze = Color(hex: "7A6B52")
+
+    // MARK: Light Mode - Enhanced Borders & Surfaces
+
+    /// Visible card border for light mode - warm taupe
+    /// Hex: #C9C3BA
+    static let lightCardBorder = Color(hex: "C9C3BA")
+
+    /// Subtle inner shadow border for depth
+    /// Hex: #E8E4DE
+    static let lightInnerBorder = Color(hex: "E8E4DE")
+
+    /// Card shadow color for light mode - warm brown tint
+    static let lightCardShadow = Color(hex: "8B7355").opacity(0.12)
+
+    /// Elevated card background with subtle warmth
+    /// Hex: #FFFFFE
+    static let lightCardSurface = Color(hex: "FFFFFE")
+
+    /// Recessed background for contrast with cards
+    /// Hex: #F7F4F0
+    static let lightRecessedBg = Color(hex: "F7F4F0")
+
+    // MARK: Light Mode - Enhanced Text
+
+    /// Secondary text with better contrast for light mode
+    /// Hex: #5A5754 (4.7:1 contrast on white)
+    static let lightTextSecondary = Color(hex: "5A5754")
+
+    /// Tertiary text, still readable in light mode
+    /// Hex: #6E6B67 (3.5:1 contrast - passes for large text)
+    static let lightTextTertiary = Color(hex: "6E6B67")
+
+    /// Muted but visible placeholder text
+    /// Hex: #8A8682
+    static let lightTextMuted = Color(hex: "8A8682")
+
+    // MARK: - Adaptive UI Colors (Light/Dark Mode Aware)
+
+    /// Adaptive card background - pure white in light, dark gray in dark
+    static let cardBackgroundAdaptive = adaptive(
+        light: lightCardSurface,
+        dark: Color(white: 0.15)
+    )
+
+    /// Adaptive card border - clearly visible in both modes
+    static let cardBorderAdaptive = adaptive(
+        light: lightCardBorder,
+        dark: Color.white.opacity(0.12)
+    )
+
+    /// Adaptive subtle border - inner borders and dividers
+    static let subtleBorderAdaptive = adaptive(
+        light: lightInnerBorder,
+        dark: Color.white.opacity(0.08)
+    )
+
+    /// Adaptive icon color - burnished amber in light, bright amber in dark
+    static let iconPrimaryAdaptive = adaptive(
+        light: burnishedAmber,
+        dark: amberPrimary
+    )
+
+    /// Adaptive secondary icon - bronze in light, muted amber in dark
+    static let iconSecondaryAdaptive = adaptive(
+        light: warmBronze,
+        dark: amberDark
+    )
+
+    /// Adaptive secondary background - recessed surfaces
+    static let secondaryBackgroundAdaptive = adaptive(
+        light: lightRecessedBg,
+        dark: Color(white: 0.12)
+    )
+
+    /// Adaptive tertiary text - readable in both modes
+    static let textTertiaryAdaptive = adaptive(
+        light: lightTextTertiary,
+        dark: Color(hex: "9C9A97")
+    )
+
+    /// Adaptive secondary text - clear in both modes
+    static let textSecondaryAdaptive = adaptive(
+        light: lightTextSecondary,
+        dark: Color(hex: "A8A5A2")
+    )
+
+    /// Adaptive muted text for hints and placeholders
+    static let textMutedAdaptive = adaptive(
+        light: lightTextMuted,
+        dark: Color(hex: "A0A0A0")
+    )
+
+    /// Adaptive card shadow
+    static let cardShadowAdaptive = adaptive(
+        light: lightCardShadow,
+        dark: Color.black.opacity(0.3)
+    )
+
+    /// Adaptive selection/focus background
+    static let selectionBackgroundAdaptive = adaptive(
+        light: Color(hex: "FFF8E7"),  // Warm cream highlight
+        dark: amberPrimary.opacity(0.15)
+    )
+
+    /// Adaptive selection border
+    static let selectionBorderAdaptive = adaptive(
+        light: burnishedAmber.opacity(0.4),
+        dark: amberPrimary.opacity(0.5)
+    )
 }
 
 // MARK: - Adaptive Colors

@@ -4,6 +4,7 @@ import OSLog
 /// Notification posted when settings are reset due to corruption
 extension Notification.Name {
     static let settingsDidReset = Notification.Name("com.speechtotext.settingsDidReset")
+    static let themeDidChange = Notification.Name("com.speechtotext.themeDidChange")
 }
 
 /// Protocol for settings service (enables testing with mocks)

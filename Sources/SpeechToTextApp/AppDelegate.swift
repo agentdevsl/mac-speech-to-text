@@ -11,6 +11,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var recordingModalObserver: NSObjectProtocol?
     private var settingsObserver: NSObjectProtocol?
     private var mainViewObserver: NSObjectProtocol?
+    private var themeChangeObserver: NSObjectProtocol?
 
     // MARK: - Hold-to-Record Recording
 
@@ -57,6 +58,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Apply UI test configuration if in test mode
         applyUITestConfiguration()
+
+        // Apply saved theme on launch
+        let savedSettings = settingsService.load()
+        NSApp.appearance = savedSettings.ui.theme.nsAppearance
 
         // Always setup notification observers for menu actions
         // (works with MenuBarExtra from SpeechToTextApp)
@@ -173,6 +178,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(observer)
             mainViewObserver = nil
         }
+        if let observer = themeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            themeChangeObserver = nil
+        }
 
         // 4. Mark sessions inactive to prevent async operations from proceeding
         isHoldToRecordSessionActive = false
@@ -252,6 +261,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 self?.showMainView()
             }
+        }
+
+        // Observer for theme changes - applies NSAppearance app-wide
+        // Note: No Task wrapper - runs synchronously on main queue to prevent race conditions
+        themeChangeObserver = NotificationCenter.default.addObserver(
+            forName: .themeDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            let settings = self.settingsService.load()
+            NSApp.appearance = settings.ui.theme.nsAppearance
         }
     }
 
