@@ -841,6 +841,31 @@ if [ -f "${PROJECT_ROOT}/Resources/AppIcon.icns" ]; then
 elif [ -f "${PROJECT_ROOT}/Sources/SpeechToTextApp/Resources/AppIcon.icns" ]; then
     cp "${PROJECT_ROOT}/Sources/SpeechToTextApp/Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/"
     print_success "Copied app icon"
+elif [ -f "${PROJECT_ROOT}/app_logov2.png" ]; then
+    # Convert PNG to icns using sips (built-in macOS tool)
+    print_info "Converting app icon to .icns format..."
+    ICONSET_DIR="${BUILD_DIR}/AppIcon.iconset"
+    mkdir -p "${ICONSET_DIR}"
+
+    # Create icon sizes
+    sips -z 16 16     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null || true
+    sips -z 32 32     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null || true
+    sips -z 32 32     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null || true
+    sips -z 64 64     "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null || true
+    sips -z 128 128   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null || true
+    sips -z 256 256   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null || true
+    sips -z 256 256   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null || true
+    sips -z 512 512   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null || true
+    sips -z 512 512   "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null || true
+    sips -z 1024 1024 "${PROJECT_ROOT}/app_logov2.png" --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null || true
+
+    # Create .icns file
+    iconutil -c icns "${ICONSET_DIR}" -o "${APP_BUNDLE}/Contents/Resources/AppIcon.icns" 2>/dev/null || {
+        print_warning "Could not create .icns file (iconutil may not be available)"
+    }
+
+    rm -rf "${ICONSET_DIR}"
+    print_success "Created app icon from app_logov2.png"
 fi
 
 # Set permissions
