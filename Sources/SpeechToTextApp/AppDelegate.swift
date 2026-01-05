@@ -443,8 +443,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor
     private func showRecordingModal() {
+        print("🔴🔴🔴 showRecordingModal CALLED 🔴🔴🔴")
         // Don't show multiple modals
         if recordingWindow != nil {
+            print("🔴 Already have a window, returning")
             return
         }
 
@@ -455,15 +457,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let viewModel = RecordingViewModel()
 
         // Create SwiftUI view with pre-created ViewModel
-        let contentView = RecordingModal(viewModel: viewModel)
+        // Using LiquidGlassRecordingModal for stunning prismatic glass effects
+        print("🔴 DEBUG: Creating LiquidGlassRecordingModal")
+        let contentView = LiquidGlassRecordingModal(viewModel: viewModel)
             .onDisappear { [weak self] in
+                print("🔴 DEBUG: LiquidGlassRecordingModal disappeared")
                 self?.recordingWindow?.close()
                 self?.recordingWindow = nil
             }
 
-        // Create floating window for the glassmorphism recording modal
+        // Create floating window for the liquid glass recording modal
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 400),
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 450),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false

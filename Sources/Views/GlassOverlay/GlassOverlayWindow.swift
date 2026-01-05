@@ -136,10 +136,8 @@ final class GlassOverlayWindow {
         configureWindow(window)
         positionWindow(window)
 
-        // Create SwiftUI view with ViewModel
-        // Note: GlassRecordingOverlay is the SwiftUI view that will be created separately
-        // For now, create a placeholder that will be replaced with the actual view
-        let contentView = GlassOverlayContentView(viewModel: viewModel)
+        // Create SwiftUI view with ViewModel - using the Liquid Glass overlay
+        let contentView = LiquidGlassOverlayBridge(viewModel: viewModel)
         window.contentView = NSHostingView(rootView: contentView)
 
         return window
@@ -222,6 +220,7 @@ final class GlassOverlayWindowController {
     // MARK: - Properties
 
     private var overlayWindow: GlassOverlayWindow?
+    private let settingsService = SettingsService()
 
     // MARK: - Initialization
 
@@ -232,6 +231,9 @@ final class GlassOverlayWindowController {
     /// Show the glass overlay in recording state
     func showRecording() {
         ensureWindow()
+        // Load waveform style from settings each time we show recording
+        let settings = settingsService.load()
+        overlayWindow?.overlayViewModel.waveformStyle = settings.ui.waveformStyle
         overlayWindow?.overlayViewModel.showRecording()
         overlayWindow?.show()
     }
@@ -277,22 +279,50 @@ final class GlassOverlayWindowController {
     }
 }
 
-// MARK: - Placeholder Content View
+// MARK: - Liquid Glass Overlay Bridge
 
-/// Placeholder SwiftUI view for the glass overlay content
-/// This will be replaced with GlassRecordingOverlay when that view is created
+/// Bridge view that connects GlassOverlayViewModel to GlassRecordingOverlay
+private struct LiquidGlassOverlayBridge: View {
+    @Bindable var viewModel: GlassOverlayViewModel
+
+    var body: some View {
+        Group {
+            switch viewModel.state {
+            case .hidden:
+                EmptyView()
+
+            case .recording:
+                GlassRecordingOverlay(
+                    state: .recording,
+                    audioLevel: viewModel.audioLevel,
+                    elapsedTime: viewModel.recordingDuration,
+                    waveformStyle: viewModel.waveformStyle
+                )
+
+            case .transcribing:
+                GlassRecordingOverlay(
+                    state: .transcribing,
+                    audioLevel: 0,
+                    elapsedTime: viewModel.recordingDuration,
+                    waveformStyle: viewModel.waveformStyle
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Legacy Placeholder Content View (Deprecated)
+
+/// Legacy placeholder - kept for reference but no longer used
 private struct GlassOverlayContentView: View {
     let viewModel: GlassOverlayViewModel
 
     var body: some View {
-        // Placeholder content - will be replaced with actual GlassRecordingOverlay
         ZStack {
-            // Glass background
             RoundedRectangle(cornerRadius: 16)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
 
-            // Content based on state
             Group {
                 switch viewModel.state {
                 case .hidden:
@@ -300,17 +330,12 @@ private struct GlassOverlayContentView: View {
 
                 case .recording:
                     HStack(spacing: 12) {
-                        // Recording indicator
                         Circle()
                             .fill(.red)
                             .frame(width: 12, height: 12)
-
                         Text("Recording...")
                             .font(.headline)
-                            .foregroundStyle(.primary)
-
                         Spacer()
-
                         Text(viewModel.formattedDuration)
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.secondary)
@@ -321,11 +346,8 @@ private struct GlassOverlayContentView: View {
                     HStack(spacing: 12) {
                         ProgressView()
                             .scaleEffect(0.8)
-
                         Text("Transcribing...")
                             .font(.headline)
-                            .foregroundStyle(.primary)
-
                         Spacer()
 
                         Text(viewModel.formattedDuration)

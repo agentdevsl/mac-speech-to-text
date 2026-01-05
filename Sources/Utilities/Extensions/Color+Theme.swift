@@ -124,6 +124,68 @@ extension Color {
     /// Dark warm gray - use for secondary icons
     static let warmGrayDark = textSecondary
 
+    // MARK: - Liquid Glass Palette
+
+    /// Deep glass tint - rich blue-violet undertone
+    /// Hex: #1a1a2e
+    static let liquidGlassDeep = Color(hex: "1a1a2e")
+
+    /// Mid glass tint - subtle blue-gray
+    /// Hex: #2d2d44
+    static let liquidGlassMid = Color(hex: "2d2d44")
+
+    /// Light glass tint - frosted white-blue
+    /// Hex: #e8eaf6
+    static let liquidGlassLight = Color(hex: "e8eaf6")
+
+    /// Glass shadow - deep blue-black for depth
+    /// Hex: #0d0d1a
+    static let liquidGlassShadow = Color(hex: "0d0d1a")
+
+    // MARK: - Prismatic Rainbow Colors
+
+    /// Prismatic pink - soft rose
+    /// Hex: #ff6b9d
+    static let liquidPrismaticPink = Color(hex: "ff6b9d")
+
+    /// Prismatic purple - electric violet
+    /// Hex: #c471ed
+    static let liquidPrismaticPurple = Color(hex: "c471ed")
+
+    /// Prismatic blue - bright azure
+    /// Hex: #667eea
+    static let liquidPrismaticBlue = Color(hex: "667eea")
+
+    /// Prismatic cyan - vibrant teal
+    /// Hex: #48dbfb
+    static let liquidPrismaticCyan = Color(hex: "48dbfb")
+
+    /// Prismatic green - fresh mint
+    /// Hex: #26de81
+    static let liquidPrismaticGreen = Color(hex: "26de81")
+
+    /// Prismatic yellow - warm gold
+    /// Hex: #fed330
+    static let liquidPrismaticYellow = Color(hex: "fed330")
+
+    /// Prismatic orange - sunset coral
+    /// Hex: #ff9f43
+    static let liquidPrismaticOrange = Color(hex: "ff9f43")
+
+    // MARK: - Liquid Recording States
+
+    /// Recording core - intense warm red
+    /// Hex: #ff4757
+    static let liquidRecordingCore = Color(hex: "ff4757")
+
+    /// Recording mid - soft coral
+    /// Hex: #ff6b81
+    static let liquidRecordingMid = Color(hex: "ff6b81")
+
+    /// Recording outer - pale rose glow
+    /// Hex: #ff8a9b
+    static let liquidRecordingOuter = Color(hex: "ff8a9b")
+
     // MARK: - Waveform Colors
 
     /// Active waveform color when recording

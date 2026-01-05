@@ -34,6 +34,9 @@ final class GlassOverlayViewModel {
     /// Current recording duration in seconds
     var recordingDuration: TimeInterval = 0.0
 
+    /// Current waveform style from user settings
+    var waveformStyle: WaveformStyleOption = .aurora
+
     /// Whether the overlay is currently visible (state != .hidden)
     var isVisible: Bool {
         state != .hidden

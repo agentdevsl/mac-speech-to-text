@@ -112,19 +112,9 @@ struct AboutSection: View {
                 .foregroundStyle(.secondary)
                 .accessibilityAddTraits(.isHeader)
 
-            HStack(spacing: 12) {
-                // Privacy Policy button
-                LinkButton(
-                    title: "Privacy Policy",
-                    icon: "hand.raised",
-                    action: { viewModel.openPrivacyPolicy(openURL: openURL) }
-                )
-                .accessibilityIdentifier("aboutSection.privacyLink")
-            }
-
             // Acknowledgments button (full width)
             Button {
-                viewModel.showAcknowledgments()
+                viewModel.openAcknowledgments()
             } label: {
                 HStack {
                     Image(systemName: "heart")
@@ -286,11 +276,7 @@ final class AboutSectionViewModel {
 
     private static let supportURLString = "https://speechtotext.app/support"
     private static let privacyPolicyURLString = "https://speechtotext.app/privacy"
-
-    // MARK: - State
-
-    /// Tracks whether acknowledgments are shown (fallback for notification)
-    var isShowingAcknowledgments: Bool = false
+    private static let acknowledgementsURLString = "https://claude.ai"
 
     // MARK: - Initialization
 
@@ -322,27 +308,13 @@ final class AboutSectionViewModel {
         }
     }
 
-    func showAcknowledgments() {
-        // Post notification to show acknowledgments sheet
-        NotificationCenter.default.post(
-            name: .showAcknowledgments,
-            object: nil
-        )
-
-        // Also set local state as fallback if no listener is registered
-        // Views can observe isShowingAcknowledgments as an alternative to the notification
-        isShowingAcknowledgments = true
+    func openAcknowledgments() {
+        guard let url = URL(string: Self.acknowledgementsURLString) else {
+            AppLogger.system.error("Invalid acknowledgements URL: \(Self.acknowledgementsURLString)")
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
-
-    func hideAcknowledgments() {
-        isShowingAcknowledgments = false
-    }
-}
-
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let showAcknowledgments = Notification.Name("com.speechtotext.showAcknowledgments")
 }
 
 // MARK: - Previews

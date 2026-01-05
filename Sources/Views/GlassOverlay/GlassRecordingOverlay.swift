@@ -1,63 +1,49 @@
 // GlassRecordingOverlay.swift
 // macOS Local Speech-to-Text Application
 //
-// Part 1: Glass Recording Overlay
-// Main glass panel view for recording/transcribing status
-// Positioned at bottom center of screen with pill-shaped design
+// Simplified Liquid Glass Recording Overlay
+// Clean glass background with Aurora waveform focus
 
 import SwiftUI
 
-/// Glass Recording Overlay - A minimal, pill-shaped status indicator
-/// Displays recording waveform, status text, and timer
+/// Liquid Glass Recording Overlay - Clean floating glass indicator
+/// Features Aurora waveform visualization with subtle prismatic effects
 struct GlassRecordingOverlay: View {
     // MARK: - State Enum
 
-    /// Represents the current state of the overlay
     enum OverlayState: Equatable {
         case recording
         case transcribing
 
         var statusText: String {
             switch self {
-            case .recording:
-                return "Recording..."
-            case .transcribing:
-                return "Transcribing..."
+            case .recording: return "Recording..."
+            case .transcribing: return "Transcribing..."
             }
         }
 
         var accessibilityLabel: String {
             switch self {
-            case .recording:
-                return "Recording in progress"
-            case .transcribing:
-                return "Transcribing audio"
+            case .recording: return "Recording in progress"
+            case .transcribing: return "Transcribing audio"
             }
         }
     }
 
     // MARK: - Properties
 
-    /// Current state of the overlay
     let state: OverlayState
-
-    /// Current audio level (0.0 - 1.0) for waveform visualization
     let audioLevel: Float
-
-    /// Elapsed recording time in seconds
     let elapsedTime: TimeInterval
+    let waveformStyle: WaveformStyleOption
 
-    // MARK: - State
+    // MARK: - Animation State
 
-    /// Controls entrance/exit animations
     @State private var isVisible: Bool = false
-
-    /// Controls pulsing animation for recording indicator
-    @State private var isPulsing: Bool = false
+    @State private var glassRotation: Double = 0
 
     // MARK: - Constants
 
-    /// Overlay dimensions
     private let overlayWidth: CGFloat = 300
     private let overlayHeight: CGFloat = 80
     private let cornerRadius: CGFloat = 24
@@ -66,113 +52,220 @@ struct GlassRecordingOverlay: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Recording indicator dot
-            recordingIndicator
+            // Glowing orb indicator
+            orbIndicator
 
-            // Waveform or spinner based on state
-            centerContent
+            // Aurora waveform or transcribing animation
+            centerVisualization
+                .frame(width: 100, height: 44)
 
-            // Status text
-            statusTextView
-
-            // Timer display (only in recording state)
-            if state == .recording {
-                timerView
+            // Status and timer
+            VStack(alignment: .leading, spacing: 2) {
+                statusTextView
+                if state == .recording {
+                    timerView
+                }
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .frame(width: overlayWidth, height: overlayHeight)
-        .background {
-            // Glass material background
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    // Subtle white border for glass edge effect
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: 10)
-        }
+        .background { glassBackground }
+        .overlay { glassOverlay }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: 10)
+        .shadow(color: .black.opacity(0.05), radius: 40, x: 0, y: 20)
         .scaleEffect(isVisible ? 1.0 : 0.85)
         .opacity(isVisible ? 1.0 : 0.0)
         .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
-                isVisible = true
-            }
-            startPulsingAnimation()
+            startAnimations()
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("glassRecordingOverlay")
         .accessibilityLabel(accessibilityDescription)
     }
 
-    // MARK: - Subviews
+    // MARK: - Glass Background (Apple Liquid Glass Style)
 
-    /// Pulsing recording indicator dot
-    private var recordingIndicator: some View {
-        Circle()
-            .fill(indicatorColor)
-            .frame(width: 12, height: 12)
-            .scaleEffect(isPulsing && state == .recording ? 1.2 : 1.0)
-            .opacity(isPulsing && state == .recording ? 0.7 : 1.0)
-            .accessibilityIdentifier("recordingIndicatorDot")
-    }
+    private var glassBackground: some View {
+        ZStack {
+            // Base: Ultra-transparent frosted glass
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial.opacity(0.25))
 
-    /// Center content - waveform for recording, spinner for transcribing
-    @ViewBuilder
-    private var centerContent: some View {
-        switch state {
-        case .recording:
-            DynamicWaveformView(audioLevel: audioLevel)
-                .frame(width: 120, height: 40)
-                .accessibilityIdentifier("overlayWaveform")
+            // Very soft white fill for the frosted look
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(Color.white.opacity(0.08))
 
-        case .transcribing:
-            ProgressView()
-                .scaleEffect(0.8)
-                .frame(width: 40, height: 40)
-                .accessibilityIdentifier("transcribingSpinner")
+            // Inner glow effect (soft white around edges)
+            RoundedRectangle(cornerRadius: cornerRadius - 2, style: .continuous)
+                .stroke(Color.white.opacity(0.3), lineWidth: 3)
+                .blur(radius: 3)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+
+            // Top specular highlight
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.25),
+                            Color.white.opacity(0.05),
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: UnitPoint(x: 0.5, y: 0.35)
+                    )
+                )
         }
     }
 
-    /// Status text view
+    // MARK: - Glass Overlay (Soft Edge Glow)
+
+    private var glassOverlay: some View {
+        ZStack {
+            // Soft outer glow (creates the floating glass effect)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.5), lineWidth: 1)
+                .blur(radius: 0.5)
+
+            // Very subtle inner border
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+        }
+    }
+
+    // MARK: - Orb Indicator
+
+    private var orbIndicator: some View {
+        ZStack {
+            // Outer glow
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            (state == .recording ? Color.liquidRecordingCore : Color.liquidPrismaticBlue).opacity(0.25),
+                            .clear
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 16
+                    )
+                )
+                .frame(width: 32, height: 32)
+
+            // Main orb
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: state == .recording ? [
+                            Color.liquidRecordingCore,
+                            Color.liquidRecordingMid
+                        ] : [
+                            Color.liquidPrismaticBlue,
+                            Color.liquidPrismaticPurple
+                        ],
+                        center: UnitPoint(x: 0.35, y: 0.35),
+                        startRadius: 0,
+                        endRadius: 10
+                    )
+                )
+                .frame(width: 12, height: 12)
+
+            // Inner highlight
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.8),
+                            Color.white.opacity(0.2),
+                            .clear
+                        ],
+                        center: UnitPoint(x: 0.3, y: 0.3),
+                        startRadius: 0,
+                        endRadius: 4
+                    )
+                )
+                .frame(width: 5, height: 5)
+                .offset(x: -2, y: -2)
+        }
+        .accessibilityIdentifier("recordingIndicatorDot")
+    }
+
+    // MARK: - Center Visualization
+
+    @ViewBuilder
+    private var centerVisualization: some View {
+        switch state {
+        case .recording:
+            // Dynamic waveform based on user settings
+            WaveformVisualization(style: waveformStyle, audioLevel: audioLevel, isRecording: true)
+                .accessibilityIdentifier("overlayWaveform")
+
+        case .transcribing:
+            // Prismatic spinner
+            ZStack {
+                Circle()
+                    .stroke(
+                        AngularGradient(
+                            colors: [
+                                Color.liquidPrismaticBlue,
+                                Color.liquidPrismaticPurple,
+                                Color.liquidPrismaticPink,
+                                Color.liquidPrismaticBlue
+                            ],
+                            center: .center,
+                            angle: .degrees(glassRotation * 2)
+                        ),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                    )
+                    .frame(width: 28, height: 28)
+
+                Circle()
+                    .trim(from: 0, to: 0.3)
+                    .stroke(Color.white.opacity(0.8), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                    .frame(width: 28, height: 28)
+                    .rotationEffect(.degrees(glassRotation * 3))
+            }
+            .accessibilityIdentifier("transcribingSpinner")
+        }
+    }
+
+    // MARK: - Status Text
+
     private var statusTextView: some View {
         Text(state.statusText)
-            .font(.system(size: 14, weight: .medium))
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
             .foregroundStyle(.primary)
             .accessibilityIdentifier("overlayStatusText")
     }
 
-    /// Timer display showing elapsed recording time
+    // MARK: - Timer View
+
     private var timerView: some View {
         Text(formattedTime)
-            .font(.system(size: 14, weight: .medium, design: .monospaced))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [
+                        Color.liquidPrismaticCyan,
+                        Color.liquidPrismaticBlue
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
             .accessibilityIdentifier("overlayTimer")
             .accessibilityLabel("Recording time \(formattedTimeAccessible)")
     }
 
     // MARK: - Computed Properties
 
-    /// Color for the recording indicator dot
-    private var indicatorColor: Color {
-        switch state {
-        case .recording:
-            return .warmAmber
-        case .transcribing:
-            return .warmAmberLight.opacity(0.6)
-        }
-    }
-
-    /// Formatted time string (M:SS format)
     private var formattedTime: String {
         let minutes = Int(elapsedTime) / 60
         let seconds = Int(elapsedTime) % 60
         return String(format: "%d:%02d", minutes, seconds)
     }
 
-    /// Accessible time description
     private var formattedTimeAccessible: String {
         let minutes = Int(elapsedTime) / 60
         let seconds = Int(elapsedTime) % 60
@@ -183,7 +276,6 @@ struct GlassRecordingOverlay: View {
         }
     }
 
-    /// Full accessibility description
     private var accessibilityDescription: String {
         switch state {
         case .recording:
@@ -193,44 +285,40 @@ struct GlassRecordingOverlay: View {
         }
     }
 
-    // MARK: - Private Methods
+    // MARK: - Animations
 
-    /// Start the pulsing animation for the recording indicator
-    private func startPulsingAnimation() {
-        withAnimation(
-            .easeInOut(duration: 0.8)
-            .repeatForever(autoreverses: true)
-        ) {
-            isPulsing = true
+    private func startAnimations() {
+        // Entrance animation
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.75)) {
+            isVisible = true
+        }
+
+        // Slow continuous glass rotation for prismatic effect
+        withAnimation(.linear(duration: 25).repeatForever(autoreverses: false)) {
+            glassRotation = 360
         }
     }
 }
 
 // MARK: - Overlay Container
 
-/// Container view that positions the overlay at the bottom center of the screen
 struct GlassRecordingOverlayContainer: View {
-    /// Current state of the overlay
     let state: GlassRecordingOverlay.OverlayState
-
-    /// Current audio level (0.0 - 1.0)
     let audioLevel: Float
-
-    /// Elapsed recording time in seconds
     let elapsedTime: TimeInterval
+    let waveformStyle: WaveformStyleOption
 
-    /// Distance from bottom of screen
     private let bottomOffset: CGFloat = 100
 
     var body: some View {
         GeometryReader { geometry in
             VStack {
                 Spacer()
-
                 GlassRecordingOverlay(
                     state: state,
                     audioLevel: audioLevel,
-                    elapsedTime: elapsedTime
+                    elapsedTime: elapsedTime,
+                    waveformStyle: waveformStyle
                 )
                 .padding(.bottom, bottomOffset)
             }
@@ -243,9 +331,8 @@ struct GlassRecordingOverlayContainer: View {
 
 // MARK: - Previews
 
-#Preview("Recording State") {
+#Preview("Recording") {
     ZStack {
-        // Simulated desktop background
         LinearGradient(
             colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
             startPoint: .topLeading,
@@ -255,15 +342,15 @@ struct GlassRecordingOverlayContainer: View {
 
         GlassRecordingOverlayContainer(
             state: .recording,
-            audioLevel: 0.5,
-            elapsedTime: 3
+            audioLevel: 0.6,
+            elapsedTime: 5,
+            waveformStyle: .aurora
         )
     }
 }
 
-#Preview("Transcribing State") {
+#Preview("Transcribing") {
     ZStack {
-        // Simulated desktop background
         LinearGradient(
             colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
             startPoint: .topLeading,
@@ -274,128 +361,8 @@ struct GlassRecordingOverlayContainer: View {
         GlassRecordingOverlayContainer(
             state: .transcribing,
             audioLevel: 0.0,
-            elapsedTime: 15
+            elapsedTime: 15,
+            waveformStyle: .aurora
         )
-    }
-}
-
-#Preview("Recording - Long Duration") {
-    ZStack {
-        Color.gray.opacity(0.2)
-            .ignoresSafeArea()
-
-        GlassRecordingOverlay(
-            state: .recording,
-            audioLevel: 0.7,
-            elapsedTime: 125 // 2:05
-        )
-    }
-}
-
-#Preview("Overlay Only - Recording") {
-    GlassRecordingOverlay(
-        state: .recording,
-        audioLevel: 0.6,
-        elapsedTime: 5
-    )
-    .padding(40)
-    .background(Color.gray.opacity(0.2))
-}
-
-#Preview("Overlay Only - Transcribing") {
-    GlassRecordingOverlay(
-        state: .transcribing,
-        audioLevel: 0.0,
-        elapsedTime: 10
-    )
-    .padding(40)
-    .background(Color.gray.opacity(0.2))
-}
-
-#Preview("Animated Demo") {
-    GlassRecordingOverlayAnimatedPreview()
-}
-
-/// Preview helper for animated overlay demo
-private struct GlassRecordingOverlayAnimatedPreview: View {
-    @State private var audioLevel: Float = 0.5
-    @State private var elapsedTime: TimeInterval = 0
-    @State private var state: GlassRecordingOverlay.OverlayState = .recording
-    @State private var audioTimer: Timer?
-    @State private var timeTimer: Timer?
-
-    var body: some View {
-        ZStack {
-            // Simulated desktop background
-            LinearGradient(
-                colors: [.blue.opacity(0.3), .purple.opacity(0.3)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-
-            VStack {
-                // State picker at top
-                Picker("State", selection: $state) {
-                    Text("Recording").tag(GlassRecordingOverlay.OverlayState.recording)
-                    Text("Transcribing").tag(GlassRecordingOverlay.OverlayState.transcribing)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 250)
-                .padding(.top, 40)
-
-                Spacer()
-
-                // Overlay at bottom
-                GlassRecordingOverlay(
-                    state: state,
-                    audioLevel: audioLevel,
-                    elapsedTime: elapsedTime
-                )
-                .padding(.bottom, 100)
-            }
-        }
-        .onAppear {
-            startAnimations()
-        }
-        .onDisappear {
-            stopAnimations()
-        }
-        .onChange(of: state) { _, _ in
-            // Reset audio when switching states
-            if state == .transcribing {
-                audioLevel = 0
-            }
-        }
-    }
-
-    private func startAnimations() {
-        // Simulate audio level changes
-        audioTimer?.invalidate()
-        audioTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { _ in
-            Task { @MainActor in
-                if state == .recording {
-                    // Simulate natural speech patterns
-                    let base = Float.random(in: 0.3...0.8)
-                    let variation = Float.random(in: -0.15...0.15)
-                    audioLevel = max(0, min(1, base + variation))
-                }
-            }
-        }
-
-        // Increment timer
-        timeTimer?.invalidate()
-        timeTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
-            Task { @MainActor in
-                elapsedTime += 1
-            }
-        }
-    }
-
-    private func stopAnimations() {
-        audioTimer?.invalidate()
-        audioTimer = nil
-        timeTimer?.invalidate()
-        timeTimer = nil
     }
 }

@@ -52,7 +52,8 @@ struct UserSettings: Codable, Sendable {
             showConfidenceIndicator: true,
             animationsEnabled: true,
             menuBarIcon: .default,
-            recordingMode: .holdToRecord
+            recordingMode: .holdToRecord,
+            waveformStyle: .aurora
         ),
         privacy: PrivacyConfiguration(
             collectAnonymousStats: true,
@@ -172,6 +173,83 @@ struct UIConfiguration: Codable, Sendable {
     var animationsEnabled: Bool
     var menuBarIcon: MenuBarIcon
     var recordingMode: RecordingMode
+    var waveformStyle: WaveformStyleOption
+
+    // Custom decoder to handle missing waveformStyle in existing settings
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        theme = try container.decode(Theme.self, forKey: .theme)
+        modalPosition = try container.decode(ModalPosition.self, forKey: .modalPosition)
+        showWaveform = try container.decode(Bool.self, forKey: .showWaveform)
+        showConfidenceIndicator = try container.decode(Bool.self, forKey: .showConfidenceIndicator)
+        animationsEnabled = try container.decode(Bool.self, forKey: .animationsEnabled)
+        menuBarIcon = try container.decode(MenuBarIcon.self, forKey: .menuBarIcon)
+        recordingMode = try container.decode(RecordingMode.self, forKey: .recordingMode)
+        waveformStyle = try container.decodeIfPresent(WaveformStyleOption.self, forKey: .waveformStyle) ?? .aurora
+    }
+
+    init(
+        theme: Theme = .system,
+        modalPosition: ModalPosition = .center,
+        showWaveform: Bool = true,
+        showConfidenceIndicator: Bool = true,
+        animationsEnabled: Bool = true,
+        menuBarIcon: MenuBarIcon = .default,
+        recordingMode: RecordingMode = .holdToRecord,
+        waveformStyle: WaveformStyleOption = .aurora
+    ) {
+        self.theme = theme
+        self.modalPosition = modalPosition
+        self.showWaveform = showWaveform
+        self.showConfidenceIndicator = showConfidenceIndicator
+        self.animationsEnabled = animationsEnabled
+        self.menuBarIcon = menuBarIcon
+        self.recordingMode = recordingMode
+        self.waveformStyle = waveformStyle
+    }
+}
+
+/// Waveform visualization style options (stored in settings)
+enum WaveformStyleOption: String, Codable, CaseIterable, Sendable {
+    case aurora = "aurora"
+    case siriRings = "siriRings"
+    case particleVortex = "particleVortex"
+    case crystalline = "crystalline"
+    case liquidOrb = "liquidOrb"
+    case flowingRibbon = "flowingRibbon"
+
+    var displayName: String {
+        switch self {
+        case .aurora: return "Aurora"
+        case .siriRings: return "Siri Rings"
+        case .particleVortex: return "Particle Vortex"
+        case .crystalline: return "Crystalline"
+        case .liquidOrb: return "Liquid Orb"
+        case .flowingRibbon: return "Flowing Ribbon"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .aurora: return "Flowing aurora waves with prismatic colors"
+        case .siriRings: return "Concentric rings that pulse outward"
+        case .particleVortex: return "Swirling particles in orbital patterns"
+        case .crystalline: return "Geometric crystalline patterns that morph"
+        case .liquidOrb: return "Morphing liquid orb visualization"
+        case .flowingRibbon: return "Ribbon-like flowing waveform"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .aurora: return "waveform.path"
+        case .siriRings: return "circle.circle"
+        case .particleVortex: return "sparkles"
+        case .crystalline: return "hexagon"
+        case .liquidOrb: return "circle.fill"
+        case .flowingRibbon: return "wind"
+        }
+    }
 }
 
 enum Theme: String, Codable, Sendable {

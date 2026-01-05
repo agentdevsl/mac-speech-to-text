@@ -288,6 +288,8 @@ struct MainView: View {
             } else {
                 LanguageSectionPlaceholder()
             }
+        case .theme:
+            ThemeSection(settingsService: settingsService)
         case .privacy:
             if let privacyVM = privacyViewModel {
                 PrivacySection(viewModel: privacyVM)
