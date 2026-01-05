@@ -18,7 +18,8 @@ struct ShortcutRecorderView: View {
 
     @State private var isRecording = false
     @State private var currentShortcut: KeyboardShortcuts.Shortcut?
-    @State private var eventMonitor: Any?
+    @State private var keyEventMonitor: Any?
+    @State private var mouseEventMonitor: Any?
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -69,6 +70,12 @@ struct ShortcutRecorderView: View {
             // Refresh shortcut on appear
             currentShortcut = KeyboardShortcuts.getShortcut(for: shortcutName)
         }
+        .onDisappear {
+            // Ensure monitors are cleaned up when view disappears
+            if isRecording {
+                stopRecording()
+            }
+        }
     }
 
     // MARK: - Computed Properties
@@ -113,7 +120,7 @@ struct ShortcutRecorderView: View {
         isRecording = true
 
         // Start monitoring key events
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
+        keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { event in
             if event.type == .keyDown {
                 handleKeyDown(event)
                 return nil // Consume the event
@@ -124,9 +131,9 @@ struct ShortcutRecorderView: View {
             return event
         }
 
-        // Also monitor for clicks outside to cancel
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [self] event in
+        // Also monitor for clicks outside to cancel (store monitor for proper cleanup)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [self] in
+            mouseEventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { event in
                 if isRecording {
                     stopRecording()
                 }
@@ -137,9 +144,15 @@ struct ShortcutRecorderView: View {
 
     private func stopRecording() {
         isRecording = false
-        if let monitor = eventMonitor {
+        // Clean up key event monitor
+        if let monitor = keyEventMonitor {
             NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
+            keyEventMonitor = nil
+        }
+        // Clean up mouse event monitor
+        if let monitor = mouseEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            mouseEventMonitor = nil
         }
     }
 
@@ -215,7 +228,6 @@ struct ShortcutRecorderView: View {
         return parts.joined()
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
     private func keyName(for key: KeyboardShortcuts.Key?) -> String {
         guard let key = key else { return "" }
 

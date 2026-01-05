@@ -22,6 +22,7 @@ struct HomeSection: View {
     // MARK: - Environment
 
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Dependencies
 
@@ -102,8 +103,12 @@ struct HomeSection: View {
         }
         .focusScope(homeFocusScope)
         .onKeyPress(.tab) {
-            handleTabNavigation()
-            return .handled
+            // Only handle tab when focused on permission cards
+            if focusedCard != nil {
+                handleTabNavigation()
+                return .handled
+            }
+            return .ignored  // Allow standard tab behavior otherwise
         }
         .onKeyPress(.return) {
             if focusedCard != nil {
@@ -120,12 +125,18 @@ struct HomeSection: View {
             return .ignored
         }
         .onAppear {
+            // Reload settings on appear to ensure fresh state
+            settings = settingsService.load()
             // Set initial focus to microphone card if no permissions granted
             if !microphoneGranted {
                 focusedCard = .microphone
             } else if !accessibilityGranted {
                 focusedCard = .accessibility
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsDidReset)) { _ in
+            // Reload settings when they change
+            settings = settingsService.load()
         }
     }
 
@@ -163,29 +174,32 @@ struct HomeSection: View {
         VStack(spacing: 24) {
             // Animated microphone icon with glow effect
             ZStack {
-                // Outer pulse rings
-                ForEach(0..<3, id: \.self) { index in
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.amberPrimary.opacity(0.4),
-                                    Color.amberPrimary.opacity(0.1)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.5
-                        )
-                        .frame(width: CGFloat(80 + index * 24), height: CGFloat(80 + index * 24))
-                        .scaleEffect(isPulsing ? 1.2 : 1.0)
-                        .opacity(isPulsing ? 0.0 : 0.8 - Double(index) * 0.2)
-                        .animation(
-                            .easeInOut(duration: 2.0)
-                            .repeatForever(autoreverses: true)
-                            .delay(Double(index) * 0.2),
-                            value: isPulsing
-                        )
+                // Outer pulse rings (hidden when reduce motion is enabled)
+                if !reduceMotion {
+                    ForEach(0..<3, id: \.self) { index in
+                        Circle()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [
+                                        Color.amberPrimary.opacity(0.4),
+                                        Color.amberPrimary.opacity(0.1)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 1.5
+                            )
+                            .frame(width: CGFloat(80 + index * 24), height: CGFloat(80 + index * 24))
+                            .scaleEffect(isPulsing ? 1.2 : 1.0)
+                            .opacity(isPulsing ? 0.0 : 0.8 - Double(index) * 0.2)
+                            .animation(
+                                .easeInOut(duration: 2.0)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(index) * 0.2),
+                                value: isPulsing
+                            )
+                    }
+                    .accessibilityHidden(true)  // Decorative elements
                 }
 
                 // Glass card background
@@ -209,7 +223,8 @@ struct HomeSection: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .symbolEffect(.pulse, options: .repeating, value: isPulsing)
+                    .symbolEffect(.pulse, options: reduceMotion ? [] : .repeating, value: isPulsing)
+                    .accessibilityLabel("Speech to Text - Ready to record")
             }
             .frame(height: 160)
             .accessibilityIdentifier("homeMicIcon")
@@ -479,11 +494,16 @@ struct HomeSection: View {
     }
 
     private func startPulseAnimation() {
-        withAnimation(
-            .easeInOut(duration: 1.5)
-            .repeatForever(autoreverses: true)
-        ) {
-            isPulsing = true
+        // Respect user's reduce motion preference
+        if reduceMotion {
+            isPulsing = true  // Set state without animation
+        } else {
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                isPulsing = true
+            }
         }
     }
 
@@ -519,25 +539,22 @@ struct HomeSection: View {
                 AppLogger.system.info("Opening System Settings for accessibility permission")
             }
 
-            var callbackInvoked = false
-
             await permissionService.pollForAccessibilityPermission(
                 interval: 1.0,
                 maxDuration: 60.0
             ) {
                 // Callback is already @MainActor, no nested Task needed
-                callbackInvoked = true
                 self.accessibilityGranted = true
                 self.isAccessibilityPolling = false
             }
 
             guard !Task.isCancelled else { return }
 
-            if !callbackInvoked {
+            // Check actual permission state instead of relying on callback flag
+            // This avoids race conditions between callback invocation and check
+            if !accessibilityGranted {
                 isAccessibilityPolling = false
-                if !accessibilityGranted {
-                    accessibilityError = "Permission not granted. Please enable in System Settings."
-                }
+                accessibilityError = "Permission not granted. Please enable in System Settings."
             }
         }
     }

@@ -21,8 +21,8 @@ struct GeneralSection: View {
     // MARK: - State
 
     @State private var settings: UserSettings
-    @State private var isSaving: Bool = false
     @State private var saveError: String?
+    @State private var errorDismissalTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -91,6 +91,11 @@ struct GeneralSection: View {
                 """
             )
             settings = loadedSettings
+        }
+        .onDisappear {
+            // Cancel any pending error dismissal task
+            errorDismissalTask?.cancel()
+            errorDismissalTask = nil
         }
     }
 
@@ -225,7 +230,6 @@ struct GeneralSection: View {
     }
 
     private func saveSettings() {
-        isSaving = true
         saveError = nil
         do {
             AppLogger.system.info(
@@ -240,14 +244,20 @@ struct GeneralSection: View {
             AppLogger.system.info("GeneralSection: Settings saved successfully")
         } catch {
             AppLogger.service.error("Failed to save settings: \(error.localizedDescription)")
-            saveError = "Failed to save settings. Please try again."
-            // Clear error after 3 seconds
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(3))
+            showError("Failed to save settings. Please try again.")
+        }
+    }
+
+    private func showError(_ message: String) {
+        saveError = message
+        // Cancel any previous dismissal task to avoid race condition
+        errorDismissalTask?.cancel()
+        errorDismissalTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(3))
+            if !Task.isCancelled {
                 saveError = nil
             }
         }
-        isSaving = false
     }
 
     private func updateLaunchAtLogin(enabled: Bool) {
@@ -261,14 +271,9 @@ struct GeneralSection: View {
             }
         } catch {
             AppLogger.service.error("Failed to update launch at login: \(error.localizedDescription)")
-            saveError = "Failed to update launch at login setting."
             // Revert the setting since the system call failed
             settings.general.launchAtLogin = !enabled
-            // Clear error after 3 seconds
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(3))
-                saveError = nil
-            }
+            showError("Failed to update launch at login setting.")
         }
     }
 }
@@ -433,34 +438,6 @@ private struct BlueToggleStyle: ToggleStyle {
                     }
                 }
         }
-    }
-}
-
-// MARK: - Key Badge
-
-/// Styled keyboard key badge - matches GlassKeyboardKey from HomeSection
-private struct KeyBadge: View {
-    @Environment(\.colorScheme) private var colorScheme
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
-                    .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(
-                        colorScheme == .dark ? Color.white.opacity(0.15) : Color.black.opacity(0.1),
-                        lineWidth: 1
-                    )
-            )
     }
 }
 

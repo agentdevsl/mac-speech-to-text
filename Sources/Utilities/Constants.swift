@@ -132,8 +132,17 @@ enum Constants {
             return FileManager.default.fileExists(atPath: fullPath) ? fullPath : nil
         }
 
+        /// Paths to all required model files
+        struct ModelFilePaths {
+            let encoder: String
+            let decoder: String
+            let joiner: String
+            let tokens: String
+            let bpeModel: String
+        }
+
         /// Returns paths to all required model files, or nil if any are missing
-        static var allModelFilePaths: (encoder: String, decoder: String, joiner: String, tokens: String, bpeModel: String)? {
+        static var allModelFilePaths: ModelFilePaths? {
             guard let encoder = modelFilePath(encoderFileName),
                   let decoder = modelFilePath(decoderFileName),
                   let joiner = modelFilePath(joinerFileName),
@@ -141,7 +150,13 @@ enum Constants {
                   let bpeModel = modelFilePath(bpeModelFileName) else {
                 return nil
             }
-            return (encoder: encoder, decoder: decoder, joiner: joiner, tokens: tokens, bpeModel: bpeModel)
+            return ModelFilePaths(
+                encoder: encoder,
+                decoder: decoder,
+                joiner: joiner,
+                tokens: tokens,
+                bpeModel: bpeModel
+            )
         }
     }
 }

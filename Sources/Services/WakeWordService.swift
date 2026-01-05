@@ -379,13 +379,13 @@ actor WakeWordService: WakeWordServiceProtocol {
 
     // MARK: - Private Methods
 
+    // swiftlint:disable:next line_length
     /// BPE token mappings for common wake word phrases
     ///
     /// These are pre-tokenized using the sherpa-onnx-kws-zipformer-gigaspeech model's BPE vocabulary.
     /// The tokens use the ▁ (Unicode U+2581) character to indicate word boundaries.
     ///
     /// To add new keywords, use `sherpa-onnx-cli text2token` to convert text to BPE tokens.
-    // swiftlint:disable:next line_length
     private static let bpeTokenMappings: [String: String] = [
         // Assistant-style wake words
         "hey siri": "▁HE Y ▁S I RI",
