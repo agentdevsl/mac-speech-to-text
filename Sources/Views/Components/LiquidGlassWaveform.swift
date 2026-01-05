@@ -166,22 +166,20 @@ struct AuroraWaveform: View {
     ) {
         let sparkleCount = Int(audioLevel * 12)
 
-        for i in 0..<sparkleCount {
-            let phase = time * 2 + Double(i) * 0.5
+        for sparkleIndex in 0..<sparkleCount {
+            let phase = time * 2 + Double(sparkleIndex) * 0.5
 
-            let x = size.width * (CGFloat(i) / CGFloat(max(1, sparkleCount)))
+            let xPos = size.width * (CGFloat(sparkleIndex) / CGFloat(max(1, sparkleCount)))
             let yBase = size.height * 0.3 + sin(phase) * size.height * 0.4
-            let y = yBase + sin(phase * 3) * audioLevel * 20
+            let yPos = yBase + sin(phase * 3) * audioLevel * 20
 
             let sparkleSize = 2 + audioLevel * 3
-            let opacity = (sin(phase * 4) + 1) / 2 * Double(audioLevel)
+            let sparkleOpacity = (sin(phase * 4) + 1) / 2 * Double(audioLevel)
 
-            // Pick color from prismatic palette
-            let hue = (Double(i) / Double(max(1, sparkleCount)) + time * 0.1).truncatingRemainder(dividingBy: 1.0)
-
+            // Simplified: white sparkles with slight blue tint
             context.fill(
-                Circle().path(in: CGRect(x: x - sparkleSize / 2, y: y - sparkleSize / 2, width: sparkleSize, height: sparkleSize)),
-                with: .color(Color(hue: hue, saturation: 0.8, brightness: 1.0).opacity(opacity))
+                Circle().path(in: CGRect(x: xPos - sparkleSize / 2, y: yPos - sparkleSize / 2, width: sparkleSize, height: sparkleSize)),
+                with: .color(Color.white.opacity(sparkleOpacity))
             )
         }
     }
@@ -192,59 +190,22 @@ struct AuroraWaveform: View {
     }
 
     private func waveColors(for layer: Int, isRecording: Bool, audioLevel: Float) -> WaveColors {
+        // Simplified Apple Liquid Glass palette
+        // Uses single accent color with white/frost variations
         if isRecording {
-            // Recording: warm coral to pink gradient shifting with audio
-            switch layer {
-            case 0:
-                return WaveColors(
-                    primary: Color.liquidRecordingCore,
-                    secondary: Color.liquidPrismaticPink
-                )
-            case 1:
-                return WaveColors(
-                    primary: Color.liquidRecordingMid,
-                    secondary: Color.liquidPrismaticOrange
-                )
-            case 2:
-                return WaveColors(
-                    primary: Color.liquidPrismaticOrange,
-                    secondary: Color.liquidPrismaticYellow
-                )
-            case 3:
-                return WaveColors(
-                    primary: Color.liquidPrismaticPink.opacity(0.8),
-                    secondary: Color.liquidPrismaticPurple.opacity(0.6)
-                )
-            default:
-                return WaveColors(
-                    primary: Color.liquidPrismaticPurple.opacity(0.5),
-                    secondary: Color.liquidPrismaticBlue.opacity(0.4)
-                )
-            }
+            // Recording: warm red with soft coral accents
+            let opacity = 1.0 - Double(layer) * 0.15
+            return WaveColors(
+                primary: Color.liquidRecordingCore.opacity(opacity),
+                secondary: Color.liquidRecordingMid.opacity(opacity * 0.8)
+            )
         } else {
-            // Idle: cool prismatic blues and purples
-            switch layer {
-            case 0:
-                return WaveColors(
-                    primary: Color.liquidPrismaticBlue,
-                    secondary: Color.liquidPrismaticCyan
-                )
-            case 1:
-                return WaveColors(
-                    primary: Color.liquidPrismaticPurple,
-                    secondary: Color.liquidPrismaticBlue
-                )
-            case 2:
-                return WaveColors(
-                    primary: Color.liquidPrismaticCyan.opacity(0.7),
-                    secondary: Color.liquidPrismaticGreen.opacity(0.5)
-                )
-            default:
-                return WaveColors(
-                    primary: Color.liquidPrismaticBlue.opacity(0.4),
-                    secondary: Color.liquidPrismaticPurple.opacity(0.3)
-                )
-            }
+            // Idle: refined ice blue with white frost
+            let opacity = 1.0 - Double(layer) * 0.15
+            return WaveColors(
+                primary: Color.liquidGlassAccent.opacity(opacity),
+                secondary: Color.white.opacity(opacity * 0.6)
+            )
         }
     }
 }
@@ -278,7 +239,7 @@ struct LiquidOrbWaveform: View {
 
                 context.stroke(
                     ringPath,
-                    with: .color((isRecording ? Color.liquidRecordingOuter : Color.liquidPrismaticCyan).opacity(opacity)),
+                    with: .color((isRecording ? Color.liquidRecordingMid : Color.liquidGlassAccent).opacity(opacity)),
                     lineWidth: 1
                 )
             }
@@ -292,15 +253,15 @@ struct LiquidOrbWaveform: View {
                 detail: 64
             )
 
-            // Gradient fill
+            // Gradient fill - simplified Apple Liquid Glass palette
             let gradient = Gradient(colors: isRecording ? [
                 Color.liquidRecordingCore,
                 Color.liquidRecordingMid,
-                Color.liquidRecordingOuter.opacity(0.8)
+                Color.white.opacity(0.3)
             ] : [
-                Color.liquidPrismaticBlue,
-                Color.liquidPrismaticPurple,
-                Color.liquidPrismaticCyan.opacity(0.8)
+                Color.liquidGlassAccent,
+                Color.liquidGlassAccent.opacity(0.6),
+                Color.white.opacity(0.3)
             ])
 
             // Outer glow
@@ -308,7 +269,7 @@ struct LiquidOrbWaveform: View {
                 orbPath,
                 with: .radialGradient(
                     Gradient(colors: [
-                        (isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticBlue).opacity(0.4),
+                        (isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent).opacity(0.4),
                         .clear
                     ]),
                     center: center,
@@ -359,7 +320,7 @@ struct LiquidOrbWaveform: View {
 
                 context.stroke(
                     levelPath,
-                    with: .color((isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticCyan).opacity(Double(smoothLevel) * 0.5)),
+                    with: .color((isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent).opacity(Double(smoothLevel) * 0.5)),
                     lineWidth: 2
                 )
             }
@@ -513,15 +474,15 @@ struct FlowingRibbonWaveform: View {
         }
         fillPath.closeSubpath()
 
-        // Colors
+        // Colors - simplified Apple Liquid Glass palette
         let colors: [Color] = isRecording ? [
             Color.liquidRecordingCore,
             Color.liquidRecordingMid,
-            Color.liquidPrismaticOrange
+            Color.white.opacity(0.5)
         ] : [
-            Color.liquidPrismaticBlue,
-            Color.liquidPrismaticPurple,
-            Color.liquidPrismaticCyan
+            Color.liquidGlassAccent,
+            Color.liquidGlassAccent.opacity(0.7),
+            Color.white.opacity(0.4)
         ]
 
         // Fill with gradient

@@ -169,8 +169,8 @@ struct SiriStyleRingWaves: View {
             height: glowRadius * 2
         ))
 
-        // Radial gradient for center glow
-        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticBlue
+        // Radial gradient for center glow - simplified palette
+        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent
 
         context.fill(
             glowPath,
@@ -190,84 +190,20 @@ struct SiriStyleRingWaves: View {
     // MARK: - Color Helpers
 
     private func ringColors(for ringIndex: Int, isRecording: Bool) -> (Color, Color, Color, Color) {
+        // Simplified Apple Liquid Glass palette
+        let opacity = 1.0 - Double(ringIndex) * 0.15
+
         if isRecording {
-            // Recording: warm coral to orange gradient
-            switch ringIndex {
-            case 0:
-                return (
-                    Color.liquidRecordingCore,
-                    Color.liquidRecordingMid,
-                    Color.liquidPrismaticOrange,
-                    Color.liquidRecordingMid
-                )
-            case 1:
-                return (
-                    Color.liquidRecordingMid,
-                    Color.liquidPrismaticOrange,
-                    Color.liquidPrismaticYellow,
-                    Color.liquidRecordingMid
-                )
-            case 2:
-                return (
-                    Color.liquidPrismaticOrange,
-                    Color.liquidPrismaticYellow,
-                    Color.liquidPrismaticPink,
-                    Color.liquidPrismaticOrange
-                )
-            case 3:
-                return (
-                    Color.liquidPrismaticPink.opacity(0.8),
-                    Color.liquidRecordingOuter.opacity(0.7),
-                    Color.liquidPrismaticOrange.opacity(0.6),
-                    Color.liquidPrismaticPink.opacity(0.8)
-                )
-            default:
-                return (
-                    Color.liquidRecordingOuter.opacity(0.5),
-                    Color.liquidPrismaticPink.opacity(0.4),
-                    Color.liquidPrismaticOrange.opacity(0.3),
-                    Color.liquidRecordingOuter.opacity(0.5)
-                )
-            }
+            // Recording: warm red with white frost accents
+            let coreColor = Color.liquidRecordingCore.opacity(opacity)
+            let midColor = Color.liquidRecordingMid.opacity(opacity * 0.9)
+            let frostColor = Color.white.opacity(opacity * 0.4)
+            return (coreColor, midColor, frostColor, midColor)
         } else {
-            // Idle/Transcribing: cool prismatic colors
-            switch ringIndex {
-            case 0:
-                return (
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticPink
-                )
-            case 1:
-                return (
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticPink,
-                    Color.liquidPrismaticBlue
-                )
-            case 2:
-                return (
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticPurple
-                )
-            case 3:
-                return (
-                    Color.liquidPrismaticBlue.opacity(0.7),
-                    Color.liquidPrismaticCyan.opacity(0.6),
-                    Color.liquidPrismaticPurple.opacity(0.5),
-                    Color.liquidPrismaticBlue.opacity(0.7)
-                )
-            default:
-                return (
-                    Color.liquidPrismaticCyan.opacity(0.4),
-                    Color.liquidPrismaticBlue.opacity(0.3),
-                    Color.liquidPrismaticPurple.opacity(0.3),
-                    Color.liquidPrismaticCyan.opacity(0.4)
-                )
-            }
+            // Idle: refined blue accent with white frost
+            let accentColor = Color.liquidGlassAccent.opacity(opacity)
+            let frostColor = Color.white.opacity(opacity * 0.5)
+            return (accentColor, frostColor, accentColor.opacity(opacity * 0.8), frostColor)
         }
     }
 }
@@ -314,7 +250,7 @@ private struct SiriStyleRingWavesPreview: View {
                         ),
                         in: 0...1
                     )
-                    .tint(isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticBlue)
+                    .tint(isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent)
                 }
 
                 // Simulate audio button
@@ -325,7 +261,7 @@ private struct SiriStyleRingWavesPreview: View {
                     }
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(isRecording ? Color.liquidRecordingMid : Color.liquidPrismaticPurple)
+                .tint(isRecording ? Color.liquidRecordingMid : Color.liquidGlassAccent)
             }
             .padding()
             .frame(width: 250)

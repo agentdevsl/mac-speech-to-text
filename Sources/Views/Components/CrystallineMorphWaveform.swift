@@ -154,11 +154,11 @@ struct CrystallineMorphWaveform: View {
 
         let colors = isRecording ? [
             Color.liquidRecordingCore.opacity(glowIntensity),
-            Color.liquidPrismaticOrange.opacity(glowIntensity * 0.5),
+            Color.liquidRecordingMid.opacity(glowIntensity * 0.5),
             Color.clear
         ] : [
-            Color.liquidPrismaticBlue.opacity(glowIntensity),
-            Color.liquidPrismaticCyan.opacity(glowIntensity * 0.5),
+            Color.liquidGlassAccent.opacity(glowIntensity),
+            Color.liquidGlassAccent.opacity(glowIntensity * 0.4),
             Color.clear
         ]
 
@@ -354,7 +354,7 @@ struct CrystallineMorphWaveform: View {
         path.closeSubpath()
 
         // Core glow
-        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticCyan
+        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent.opacity(0.8)
 
         var glowContext = context
         glowContext.blendMode = .plusLighter
@@ -379,14 +379,14 @@ struct CrystallineMorphWaveform: View {
 
         let lissajousColors: [Color] = isRecording ? [
             Color.liquidRecordingCore,
-            Color.liquidPrismaticPink,
+            Color.white.opacity(0.4),
             Color.liquidRecordingMid,
             Color.liquidRecordingCore
         ] : [
-            Color.liquidPrismaticCyan,
-            Color.liquidPrismaticBlue,
-            Color.liquidPrismaticPurple,
-            Color.liquidPrismaticCyan
+            Color.liquidGlassAccent.opacity(0.8),
+            Color.liquidGlassAccent,
+            Color.liquidGlassAccent.opacity(0.7),
+            Color.liquidGlassAccent.opacity(0.8)
         ]
 
         context.stroke(
@@ -436,9 +436,9 @@ struct CrystallineMorphWaveform: View {
             // Color alternates based on index
             let rayColor: Color
             if isRecording {
-                rayColor = index % 2 == 0 ? Color.liquidPrismaticOrange : Color.liquidPrismaticPink
+                rayColor = index % 2 == 0 ? Color.liquidRecordingMid : Color.white.opacity(0.4)
             } else {
-                rayColor = index % 2 == 0 ? Color.liquidPrismaticCyan : Color.liquidPrismaticBlue
+                rayColor = index % 2 == 0 ? Color.liquidGlassAccent.opacity(0.8) : Color.liquidGlassAccent
             }
 
             context.stroke(
@@ -460,68 +460,68 @@ struct CrystallineMorphWaveform: View {
 
     private func crystallineColors(for layer: Int, audioLevel: Float) -> [Color] {
         if isRecording {
-            // Warm crystalline palette: orange -> pink -> red
+            // Warm crystalline palette: red core with white frost accents
             switch layer {
             case 0:
                 return [
-                    Color.liquidPrismaticOrange,
-                    Color.liquidPrismaticPink,
+                    Color.liquidRecordingMid,
+                    Color.white.opacity(0.4),
                     Color.liquidRecordingCore,
                     Color.liquidRecordingMid,
-                    Color.liquidPrismaticOrange
+                    Color.liquidRecordingMid
                 ]
             case 1:
                 return [
                     Color.liquidRecordingCore,
-                    Color.liquidPrismaticPink,
-                    Color.liquidPrismaticOrange,
-                    Color.liquidPrismaticYellow.opacity(0.8),
+                    Color.white.opacity(0.4),
+                    Color.liquidRecordingMid,
+                    Color.white.opacity(0.3),
                     Color.liquidRecordingCore
                 ]
             case 2:
                 return [
-                    Color.liquidPrismaticPink,
+                    Color.white.opacity(0.4),
                     Color.liquidRecordingMid,
-                    Color.liquidPrismaticOrange,
-                    Color.liquidPrismaticPink
+                    Color.liquidRecordingMid,
+                    Color.white.opacity(0.4)
                 ]
             default:
                 return [
                     Color.liquidRecordingCore,
-                    Color.liquidPrismaticPink,
+                    Color.white.opacity(0.4),
                     Color.liquidRecordingCore
                 ]
             }
         } else {
-            // Cool crystalline palette: blue -> cyan -> purple
+            // Cool crystalline palette: accent blue with white frost variations
             switch layer {
             case 0:
                 return [
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan
+                    Color.liquidGlassAccent,
+                    Color.liquidGlassAccent.opacity(0.8),
+                    Color.liquidGlassAccent.opacity(0.7),
+                    Color.liquidGlassAccent,
+                    Color.white.opacity(0.5)
                 ]
             case 1:
                 return [
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticCyan
+                    Color.liquidGlassAccent.opacity(0.8),
+                    Color.liquidGlassAccent,
+                    Color.liquidGlassAccent.opacity(0.7),
+                    Color.liquidGlassAccent.opacity(0.8)
                 ]
             case 2:
                 return [
-                    Color.liquidPrismaticPurple,
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan.opacity(0.8),
-                    Color.liquidPrismaticPurple
+                    Color.liquidGlassAccent.opacity(0.7),
+                    Color.liquidGlassAccent,
+                    Color.white.opacity(0.5),
+                    Color.liquidGlassAccent.opacity(0.7)
                 ]
             default:
                 return [
-                    Color.liquidPrismaticBlue,
-                    Color.liquidPrismaticCyan,
-                    Color.liquidPrismaticBlue
+                    Color.liquidGlassAccent,
+                    Color.white.opacity(0.5),
+                    Color.liquidGlassAccent
                 ]
             }
         }

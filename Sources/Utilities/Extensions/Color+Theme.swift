@@ -142,35 +142,42 @@ extension Color {
     /// Hex: #0d0d1a
     static let liquidGlassShadow = Color(hex: "0d0d1a")
 
-    // MARK: - Prismatic Rainbow Colors
+    // MARK: - Refined Glass Palette (Apple Liquid Glass Inspired)
 
-    /// Prismatic pink - soft rose
-    /// Hex: #ff6b9d
-    static let liquidPrismaticPink = Color(hex: "ff6b9d")
+    /// Primary glass color - soft ice blue (barely perceptible)
+    /// Hex: #E8F4FC
+    static let liquidGlassPrimary = Color(hex: "E8F4FC")
 
-    /// Prismatic purple - electric violet
-    /// Hex: #c471ed
-    static let liquidPrismaticPurple = Color(hex: "c471ed")
+    /// Secondary glass color - cool silver
+    /// Hex: #F0F2F5
+    static let liquidGlassSecondary = Color(hex: "F0F2F5")
 
-    /// Prismatic blue - bright azure
+    /// Glass accent - single blue accent for highlights
     /// Hex: #667eea
-    static let liquidPrismaticBlue = Color(hex: "667eea")
+    static let liquidGlassAccent = Color(hex: "667eea")
 
-    /// Prismatic cyan - vibrant teal
-    /// Hex: #48dbfb
-    static let liquidPrismaticCyan = Color(hex: "48dbfb")
+    // MARK: - Legacy Prismatic (Mapped to Refined Palette)
 
-    /// Prismatic green - fresh mint
-    /// Hex: #26de81
-    static let liquidPrismaticGreen = Color(hex: "26de81")
+    /// @deprecated Use liquidGlassAccent or white with opacity
+    static let liquidPrismaticPink = liquidGlassAccent.opacity(0.8)
 
-    /// Prismatic yellow - warm gold
-    /// Hex: #fed330
-    static let liquidPrismaticYellow = Color(hex: "fed330")
+    /// @deprecated Use liquidGlassAccent
+    static let liquidPrismaticPurple = liquidGlassAccent
 
-    /// Prismatic orange - sunset coral
-    /// Hex: #ff9f43
-    static let liquidPrismaticOrange = Color(hex: "ff9f43")
+    /// @deprecated Use liquidGlassAccent
+    static let liquidPrismaticBlue = liquidGlassAccent
+
+    /// @deprecated Use liquidGlassPrimary
+    static let liquidPrismaticCyan = liquidGlassPrimary
+
+    /// @deprecated Use liquidGlassPrimary
+    static let liquidPrismaticGreen = liquidGlassPrimary
+
+    /// @deprecated Use amberPrimary
+    static let liquidPrismaticYellow = amberPrimary
+
+    /// @deprecated Use amberBright
+    static let liquidPrismaticOrange = amberBright
 
     // MARK: - Liquid Recording States
 

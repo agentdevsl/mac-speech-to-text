@@ -210,7 +210,7 @@ struct ParticleVortexWaveform: View {
         let glowRadius = radius * (1.2 + level * 0.3)
         let glowOpacity = 0.15 + Double(level) * 0.15
 
-        let baseColor = isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticBlue
+        let baseColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent
 
         context.fill(
             Circle().path(in: CGRect(
@@ -337,28 +337,21 @@ struct ParticleVortexWaveform: View {
     }
 
     private func calculateHue(for particle: Particle, time: Double) -> Double {
-        // Base hue from particle's offset
-        var hue = particle.hueOffset
+        // Simplified Apple Liquid Glass palette - single hue with slight variation
+        // Base hue from particle's offset (subtle variation)
+        var hueVariation = particle.hueOffset * 0.05
 
-        // Add time-based cycling
-        hue += time * 0.05
-
-        // Add position-based variation
-        hue += sin(particle.angle) * 0.1
+        // Add subtle time-based variation
+        hueVariation += sin(time * 0.3) * 0.02
 
         // Shift hue range based on recording state
         if isRecording {
-            // Warm prismatic: pink -> orange -> yellow (hue 0.9-0.15)
-            hue = 0.9 + (hue.truncatingRemainder(dividingBy: 1.0)) * 0.25
-            if hue > 1.0 {
-                hue -= 1.0
-            }
+            // Warm: red-orange range (hue ~0.0-0.05)
+            return (0.0 + hueVariation).truncatingRemainder(dividingBy: 1.0)
         } else {
-            // Cool prismatic: blue -> cyan -> purple (hue 0.5-0.85)
-            hue = 0.5 + (hue.truncatingRemainder(dividingBy: 1.0)) * 0.35
+            // Cool: blue range (hue ~0.6-0.65) - matches liquidGlassAccent #667eea
+            return (0.63 + hueVariation).truncatingRemainder(dividingBy: 1.0)
         }
-
-        return hue.truncatingRemainder(dividingBy: 1.0)
     }
 
     private func drawCenterOrb(
@@ -368,8 +361,8 @@ struct ParticleVortexWaveform: View {
     ) {
         let orbRadius: CGFloat = 8 + level * 4
 
-        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidPrismaticCyan
-        let midColor = isRecording ? Color.liquidRecordingMid : Color.liquidPrismaticBlue
+        let coreColor = isRecording ? Color.liquidRecordingCore : Color.liquidGlassAccent
+        let midColor = isRecording ? Color.liquidRecordingMid : Color.liquidGlassAccent.opacity(0.7)
 
         // Outer glow
         let glowRadius = orbRadius * 3
