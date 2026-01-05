@@ -236,22 +236,22 @@ struct GeneralSection: View {
                         .foregroundStyle(Color.warmAmber)
                         .frame(width: 24)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Hold-to-Record")
-                            .font(.body)
-                            .foregroundStyle(.primary)
-
-                        Text("Click to change")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text("Hold-to-Record")
+                        .font(.body)
+                        .foregroundStyle(.primary)
                 }
 
                 Spacer()
 
                 // Shortcut recorder (custom to avoid Bundle.module crash)
-                ShortcutRecorderView(for: .holdToRecord)
-                    .accessibilityIdentifier("hotkeyRecorder")
+                VStack(spacing: 6) {
+                    ShortcutRecorderView(for: .holdToRecord)
+                        .accessibilityIdentifier("hotkeyRecorder")
+
+                    Text("Click to change")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(16)
             .background(
@@ -292,21 +292,21 @@ struct GeneralSection: View {
                     .foregroundStyle(Color.warmAmber)
                     .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Toggle Recording")
-                        .font(.body)
-                        .foregroundStyle(.primary)
-
-                    Text("Press once to start, again to stop")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Toggle Recording")
+                    .font(.body)
+                    .foregroundStyle(.primary)
             }
 
             Spacer()
 
-            ShortcutRecorderView(for: .toggleRecording, placeholder: "Set Toggle Key")
-                .accessibilityIdentifier("toggleRecordingRecorder")
+            VStack(spacing: 6) {
+                ShortcutRecorderView(for: .toggleRecording, placeholder: "Set Toggle Key")
+                    .accessibilityIdentifier("toggleRecordingRecorder")
+
+                Text("Click to change")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(16)
         .background(
