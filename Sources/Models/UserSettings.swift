@@ -12,7 +12,47 @@ struct UserSettings: Codable, Sendable {
     var ui: UIConfiguration
     var privacy: PrivacyConfiguration
     var onboarding: OnboardingState
+    var voiceTrigger: VoiceTriggerConfiguration
     var lastModified: Date
+
+    // Custom decoder to handle migration from existing settings without voiceTrigger
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        general = try container.decode(GeneralConfiguration.self, forKey: .general)
+        hotkey = try container.decode(HotkeyConfiguration.self, forKey: .hotkey)
+        language = try container.decode(LanguageConfiguration.self, forKey: .language)
+        audio = try container.decode(AudioConfiguration.self, forKey: .audio)
+        ui = try container.decode(UIConfiguration.self, forKey: .ui)
+        privacy = try container.decode(PrivacyConfiguration.self, forKey: .privacy)
+        onboarding = try container.decode(OnboardingState.self, forKey: .onboarding)
+        voiceTrigger = try container.decodeIfPresent(VoiceTriggerConfiguration.self, forKey: .voiceTrigger) ?? .default
+        lastModified = try container.decode(Date.self, forKey: .lastModified)
+    }
+
+    init(
+        version: Int,
+        general: GeneralConfiguration,
+        hotkey: HotkeyConfiguration,
+        language: LanguageConfiguration,
+        audio: AudioConfiguration,
+        ui: UIConfiguration,
+        privacy: PrivacyConfiguration,
+        onboarding: OnboardingState,
+        voiceTrigger: VoiceTriggerConfiguration = .default,
+        lastModified: Date
+    ) {
+        self.version = version
+        self.general = general
+        self.hotkey = hotkey
+        self.language = language
+        self.audio = audio
+        self.ui = ui
+        self.privacy = privacy
+        self.onboarding = onboarding
+        self.voiceTrigger = voiceTrigger
+        self.lastModified = lastModified
+    }
 
     // Typealiases for view compatibility
     typealias HotkeyConfig = HotkeyConfiguration
@@ -72,6 +112,7 @@ struct UserSettings: Codable, Sendable {
             ),
             skippedSteps: []
         ),
+        voiceTrigger: VoiceTriggerConfiguration.default,
         lastModified: Date()
     )
 }
@@ -223,12 +264,12 @@ struct UIConfiguration: Codable, Sendable {
 
 /// Waveform visualization style options (stored in settings)
 enum WaveformStyleOption: String, Codable, CaseIterable, Sendable {
-    case aurora = "aurora"
-    case siriRings = "siriRings"
-    case particleVortex = "particleVortex"
-    case crystalline = "crystalline"
-    case liquidOrb = "liquidOrb"
-    case flowingRibbon = "flowingRibbon"
+    case aurora
+    case siriRings
+    case particleVortex
+    case crystalline
+    case liquidOrb
+    case flowingRibbon
 
     var displayName: String {
         switch self {

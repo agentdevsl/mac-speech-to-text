@@ -16,6 +16,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Codable {
     case home
     case general
     case audio
+    case voiceTrigger
     case language
     case theme
     case privacy
@@ -29,6 +30,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Codable {
         case .home: return "Home"
         case .general: return "General"
         case .audio: return "Audio"
+        case .voiceTrigger: return "Voice Trigger"
         case .language: return "Language"
         case .theme: return "Theme"
         case .privacy: return "Privacy"
@@ -42,6 +44,7 @@ enum SidebarSection: String, CaseIterable, Identifiable, Codable {
         case .home: return "house.fill"
         case .general: return "gear"
         case .audio: return "waveform"
+        case .voiceTrigger: return "mic.circle"
         case .language: return "globe"
         case .theme: return "paintbrush"
         case .privacy: return "lock.shield"

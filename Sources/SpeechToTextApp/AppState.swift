@@ -12,6 +12,9 @@ class AppState {
     var showSettings: Bool = false
     var errorMessage: String?
 
+    // Voice trigger monitoring state (for menu bar indicator)
+    var voiceTriggerState: VoiceTriggerState = .idle
+
     // Services
     let fluidAudioService: FluidAudioService
     let permissionService: PermissionService
@@ -22,6 +25,10 @@ class AppState {
     @ObservationIgnored private var loadingTask: Task<Void, Never>?
     /// nonisolated copy for deinit access (deinit cannot access MainActor-isolated state)
     @ObservationIgnored private nonisolated(unsafe) var deinitLoadingTask: Task<Void, Never>?
+    /// Observer for voice trigger state changes
+    @ObservationIgnored private var voiceTriggerStateObserver: NSObjectProtocol?
+    /// nonisolated copy for deinit access
+    @ObservationIgnored private nonisolated(unsafe) var deinitVoiceTriggerStateObserver: NSObjectProtocol?
 
     init() {
         // Initialize services
@@ -45,10 +52,30 @@ class AppState {
 
         // Check if onboarding needed
         self.showOnboarding = !settings.onboarding.completed
+
+        // Observe voice trigger state changes from AppDelegate
+        let observer = NotificationCenter.default.addObserver(
+            forName: .voiceTriggerStateChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            if let state = notification.userInfo?["state"] as? VoiceTriggerState {
+                // Use Task to hop to MainActor for thread-safe property mutation
+                Task { @MainActor [weak self] in
+                    self?.voiceTriggerState = state
+                }
+            }
+        }
+        voiceTriggerStateObserver = observer
+        deinitVoiceTriggerStateObserver = observer
     }
 
     deinit {
         deinitLoadingTask?.cancel()
+        if let observer = deinitVoiceTriggerStateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     /// Initialize FluidAudio on app startup

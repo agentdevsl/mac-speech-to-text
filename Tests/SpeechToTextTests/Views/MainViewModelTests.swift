@@ -89,13 +89,14 @@ final class MainViewModelTests: XCTestCase {
     // MARK: - SidebarSection Enum Tests
 
     func test_sidebarSection_allCasesCount() {
-        XCTAssertEqual(SidebarSection.allCases.count, 7)
+        XCTAssertEqual(SidebarSection.allCases.count, 8)
     }
 
     func test_sidebarSection_hasCorrectTitles() {
         XCTAssertEqual(SidebarSection.home.title, "Home")
         XCTAssertEqual(SidebarSection.general.title, "General")
         XCTAssertEqual(SidebarSection.audio.title, "Audio")
+        XCTAssertEqual(SidebarSection.voiceTrigger.title, "Voice Trigger")
         XCTAssertEqual(SidebarSection.language.title, "Language")
         XCTAssertEqual(SidebarSection.theme.title, "Theme")
         XCTAssertEqual(SidebarSection.privacy.title, "Privacy")
@@ -106,6 +107,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.home.icon, "house.fill")
         XCTAssertEqual(SidebarSection.general.icon, "gear")
         XCTAssertEqual(SidebarSection.audio.icon, "waveform")
+        XCTAssertEqual(SidebarSection.voiceTrigger.icon, "mic.circle")
         XCTAssertEqual(SidebarSection.language.icon, "globe")
         XCTAssertEqual(SidebarSection.theme.icon, "paintbrush")
         XCTAssertEqual(SidebarSection.privacy.icon, "lock.shield")
@@ -116,6 +118,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.home.accessibilityLabel, "Home section")
         XCTAssertEqual(SidebarSection.general.accessibilityLabel, "General section")
         XCTAssertEqual(SidebarSection.audio.accessibilityLabel, "Audio section")
+        XCTAssertEqual(SidebarSection.voiceTrigger.accessibilityLabel, "Voice Trigger section")
         XCTAssertEqual(SidebarSection.language.accessibilityLabel, "Language section")
         XCTAssertEqual(SidebarSection.theme.accessibilityLabel, "Theme section")
         XCTAssertEqual(SidebarSection.privacy.accessibilityLabel, "Privacy section")
@@ -126,6 +129,7 @@ final class MainViewModelTests: XCTestCase {
         XCTAssertEqual(SidebarSection.home.rawValue, "home")
         XCTAssertEqual(SidebarSection.general.rawValue, "general")
         XCTAssertEqual(SidebarSection.audio.rawValue, "audio")
+        XCTAssertEqual(SidebarSection.voiceTrigger.rawValue, "voiceTrigger")
         XCTAssertEqual(SidebarSection.language.rawValue, "language")
         XCTAssertEqual(SidebarSection.theme.rawValue, "theme")
         XCTAssertEqual(SidebarSection.privacy.rawValue, "privacy")

@@ -12,6 +12,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsObserver: NSObjectProtocol?
     private var mainViewObserver: NSObjectProtocol?
     private var themeChangeObserver: NSObjectProtocol?
+    private var voiceTriggerSettingsObserver: NSObjectProtocol?
 
     // MARK: - Hold-to-Record Recording
 
@@ -22,6 +23,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Session-level guard to prevent overlay/ViewModel state desynchronization during async operations
     private var isHoldToRecordSessionActive: Bool = false
+
+    // MARK: - Voice Trigger Monitoring
+
+    /// VoiceTriggerMonitoringService for wake word detection and hands-free recording
+    private var voiceTriggerMonitoringService: VoiceTriggerMonitoringService?
+
+    /// Whether voice monitoring is currently active (for mutex with manual recording)
+    private var isVoiceMonitoringActive: Bool = false
 
     // MARK: - Glass Overlay
 
@@ -107,6 +116,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.showRecordingModal()
             }
         }
+
+        // Auto-start voice monitoring if enabled in settings
+        if settings.voiceTrigger.enabled {
+            AppLogger.app.info("Voice triggers enabled - auto-starting voice monitoring")
+            Task { @MainActor in
+                // Small delay to ensure permissions are verified
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                await self.startVoiceMonitoring()
+            }
+        }
+
+        // Observe settings changes to start/stop voice monitoring
+        setupVoiceTriggerSettingsObserver()
     }
 
     // MARK: - UI Test Configuration
@@ -174,17 +196,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(observer)
             themeChangeObserver = nil
         }
+        if let observer = voiceTriggerSettingsObserver {
+            NotificationCenter.default.removeObserver(observer)
+            voiceTriggerSettingsObserver = nil
+        }
 
-        // 4. Mark session inactive to prevent async operations from proceeding
+        // 4. Mark sessions inactive to prevent async operations from proceeding
         isHoldToRecordSessionActive = false
+        isVoiceMonitoringActive = false
 
-        // 5. Close and cleanup windows
+        // 5. Stop voice trigger state observation and monitoring
+        voiceTriggerStateTimer?.invalidate()
+        voiceTriggerStateTimer = nil
+
+        // Stop voice monitoring with async cleanup using semaphore
+        let voiceCleanupSemaphore = DispatchSemaphore(value: 0)
+        let voiceService = voiceTriggerMonitoringService
+        voiceTriggerMonitoringService = nil
+        Task.detached {
+            await voiceService?.stopMonitoring()
+            voiceCleanupSemaphore.signal()
+        }
+        // Wait up to 300ms for voice monitoring cleanup
+        _ = voiceCleanupSemaphore.wait(timeout: .now() + 0.3)
+
+        // 6. Close and cleanup windows
         recordingWindow?.close()
         recordingWindow = nil
         GlassOverlayWindowController.shared.hideOverlay()
         MainWindowController.shared.closeWindow()
 
-        // 6. Cancel active recording session (best-effort async cleanup)
+        // 7. Cancel active recording session (best-effort async cleanup)
         // Use semaphore with timeout to give async cleanup a chance to complete
         let cleanupSemaphore = DispatchSemaphore(value: 0)
         Task.detached { [holdToRecordViewModel] in
@@ -249,6 +291,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             let settings = self.settingsService.load()
             NSApp.appearance = settings.ui.theme.nsAppearance
+        }
+    }
+
+    /// Setup observer for voice trigger enabled/disabled changes
+    @MainActor
+    private func setupVoiceTriggerSettingsObserver() {
+        voiceTriggerSettingsObserver = NotificationCenter.default.addObserver(
+            forName: .voiceTriggerEnabledDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            print("[DEBUG] voiceTriggerEnabledDidChange notification received")
+            fflush(stdout)
+            Task { @MainActor in
+                guard let self else { return }
+                let enabled = notification.userInfo?["enabled"] as? Bool ?? false
+                print("[DEBUG] Voice trigger enabled = \(enabled)")
+                fflush(stdout)
+
+                if enabled {
+                    AppLogger.app.info("Voice triggers enabled via settings - starting monitoring")
+                    await self.startVoiceMonitoring()
+                } else {
+                    AppLogger.app.info("Voice triggers disabled via settings - stopping monitoring")
+                    await self.stopVoiceMonitoring()
+                }
+            }
         }
     }
 
@@ -317,7 +386,216 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await self?.cancelHoldToRecordSession()
         }
 
+        // Configure callback for voice monitoring toggle
+        hotkeyManager?.onVoiceMonitoringToggle = { [weak self] in
+            await self?.toggleVoiceMonitoring()
+        }
+
         AppLogger.app.info("Global hotkey initialized via KeyboardShortcuts")
+    }
+
+    // MARK: - Voice Trigger Monitoring
+
+    /// Initialize the VoiceTriggerMonitoringService with required dependencies
+    private func initializeVoiceTriggerMonitoringService() {
+        guard voiceTriggerMonitoringService == nil else {
+            AppLogger.app.debug("VoiceTriggerMonitoringService already initialized")
+            return
+        }
+
+        // Create WakeWordService (actor for thread-safe wake word detection)
+        let wakeWordService = WakeWordService()
+
+        // Create AudioCaptureService with settings service
+        let audioService = AudioCaptureService(settingsService: settingsService)
+
+        // Create FluidAudioService for transcription
+        let fluidAudioService = FluidAudioService()
+
+        // Create TextInsertionService for inserting transcribed text
+        let textInsertionService = TextInsertionService()
+
+        // Initialize the VoiceTriggerMonitoringService
+        voiceTriggerMonitoringService = VoiceTriggerMonitoringService(
+            wakeWordService: wakeWordService,
+            audioService: audioService,
+            fluidAudioService: fluidAudioService,
+            textInsertionService: textInsertionService,
+            settingsService: settingsService
+        )
+
+        AppLogger.app.info("VoiceTriggerMonitoringService initialized")
+    }
+
+    /// Toggle voice monitoring on/off
+    /// Ensures mutex with manual recording modes
+    private func toggleVoiceMonitoring() async {
+        // Check if manual recording is in progress - can't toggle monitoring while recording
+        if isHoldToRecordSessionActive {
+            AppLogger.app.warning("Cannot toggle voice monitoring while manual recording is active")
+            // Could show user feedback here (e.g., beep, notification)
+            NSSound.beep()
+            return
+        }
+
+        if isVoiceMonitoringActive {
+            await stopVoiceMonitoring()
+        } else {
+            await startVoiceMonitoring()
+        }
+    }
+
+    /// Start voice trigger monitoring
+    private func startVoiceMonitoring() async {
+        print("[DEBUG] startVoiceMonitoring called")
+        fflush(stdout)
+        AppLogger.app.info("Starting voice trigger monitoring")
+
+        // Ensure service is initialized
+        initializeVoiceTriggerMonitoringService()
+
+        guard let service = voiceTriggerMonitoringService else {
+            AppLogger.app.error("VoiceTriggerMonitoringService not available")
+            return
+        }
+
+        do {
+            try await service.startMonitoring()
+            isVoiceMonitoringActive = true
+            AppLogger.app.info("Voice trigger monitoring started successfully")
+
+            // Notify AppState of the state change
+            postVoiceTriggerStateChange(service.state)
+
+            // Start observing service state changes
+            startObservingVoiceTriggerState()
+        } catch {
+            AppLogger.app.error("Failed to start voice monitoring: \(error.localizedDescription, privacy: .public)")
+            isVoiceMonitoringActive = false
+
+            // Notify of error state
+            if let vtError = error as? VoiceTriggerError {
+                postVoiceTriggerStateChange(.error(vtError))
+            }
+
+            // Show user feedback for the error
+            await showVoiceMonitoringError(error)
+        }
+    }
+
+    /// Stop voice trigger monitoring
+    private func stopVoiceMonitoring() async {
+        AppLogger.app.info("Stopping voice trigger monitoring")
+
+        // Stop observing state changes
+        stopObservingVoiceTriggerState()
+
+        await voiceTriggerMonitoringService?.stopMonitoring()
+        isVoiceMonitoringActive = false
+
+        // Notify AppState of the state change to idle
+        postVoiceTriggerStateChange(.idle)
+
+        AppLogger.app.info("Voice trigger monitoring stopped")
+    }
+
+    /// Show error feedback for voice monitoring failures
+    private func showVoiceMonitoringError(_ error: Error) async {
+        // Play error sound
+        NSSound.beep()
+
+        // Log the specific error type for debugging
+        if let voiceTriggerError = error as? VoiceTriggerError {
+            AppLogger.app.error("Voice trigger error: \(voiceTriggerError.description, privacy: .public)")
+        }
+
+        // Could show an alert or notification to the user
+        // For now, just log - the VoiceTriggerMonitoringService.errorMessage can be observed by UI
+    }
+
+    // MARK: - Voice Trigger State Observation
+
+    /// Timer for polling voice trigger state changes
+    private var voiceTriggerStateTimer: Timer?
+    /// Last observed voice trigger state (to detect changes)
+    private var lastObservedVoiceTriggerState: VoiceTriggerState = .idle
+
+    /// Start observing voice trigger state changes
+    private func startObservingVoiceTriggerState() {
+        // Use a timer to poll state changes since @Observable doesn't have built-in KVO
+        // Poll every 100ms for responsive UI updates
+        voiceTriggerStateTimer?.invalidate()
+        voiceTriggerStateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.checkVoiceTriggerStateChange()
+            }
+        }
+    }
+
+    /// Stop observing voice trigger state changes
+    private func stopObservingVoiceTriggerState() {
+        voiceTriggerStateTimer?.invalidate()
+        voiceTriggerStateTimer = nil
+    }
+
+    /// Check if voice trigger state has changed and notify if so
+    private func checkVoiceTriggerStateChange() {
+        guard let service = voiceTriggerMonitoringService else { return }
+
+        let currentState = service.state
+        if currentState != lastObservedVoiceTriggerState {
+            let previousState = lastObservedVoiceTriggerState
+            lastObservedVoiceTriggerState = currentState
+            postVoiceTriggerStateChange(currentState)
+
+            // Show/hide glass overlay based on state transitions
+            handleVoiceTriggerStateUI(from: previousState, to: currentState)
+        }
+    }
+
+    /// Handle UI updates for voice trigger state changes
+    private func handleVoiceTriggerStateUI(from previousState: VoiceTriggerState, to currentState: VoiceTriggerState) {
+        switch currentState {
+        case .triggered, .capturing:
+            // Show recording overlay when wake word triggers capture
+            if !previousState.isCapturing {
+                print("[DEBUG] Showing glass overlay for voice trigger capture")
+                fflush(stdout)
+                glassOverlayController.showRecording()
+            }
+
+        case .transcribing:
+            // Show transcribing state
+            print("[DEBUG] Showing transcribing state")
+            fflush(stdout)
+            glassOverlayController.showTranscribing()
+
+        case .inserting:
+            // Keep transcribing visual during insertion
+            break
+
+        case .monitoring, .idle:
+            // Hide overlay when returning to monitoring or idle
+            if previousState.isCapturing || previousState == .transcribing || previousState == .inserting {
+                print("[DEBUG] Hiding glass overlay")
+                fflush(stdout)
+                glassOverlayController.hideOverlay()
+            }
+
+        case .error:
+            // Hide overlay on error
+            glassOverlayController.hideOverlay()
+        }
+    }
+
+    /// Post notification for voice trigger state change
+    private func postVoiceTriggerStateChange(_ state: VoiceTriggerState) {
+        NotificationCenter.default.post(
+            name: .voiceTriggerStateChanged,
+            object: nil,
+            userInfo: ["state": state]
+        )
+        AppLogger.app.debug("Posted voice trigger state change: \(state.description, privacy: .public)")
     }
 
     /// Cancel hold-to-record session (e.g., when hold duration is too short)
@@ -341,6 +619,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Start a hold-to-record session
     private func startHoldToRecordSession() async {
+        // Mutex guard: can't start manual recording while voice monitoring is active
+        if isVoiceMonitoringActive {
+            print("[DEBUG] START IGNORED: voice monitoring is active")
+            fflush(stdout)
+            AppLogger.app.warning("Cannot start hold-to-record while voice monitoring is active")
+            NSSound.beep()
+            return
+        }
+
         // Session guard: prevent concurrent session operations
         guard !isHoldToRecordSessionActive else {
             print("[DEBUG] START IGNORED: session already active")

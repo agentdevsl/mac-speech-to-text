@@ -877,6 +877,15 @@ elif [ -f "${PROJECT_ROOT}/app_logov2.png" ]; then
     print_success "Copied app logo to Resources"
 fi
 
+# Copy SPM resource bundle (contains Models for voice trigger, etc.)
+SPM_BUNDLE="${PROJECT_ROOT}/.build/${BUILD_CONFIG}/SpeechToText_SpeechToText.bundle"
+if [ -d "${SPM_BUNDLE}" ]; then
+    cp -R "${SPM_BUNDLE}" "${APP_BUNDLE}/Contents/Resources/"
+    print_success "Copied SPM resource bundle (voice trigger models)"
+else
+    print_warning "SPM resource bundle not found at ${SPM_BUNDLE}"
+fi
+
 # Set permissions
 chmod -R 755 "${APP_BUNDLE}"
 

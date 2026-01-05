@@ -6,4 +6,7 @@ extension KeyboardShortcuts.Name {
 
     /// Toggle recording (for toggle mode)
     static let toggleRecording = Self("toggleRecording")
+
+    /// Toggle voice monitoring on/off
+    static let toggleVoiceMonitoring = Self("toggleVoiceMonitoring")
 }

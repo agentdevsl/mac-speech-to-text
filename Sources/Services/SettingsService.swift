@@ -5,6 +5,7 @@ import OSLog
 extension Notification.Name {
     static let settingsDidReset = Notification.Name("com.speechtotext.settingsDidReset")
     static let themeDidChange = Notification.Name("com.speechtotext.themeDidChange")
+    static let voiceTriggerEnabledDidChange = Notification.Name("com.speechtotext.voiceTriggerEnabledDidChange")
 }
 
 /// Protocol for settings service (enables testing with mocks)

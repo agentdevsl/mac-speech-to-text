@@ -11,6 +11,7 @@ final class AudioBufferProcessor: @unchecked Sendable {
     private let levelThrottler = AudioLevelThrottler(minInterval: 0.05)
     private let streamingBuffer: StreamingAudioBuffer
     private let levelCallback: @Sendable (Double) -> Void
+    private let bufferCallback: (@Sendable (AVAudioPCMBuffer) -> Void)?
     private let processorId: String
     private var processedBufferCount: Int = 0
     private let countLock = NSLock()
@@ -18,9 +19,15 @@ final class AudioBufferProcessor: @unchecked Sendable {
     /// Native sample rate (stored for downstream resampling)
     let nativeSampleRate: Double
 
-    init(streamingBuffer: StreamingAudioBuffer, nativeFormat: AVAudioFormat, levelCallback: @escaping @Sendable (Double) -> Void) {
+    init(
+        streamingBuffer: StreamingAudioBuffer,
+        nativeFormat: AVAudioFormat,
+        levelCallback: @escaping @Sendable (Double) -> Void,
+        bufferCallback: (@Sendable (AVAudioPCMBuffer) -> Void)? = nil
+    ) {
         self.streamingBuffer = streamingBuffer
         self.levelCallback = levelCallback
+        self.bufferCallback = bufferCallback
         self.processorId = UUID().uuidString.prefix(8).description
         self.nativeSampleRate = nativeFormat.sampleRate
 
@@ -30,7 +37,11 @@ final class AudioBufferProcessor: @unchecked Sendable {
     }
 
     deinit {
-        AppLogger.trace(AppLogger.audio, "AudioBufferProcessor[\(processorId)] deallocated after \(processedBufferCount) buffers")
+        // Acquire lock for thread-safe read of processedBufferCount
+        countLock.lock()
+        let finalCount = processedBufferCount
+        countLock.unlock()
+        AppLogger.trace(AppLogger.audio, "AudioBufferProcessor[\(processorId)] deallocated after \(finalCount) buffers")
     }
 
     /// Process audio buffer - safe to call from any thread
@@ -87,6 +98,9 @@ final class AudioBufferProcessor: @unchecked Sendable {
             AppLogger.trace(AppLogger.audio, "[\(processorId)] Buffer #\(currentCount): reporting level=\(String(format: "%.4f", level))")
             levelCallback(level)
         }
+
+        // Invoke buffer callback for real-time processing (e.g., wake word detection)
+        bufferCallback?(buffer)
     }
 
     /// Wait for all pending writes to complete
@@ -94,7 +108,11 @@ final class AudioBufferProcessor: @unchecked Sendable {
         let pending = pendingWrites.currentCount
         AppLogger.debug(AppLogger.audio, "[\(processorId)] waitForCompletion: waiting for \(pending) pending writes")
         await pendingWrites.waitForCompletion()
-        AppLogger.debug(AppLogger.audio, "[\(processorId)] waitForCompletion: all writes completed, total buffers processed=\(processedBufferCount)")
+        // Acquire lock for thread-safe read of processedBufferCount
+        countLock.lock()
+        let totalCount = processedBufferCount
+        countLock.unlock()
+        AppLogger.debug(AppLogger.audio, "[\(processorId)] waitForCompletion: all writes completed, total buffers processed=\(totalCount)")
     }
 }
 
@@ -121,7 +139,13 @@ class AudioCaptureService {
     }
 
     /// Start audio capture
-    func startCapture(levelCallback: @escaping @Sendable (Double) -> Void) async throws {
+    /// - Parameters:
+    ///   - levelCallback: Called with audio level (0.0-1.0) for visualization
+    ///   - bufferCallback: Optional callback for real-time audio buffer processing (e.g., wake word detection)
+    func startCapture(
+        levelCallback: @escaping @Sendable (Double) -> Void,
+        bufferCallback: (@Sendable (AVAudioPCMBuffer) -> Void)? = nil
+    ) async throws {
         AppLogger.info(AppLogger.audio, "[\(serviceId)] startCapture() called")
 
         // Guard against concurrent capture attempts
@@ -132,7 +156,7 @@ class AudioCaptureService {
         isCapturing = true
 
         do {
-            try await performCapture(levelCallback: levelCallback)
+            try await performCapture(levelCallback: levelCallback, bufferCallback: bufferCallback)
         } catch {
             isCapturing = false
             throw error
@@ -141,7 +165,10 @@ class AudioCaptureService {
 
     /// Internal capture implementation
     /// Note: Caller must ensure microphone permission is granted before calling this method
-    private func performCapture(levelCallback: @escaping @Sendable (Double) -> Void) async throws {
+    private func performCapture(
+        levelCallback: @escaping @Sendable (Double) -> Void,
+        bufferCallback: (@Sendable (AVAudioPCMBuffer) -> Void)? = nil
+    ) async throws {
         let buffer = StreamingAudioBuffer()
         streamingBuffer = buffer
 
@@ -156,7 +183,12 @@ class AudioCaptureService {
         }
 
         // Create processor and install tap
-        let processor = AudioBufferProcessor(streamingBuffer: buffer, nativeFormat: nativeFormat, levelCallback: levelCallback)
+        let processor = AudioBufferProcessor(
+            streamingBuffer: buffer,
+            nativeFormat: nativeFormat,
+            levelCallback: levelCallback,
+            bufferCallback: bufferCallback
+        )
         bufferProcessor = processor
         inputNode.installTap(
             onBus: 0,

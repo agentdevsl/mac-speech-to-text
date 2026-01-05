@@ -22,6 +22,9 @@ class HotkeyManager {
     /// Called when recording is cancelled (e.g., hold duration too short)
     var onRecordingCancel: (() async -> Void)?
 
+    /// Called when voice monitoring should be toggled
+    var onVoiceMonitoringToggle: (() async -> Void)?
+
     // MARK: - Configuration
 
     /// Minimum hold duration required to trigger transcription (prevents accidental taps)
@@ -69,6 +72,7 @@ class HotkeyManager {
             AppLogger.app.debug("HotkeyManager: deinit - disabling hotkeys")
             KeyboardShortcuts.disable(.holdToRecord)
             KeyboardShortcuts.disable(.toggleRecording)
+            KeyboardShortcuts.disable(.toggleVoiceMonitoring)
             AppLogger.app.debug("HotkeyManager: deinit - hotkeys disabled successfully")
         }
     }
@@ -107,6 +111,9 @@ class HotkeyManager {
 
         // Also set up toggle mode hotkey
         setupToggleModeHotkey()
+
+        // Set up voice monitoring toggle hotkey
+        setupVoiceMonitoringHotkey()
     }
 
     private func setupToggleModeHotkey() {
@@ -121,6 +128,20 @@ class HotkeyManager {
         }
 
         AppLogger.app.debug("HotkeyManager: Registered handlers for .toggleRecording")
+    }
+
+    private func setupVoiceMonitoringHotkey() {
+        KeyboardShortcuts.enable(.toggleVoiceMonitoring)
+        AppLogger.app.debug("HotkeyManager: Enabled .toggleVoiceMonitoring shortcut")
+
+        KeyboardShortcuts.onKeyDown(for: .toggleVoiceMonitoring) { [weak self] in
+            AppLogger.app.debug("HotkeyManager: onKeyDown callback triggered for voice monitoring toggle")
+            Task { @MainActor in
+                await self?.onVoiceMonitoringToggle?()
+            }
+        }
+
+        AppLogger.app.debug("HotkeyManager: Registered handlers for .toggleVoiceMonitoring")
     }
 
     /// Handle toggle key press - starts or stops recording in toggle mode (internal for testability)
