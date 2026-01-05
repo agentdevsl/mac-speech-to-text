@@ -107,6 +107,7 @@ struct GeneralSection: View {
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
 
             Text("Recording behavior and startup options")
                 .font(.subheadline)
@@ -122,6 +123,7 @@ struct GeneralSection: View {
             Text("Recording Mode")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
 
             // Mode picker cards
             VStack(spacing: 12) {
@@ -156,6 +158,7 @@ struct GeneralSection: View {
             Text("Behavior")
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .accessibilityAddTraits(.isHeader)
 
             VStack(spacing: 12) {
                 // Launch at login
@@ -292,11 +295,12 @@ private struct RecordingModeCard: View {
     var body: some View {
         Button(action: onSelect) {
             HStack(spacing: 16) {
-                // Icon
+                // Icon (decorative, hidden from accessibility)
                 Image(systemName: icon)
                     .font(.system(size: 24))
                     .foregroundStyle(isSelected ? Color.iconPrimaryAdaptive : Color.textTertiaryAdaptive)
                     .frame(width: 40)
+                    .accessibilityHidden(true)
 
                 // Text content - use explicit colors for white card background
                 VStack(alignment: .leading, spacing: 4) {
@@ -313,7 +317,7 @@ private struct RecordingModeCard: View {
 
                 Spacer()
 
-                // Selection indicator
+                // Selection indicator (visual only, state communicated at button level)
                 ZStack {
                     Circle()
                         .stroke(isSelected ? Color.iconPrimaryAdaptive : Color.cardBorderAdaptive, lineWidth: 2)
@@ -325,6 +329,7 @@ private struct RecordingModeCard: View {
                             .frame(width: 14, height: 14)
                     }
                 }
+                .accessibilityHidden(true)
             }
             .padding(16)
             .background(
@@ -340,6 +345,11 @@ private struct RecordingModeCard: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title). \(description)")
+        .accessibilityValue(isSelected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : [.isButton])
+        .accessibilityHint("Double-tap to select this recording mode")
     }
 }
 
@@ -359,6 +369,7 @@ private struct GeneralToggleRow: View {
                     .font(.system(size: 16))
                     .foregroundStyle(Color.iconPrimaryAdaptive)
                     .frame(width: 24)
+                    .accessibilityHidden(true)  // Decorative icon
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
@@ -373,6 +384,7 @@ private struct GeneralToggleRow: View {
         }
         .toggleStyle(BlueToggleStyle())
         .padding(.vertical, 4)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 }
 
@@ -389,6 +401,7 @@ private struct PasteBehaviorRow: View {
                 .font(.system(size: 16))
                 .foregroundStyle(Color.iconPrimaryAdaptive)
                 .frame(width: 24)
+                .accessibilityHidden(true)  // Decorative icon
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("After Paste")
@@ -402,13 +415,16 @@ private struct PasteBehaviorRow: View {
 
             Spacer()
 
-            Picker("", selection: $selectedBehavior) {
+            Picker("After Paste Behavior", selection: $selectedBehavior) {
                 ForEach(PasteBehavior.allCases, id: \.self) { behavior in
                     Text(behavior.displayName).tag(behavior)
                 }
             }
             .pickerStyle(.menu)
             .frame(width: 140)
+            .labelsHidden()  // Hide visual label since we have custom layout
+            .accessibilityLabel("After paste behavior")
+            .accessibilityHint("Choose what happens after text is inserted")
         }
         .padding(.vertical, 4)
     }
@@ -423,7 +439,7 @@ private struct BlueToggleStyle: ToggleStyle {
             configuration.label
             Spacer()
             RoundedRectangle(cornerRadius: 11)
-                .fill(configuration.isOn ? Color.blue : Color(white: 0.3))
+                .fill(configuration.isOn ? Color.blue : Color(white: 0.45))  // Better contrast
                 .frame(width: 38, height: 22)
                 .overlay(
                     Circle()
@@ -431,13 +447,18 @@ private struct BlueToggleStyle: ToggleStyle {
                         .shadow(radius: 1)
                         .padding(2)
                         .offset(x: configuration.isOn ? 8 : -8)
+                        .animation(.easeInOut(duration: 0.15), value: configuration.isOn)
                 )
-                .onTapGesture {
-                    withAnimation(.easeInOut(duration: 0.15)) {
-                        configuration.isOn.toggle()
-                    }
-                }
         }
+        .contentShape(Rectangle())  // Make entire row tappable
+        .onTapGesture {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                configuration.isOn.toggle()
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityValue(configuration.isOn ? "On" : "Off")
     }
 }
 

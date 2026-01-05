@@ -223,7 +223,7 @@ struct HomeSection: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .symbolEffect(.pulse, options: reduceMotion ? [] : .repeating, value: isPulsing)
+                    .symbolEffect(.pulse, options: reduceMotion ? .nonRepeating : .repeating, value: isPulsing)
                     .accessibilityLabel("Speech to Text - Ready to record")
             }
             .frame(height: 160)
@@ -242,6 +242,7 @@ struct HomeSection: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
             }
             .padding(.horizontal, 4)
@@ -343,6 +344,7 @@ struct HomeSection: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -350,6 +352,7 @@ struct HomeSection: View {
                     Label("All Ready", systemImage: "checkmark.seal.fill")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.successGreen)
+                        .accessibilityLabel("All permissions granted. Ready to use.")
                 }
             }
             .padding(.horizontal, 4)
@@ -409,6 +412,7 @@ struct HomeSection: View {
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -416,6 +420,7 @@ struct HomeSection: View {
                     Label("Working!", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Color.successGreen)
+                        .accessibilityLabel("Test successful")
                 }
             }
             .padding(.horizontal, 4)
@@ -560,30 +565,6 @@ struct HomeSection: View {
     }
 }
 
-// MARK: - Glass Keyboard Key
-
-/// A glassmorphism styled keyboard key
-private struct GlassKeyboardKey: View {
-    let symbol: String
-
-    var body: some View {
-        Text(symbol)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.cardBackgroundAdaptive)
-                    .shadow(color: Color.cardShadowAdaptive, radius: 3, x: 0, y: 1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.cardBorderAdaptive, lineWidth: 1)
-            )
-    }
-}
-
 // MARK: - Glass Permission Card
 
 /// Glassmorphism permission status card
@@ -604,7 +585,7 @@ private struct GlassPermissionCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // Main card content
             HStack(spacing: 14) {
-                // Icon with status glow
+                // Icon with status glow (decorative)
                 ZStack {
                     Circle()
                         .fill(iconBackgroundColor)
@@ -615,6 +596,7 @@ private struct GlassPermissionCard: View {
                         .foregroundStyle(iconColor)
                 }
                 .shadow(color: iconGlowColor, radius: 8, x: 0, y: 2)
+                .accessibilityHidden(true)
 
                 // Title and subtitle
                 VStack(alignment: .leading, spacing: 3) {
@@ -647,6 +629,34 @@ private struct GlassPermissionCard: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isLoading)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: errorMessage != nil)
         .animation(.easeInOut(duration: 0.15), value: isFocused)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabelText)
+        .accessibilityHint(accessibilityHintText)
+    }
+
+    // MARK: - Accessibility
+
+    private var accessibilityLabelText: String {
+        if isLoading {
+            return "\(title) permission: Checking"
+        } else if isGranted {
+            return "\(title) permission: Granted"
+        } else if errorMessage != nil {
+            return "\(title) permission: Not granted. Error"
+        } else {
+            return "\(title) permission: Not granted"
+        }
+    }
+
+    private var accessibilityHintText: String {
+        if isGranted {
+            return ""
+        } else if errorMessage != nil {
+            return "Double-tap to retry granting \(title) access"
+        } else if !isLoading {
+            return "Double-tap to grant \(title) access"
+        }
+        return ""
     }
 
     // MARK: - Computed Properties
@@ -813,7 +823,7 @@ private struct GlassPermissionCard: View {
         settingsService: SettingsService(),
         permissionService: PermissionService()
     )
-    .frame(width: 500, height: 650)
+    .frame(width: 600, height: 780)
 }
 
 #Preview("Home Section - Dark Mode") {
@@ -821,6 +831,6 @@ private struct GlassPermissionCard: View {
         settingsService: SettingsService(),
         permissionService: PermissionService()
     )
-    .frame(width: 500, height: 650)
+    .frame(width: 600, height: 780)
     .preferredColorScheme(.dark)
 }

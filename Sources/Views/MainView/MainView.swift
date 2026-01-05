@@ -123,7 +123,7 @@ struct MainView: View {
                 .background(detailBackground)
         }
         .background(backgroundGradient)
-        .frame(minWidth: 820, minHeight: 720)
+        .frame(minWidth: 900, minHeight: 820)
         .accessibilityIdentifier("mainView")
         .onAppear {
             initializeViewModels()
