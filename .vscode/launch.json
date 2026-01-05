@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mac-speech-to-text}",
+            "name": "Debug SpeechToText",
+            "target": "SpeechToText",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug SpeechToText"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mac-speech-to-text}",
+            "name": "Release SpeechToText",
+            "target": "SpeechToText",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release SpeechToText"
+        }
+    ]
+}

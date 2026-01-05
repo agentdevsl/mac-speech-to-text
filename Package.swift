@@ -33,6 +33,9 @@ let package = Package(
             ],
             path: "Sources",
             exclude: [],
+            resources: [
+                .process("Resources/app_logov2.png")
+            ],
             swiftSettings: [
                 .enableUpcomingFeature("BareSlashRegexLiterals"),
                 // Disable strict concurrency checking for Swift 6 compatibility

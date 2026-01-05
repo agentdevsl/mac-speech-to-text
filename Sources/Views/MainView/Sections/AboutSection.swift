@@ -53,6 +53,25 @@ struct AboutSection: View {
         .accessibilityIdentifier("aboutSection")
     }
 
+    // MARK: - Logo Loading
+
+    /// Load app logo from various sources with fallback
+    private static func loadAppLogo() -> NSImage {
+        // Try Bundle.module first (SPM resources)
+        if let url = Bundle.module.url(forResource: "app_logov2", withExtension: "png"),
+           let image = NSImage(contentsOf: url) {
+            return image
+        }
+
+        // Try main bundle (xcassets)
+        if let image = NSImage(named: "AppLogo") {
+            return image
+        }
+
+        // Fallback to app icon
+        return NSApp.applicationIconImage
+    }
+
     // MARK: - App Identity Section
 
     private var appIdentitySection: some View {
@@ -70,8 +89,8 @@ struct AboutSection: View {
                     .stroke(Color.amberPrimary.opacity(0.4), lineWidth: 2)
                     .frame(width: 100, height: 100)
 
-                // App logo - circular crop
-                Image("AppLogo")
+                // App logo - circular crop (with fallback to app icon)
+                Image(nsImage: Self.loadAppLogo())
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 96, height: 96)
