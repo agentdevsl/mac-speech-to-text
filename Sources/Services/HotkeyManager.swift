@@ -58,19 +58,20 @@ class HotkeyManager {
     }
 
     deinit {
-        // Clean up KeyboardShortcuts handlers to prevent orphaned callbacks
-        KeyboardShortcuts.disable(.holdToRecord)
+        // KeyboardShortcuts.disable must be called on main thread.
+        // deinit is nonisolated, so dispatch to main queue for cleanup.
+        // Using async to avoid blocking; cleanup is best-effort during deallocation.
+        DispatchQueue.main.async {
+            KeyboardShortcuts.disable(.holdToRecord)
+        }
     }
 
     // MARK: - Hotkey Setup
 
     private func setupHotkey() {
-        // Verify hotkey is configured
-        guard KeyboardShortcuts.getShortcut(for: .holdToRecord) != nil else {
-            AppLogger.app.warning("No hotkey configured for hold-to-record, using default")
-            // Default is set in ShortcutNames.swift, so this should rarely happen
-            return
-        }
+        // Register handlers for the hold-to-record shortcut.
+        // The default shortcut (Ctrl+Shift+Space) is defined in ShortcutNames.swift.
+        // KeyboardShortcuts library handles storage and default fallback automatically.
 
         KeyboardShortcuts.onKeyDown(for: .holdToRecord) { [weak self] in
             Task { @MainActor in
@@ -84,7 +85,11 @@ class HotkeyManager {
             }
         }
 
-        AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord")
+        if let shortcut = KeyboardShortcuts.getShortcut(for: .holdToRecord) {
+            AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord (\(shortcut))")
+        } else {
+            AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord (using default)")
+        }
     }
 
     // MARK: - Key Event Handlers (internal for testability)
@@ -108,7 +113,12 @@ class HotkeyManager {
         isProcessing = true
         keyPressStartTime = now
         AppLogger.app.debug("HotkeyManager: keyDown - starting recording")
-        await onRecordingStart?()
+
+        if let callback = onRecordingStart {
+            await callback()
+        } else {
+            AppLogger.app.warning("HotkeyManager: onRecordingStart callback not set - recording may not start properly")
+        }
     }
 
     /// Handle key up event - stops recording and invokes appropriate callback
@@ -132,10 +142,18 @@ class HotkeyManager {
         AppLogger.app.debug("HotkeyManager: keyUp - duration: \(duration)s")
 
         if duration >= minimumHoldDuration {
-            await onRecordingStop?(duration)
+            if let callback = onRecordingStop {
+                await callback(duration)
+            } else {
+                AppLogger.app.warning("HotkeyManager: onRecordingStop callback not set - transcription may not trigger")
+            }
         } else {
             AppLogger.app.debug("HotkeyManager: Duration too short (\(duration)s < \(self.minimumHoldDuration)s) - cancelling")
-            await onRecordingCancel?()
+            if let callback = onRecordingCancel {
+                await callback()
+            } else {
+                AppLogger.app.warning("HotkeyManager: onRecordingCancel callback not set - session may not be cleaned up properly")
+            }
         }
     }
 

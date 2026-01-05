@@ -330,4 +330,78 @@ final class HotkeyManagerTests: XCTestCase {
         // Then - lastActionTime should be set to keyUp time
         XCTAssertEqual(sut.lastActionTime, keyUpTime)
     }
+
+    // MARK: - Additional Edge Case Tests
+
+    func test_handleKeyDown_worksWhenCallbacksAreNil() async {
+        // Given - nil callbacks
+        sut.onRecordingStart = nil
+        sut.onRecordingStop = nil
+        sut.onRecordingCancel = nil
+
+        // When/Then - should not crash
+        await sut.handleKeyDown()
+        XCTAssertTrue(sut.isCurrentlyProcessing)
+
+        currentTestTime = currentTestTime.addingTimeInterval(0.5)
+        await sut.handleKeyUp()
+
+        XCTAssertFalse(sut.isCurrentlyProcessing)
+    }
+
+    func test_cooldownAppliesAfterCancelledRecording() async {
+        // Given - start and cancel (too short)
+        await sut.handleKeyDown()
+        currentTestTime = currentTestTime.addingTimeInterval(0.05) // Below minimum
+        await sut.handleKeyUp()
+        XCTAssertEqual(recordingCancelCallCount, 1)
+
+        // When - try to start immediately (within cooldown)
+        currentTestTime = currentTestTime.addingTimeInterval(0.1)
+        await sut.handleKeyDown()
+
+        // Then - should be blocked by cooldown
+        XCTAssertEqual(recordingStartCallCount, 1) // Still 1, not 2
+    }
+
+    func test_zeroDuration_triggersCancel() async {
+        // Given
+        await sut.handleKeyDown()
+        // No time advancement - key up immediately (zero duration)
+
+        // When
+        await sut.handleKeyUp()
+
+        // Then
+        XCTAssertEqual(recordingCancelCallCount, 1)
+        XCTAssertEqual(recordingStopCallCount, 0)
+    }
+
+    func test_cancel_doesNotApplyCooldown() async {
+        // Given - start recording
+        await sut.handleKeyDown()
+        XCTAssertEqual(recordingStartCallCount, 1)
+
+        // When - cancel (not key up)
+        sut.cancel()
+
+        // Then - should be able to start immediately (no cooldown from cancel)
+        await sut.handleKeyDown()
+        XCTAssertEqual(recordingStartCallCount, 2)
+    }
+
+    func test_veryLongDuration_handledCorrectly() async {
+        // Given
+        await sut.handleKeyDown()
+
+        // Advance by 5 minutes
+        currentTestTime = currentTestTime.addingTimeInterval(300.0)
+
+        // When
+        await sut.handleKeyUp()
+
+        // Then
+        XCTAssertEqual(lastStopDuration!, 300.0, accuracy: 0.01)
+        XCTAssertEqual(recordingStopCallCount, 1)
+    }
 }
