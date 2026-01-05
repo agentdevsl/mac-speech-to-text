@@ -73,3 +73,11 @@ xcode-project/DerivedData/
 .signing-identity
 .signing-fingerprint
 xcode-project/Config/Signing.xcconfig
+
+# ML Models (large files, download separately)
+Resources/Models/
+*.onnx
+*.bpe.model
+
+# Temporary download directory
+.tmp-model-download/

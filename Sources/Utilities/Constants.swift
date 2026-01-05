@@ -72,4 +72,28 @@ enum Constants {
         static let version = "1.0.0"
         static let buildNumber = "1"
     }
+
+    // MARK: - Voice Trigger (sherpa-onnx keyword spotting)
+    enum VoiceTrigger {
+        /// Default silence threshold after keyword detection (seconds)
+        static let defaultSilenceThreshold: TimeInterval = 5.0
+        /// Minimum silence threshold (seconds)
+        static let minSilenceThreshold: TimeInterval = 1.0
+        /// Maximum silence threshold (seconds)
+        static let maxSilenceThreshold: TimeInterval = 10.0
+        /// Default boosting score for keywords (1.0-2.0)
+        static let defaultBoostingScore: Float = 1.5
+        /// Default trigger threshold for keywords (0.0-1.0)
+        static let defaultTriggerThreshold: Float = 0.35
+        /// Maximum recording duration after keyword detection (seconds)
+        static let maxRecordingDuration: TimeInterval = 60.0
+        /// Keyword spotting model name
+        static let modelName = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        /// Model directory relative to Resources
+        static let modelDirectory = "Models/kws"
+        /// Sample rate expected by sherpa-onnx (16kHz)
+        static let sampleRate: Int = 16000
+        /// State polling interval for UI updates (seconds)
+        static let statePollingInterval: TimeInterval = 0.1
+    }
 }
