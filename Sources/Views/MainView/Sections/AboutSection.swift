@@ -17,6 +17,10 @@ struct AboutSection: View {
 
     @Environment(\.openURL) private var openURL
 
+    // MARK: - Animation State
+
+    @State private var isPulsing: Bool = false
+
     // MARK: - Body
 
     var body: some View {
@@ -53,14 +57,36 @@ struct AboutSection: View {
 
     private var appIdentitySection: some View {
         VStack(spacing: 16) {
-            // App icon
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
-                .accessibilityHidden(true)
+            // App icon with circular border and animation (matching welcome screen)
+            ZStack {
+                // Animated outer pulse ring
+                Circle()
+                    .stroke(Color.amberPrimary.opacity(isPulsing ? 0.15 : 0.4), lineWidth: isPulsing ? 6 : 3)
+                    .frame(width: isPulsing ? 104 : 96, height: isPulsing ? 104 : 96)
+                    .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isPulsing)
+
+                // Outer glow ring
+                Circle()
+                    .stroke(Color.amberPrimary.opacity(0.3), lineWidth: 2)
+                    .frame(width: 96, height: 96)
+
+                // Inner circle background
+                Circle()
+                    .fill(Color.amberPrimary.opacity(0.1))
+                    .frame(width: 88, height: 88)
+
+                // App icon
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 64, height: 64)
+                    .clipShape(Circle())
+            }
+            .shadow(color: Color.amberPrimary.opacity(0.2), radius: 8, y: 2)
+            .accessibilityHidden(true)
+            .onAppear {
+                isPulsing = true
+            }
 
             VStack(spacing: 4) {
                 // App name
