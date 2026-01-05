@@ -62,7 +62,9 @@ class HotkeyManager {
         // deinit is nonisolated, so dispatch to main queue for cleanup.
         // Using async to avoid blocking; cleanup is best-effort during deallocation.
         DispatchQueue.main.async {
+            AppLogger.app.debug("HotkeyManager: deinit - disabling .holdToRecord hotkey")
             KeyboardShortcuts.disable(.holdToRecord)
+            AppLogger.app.debug("HotkeyManager: deinit - hotkey disabled successfully")
         }
     }
 
