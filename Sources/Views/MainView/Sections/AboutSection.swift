@@ -31,6 +31,11 @@ struct AboutSection: View {
 
             Divider()
 
+            // Technology section
+            technologySection
+
+            Divider()
+
             // Links section
             linksSection
 
@@ -100,6 +105,66 @@ struct AboutSection: View {
             }
         }
         .accessibilityIdentifier("aboutSection.shortcuts")
+    }
+
+    // MARK: - Technology Section
+
+    private var technologySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Powered By")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(.secondary)
+                .accessibilityAddTraits(.isHeader)
+
+            VStack(alignment: .leading, spacing: 8) {
+                // Parakeet model info
+                HStack(spacing: 12) {
+                    Image(systemName: "waveform.badge.mic")
+                        .font(.title2)
+                        .foregroundStyle(Color.amberPrimary)
+                        .frame(width: 32)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("NVIDIA Parakeet TDT")
+                                .font(.callout)
+                                .fontWeight(.medium)
+
+                            Text("0.6b-v3")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.amberPrimary.opacity(0.2))
+                                .foregroundStyle(Color.amberPrimary)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+
+                        Text("State-of-the-art multilingual speech recognition running locally via Apple Neural Engine")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: .controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                // Privacy note
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.caption)
+                        .foregroundStyle(Color.successGreen)
+
+                    Text("All processing happens on-device. Your voice never leaves your Mac.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .accessibilityIdentifier("aboutSection.technology")
     }
 
     // MARK: - Links Section
