@@ -249,8 +249,8 @@ struct GeneralSection: View {
 
                 Spacer()
 
-                // Shortcut recorder
-                KeyboardShortcuts.Recorder(for: .holdToRecord)
+                // Shortcut recorder (custom to avoid Bundle.module crash)
+                ShortcutRecorderView(for: .holdToRecord)
                     .accessibilityIdentifier("hotkeyRecorder")
             }
             .padding(16)
@@ -305,7 +305,7 @@ struct GeneralSection: View {
 
             Spacer()
 
-            KeyboardShortcuts.Recorder(for: .toggleRecording)
+            ShortcutRecorderView(for: .toggleRecording, placeholder: "Set Toggle Key")
                 .accessibilityIdentifier("toggleRecordingRecorder")
         }
         .padding(16)
