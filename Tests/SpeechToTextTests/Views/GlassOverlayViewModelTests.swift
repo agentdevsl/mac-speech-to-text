@@ -157,7 +157,7 @@ final class GlassOverlayViewModelTests: XCTestCase {
         XCTAssertEqual(sut.recordingDuration, 0.0)
     }
 
-    func test_showRecording_doesNotTransitionWhenAlreadyRecording() {
+    func test_showRecording_resetsWhenAlreadyRecording() {
         // Given
         sut.showRecording()
         sut.recordingDuration = 15.0
@@ -165,23 +165,22 @@ final class GlassOverlayViewModelTests: XCTestCase {
         // When
         sut.showRecording() // Call again
 
-        // Then - should stay in recording state and preserve duration
+        // Then - should force reset and start fresh recording (handles stuck state)
         XCTAssertEqual(sut.state, .recording)
-        XCTAssertEqual(sut.recordingDuration, 15.0)
+        XCTAssertEqual(sut.recordingDuration, 0.0) // Reset to 0
     }
 
-    func test_showRecording_doesNotTransitionWhenTranscribing() {
+    func test_showRecording_resetsWhenTranscribing() {
         // Given
         sut.showRecording()
         sut.showTranscribing()
-        let durationBefore = sut.recordingDuration
 
         // When
-        sut.showRecording() // Try to call while transcribing
+        sut.showRecording() // Call while transcribing
 
-        // Then - should remain in transcribing state
-        XCTAssertEqual(sut.state, .transcribing)
-        XCTAssertEqual(sut.recordingDuration, durationBefore)
+        // Then - should force reset and start fresh recording (handles stuck state)
+        XCTAssertEqual(sut.state, .recording)
+        XCTAssertEqual(sut.recordingDuration, 0.0) // Reset to 0
     }
 
     // MARK: - showTranscribing() Tests
