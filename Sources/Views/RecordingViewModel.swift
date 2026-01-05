@@ -608,6 +608,13 @@ final class RecordingViewModel {
             transcribedText = result.text
             confidence = Double(result.confidence)
 
+            // Post notification for UI updates (e.g., Home screen test area)
+            NotificationCenter.default.post(
+                name: .transcriptionDidComplete,
+                object: nil,
+                userInfo: ["text": result.text]
+            )
+
             AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isTranscribing")
             isTranscribing = false
 
@@ -748,6 +755,13 @@ final class RecordingViewModel {
             // Update local state
             transcribedText = result.text
             confidence = Double(result.confidence)
+
+            // Post notification for UI updates (e.g., Home screen test area)
+            NotificationCenter.default.post(
+                name: .transcriptionDidComplete,
+                object: nil,
+                userInfo: ["text": result.text]
+            )
 
             AppLogger.stateChange(AppLogger.viewModel, from: true, to: false, context: "isTranscribing")
             isTranscribing = false

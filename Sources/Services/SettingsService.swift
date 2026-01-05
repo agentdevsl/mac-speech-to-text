@@ -8,6 +8,8 @@ extension Notification.Name {
     static let voiceTriggerEnabledDidChange = Notification.Name("com.speechtotext.voiceTriggerEnabledDidChange")
     /// Posted when voice trigger settings should be refreshed in UI (e.g., toggled via shortcut)
     static let voiceTriggerSettingsDidRefresh = Notification.Name("com.speechtotext.voiceTriggerSettingsDidRefresh")
+    /// Posted when transcription completes with the transcribed text in userInfo["text"]
+    static let transcriptionDidComplete = Notification.Name("com.speechtotext.transcriptionDidComplete")
 }
 
 /// Protocol for settings service (enables testing with mocks)

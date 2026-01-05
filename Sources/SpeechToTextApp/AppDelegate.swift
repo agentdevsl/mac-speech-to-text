@@ -72,7 +72,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainMenu()
 
         // Initialize global hotkey using KeyboardShortcuts
+        print("[DEBUG] About to call setupGlobalHotkey()")
         setupGlobalHotkey()
+        print("[DEBUG] setupGlobalHotkey() completed")
 
         // Check for app identity change (bundle ID / signing) and reset if needed
         // This handles the case where app is rebuilt with different signing, invalidating permissions
@@ -371,26 +373,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Setup global hotkey using KeyboardShortcuts library
     /// The shortcut is user-configurable via Settings > General > Hotkey
     private func setupGlobalHotkey() {
+        print("[DEBUG] setupGlobalHotkey: Creating HotkeyManager...")
         hotkeyManager = HotkeyManager()
+        print("[DEBUG] setupGlobalHotkey: HotkeyManager created: \(hotkeyManager != nil)")
 
         // Configure callbacks for hold-to-record
         hotkeyManager?.onRecordingStart = { [weak self] in
+            print("[DEBUG] onRecordingStart callback fired!")
             await self?.startHoldToRecordSession()
         }
 
         hotkeyManager?.onRecordingStop = { [weak self] duration in
+            print("[DEBUG] onRecordingStop callback fired! duration=\(duration)")
             await self?.stopHoldToRecordSession(holdDuration: duration)
         }
 
         hotkeyManager?.onRecordingCancel = { [weak self] in
+            print("[DEBUG] onRecordingCancel callback fired!")
             await self?.cancelHoldToRecordSession()
         }
 
         // Configure callback for voice monitoring toggle
         hotkeyManager?.onVoiceMonitoringToggle = { [weak self] in
+            print("[DEBUG] onVoiceMonitoringToggle callback fired!")
             await self?.toggleVoiceMonitoring()
         }
 
+        print("[DEBUG] setupGlobalHotkey: All callbacks configured")
         AppLogger.app.info("Global hotkey initialized via KeyboardShortcuts")
     }
 
@@ -630,19 +639,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide overlay and end session
         glassOverlayController.hideOverlay()
         isHoldToRecordSessionActive = false
+
+        // Resume voice monitoring if we paused it
+        if pausedVoiceMonitoringForManualRecording {
+            print("[DEBUG] Resuming voice monitoring after cancelled recording...")
+            fflush(stdout)
+            pausedVoiceMonitoringForManualRecording = false
+            await startVoiceMonitoring()
+        }
     }
 
     // MARK: - Hold-to-Record Session Management
 
+    /// Track if we paused voice monitoring for manual recording
+    private var pausedVoiceMonitoringForManualRecording: Bool = false
+
     /// Start a hold-to-record session
     private func startHoldToRecordSession() async {
-        // Mutex guard: can't start manual recording while voice monitoring is active
+        // If voice monitoring is active, pause it temporarily for manual recording
         if isVoiceMonitoringActive {
-            print("[DEBUG] START IGNORED: voice monitoring is active")
+            print("[DEBUG] Pausing voice monitoring for manual recording...")
             fflush(stdout)
-            AppLogger.app.warning("Cannot start hold-to-record while voice monitoring is active")
-            NSSound.beep()
-            return
+            AppLogger.app.info("Pausing voice monitoring for manual hold-to-record")
+            await stopVoiceMonitoring()
+            pausedVoiceMonitoringForManualRecording = true
         }
 
         // Session guard: prevent concurrent session operations
@@ -724,6 +744,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide overlay and end session
         glassOverlayController.hideOverlay()
         isHoldToRecordSessionActive = false
+
+        // Resume voice monitoring if we paused it
+        if pausedVoiceMonitoringForManualRecording {
+            print("[DEBUG] Resuming voice monitoring after manual recording...")
+            fflush(stdout)
+            pausedVoiceMonitoringForManualRecording = false
+            await startVoiceMonitoring()
+        }
     }
 
     // MARK: - Real Audio Level Updates

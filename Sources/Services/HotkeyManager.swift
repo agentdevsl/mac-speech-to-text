@@ -87,13 +87,17 @@ class HotkeyManager {
         // NOTE: Do NOT call KeyboardShortcuts.getShortcut() here - it crashes due to
         // Bundle.module not being available in executable targets.
 
+        print("[DEBUG] HotkeyManager: setupHotkey() called")
         AppLogger.app.debug("HotkeyManager: setupHotkey() called")
 
         // First, explicitly enable the shortcut to ensure Carbon hotkey is registered
+        print("[DEBUG] HotkeyManager: About to enable .holdToRecord shortcut...")
         KeyboardShortcuts.enable(.holdToRecord)
+        print("[DEBUG] HotkeyManager: Enabled .holdToRecord shortcut")
         AppLogger.app.debug("HotkeyManager: Enabled .holdToRecord shortcut")
 
         KeyboardShortcuts.onKeyDown(for: .holdToRecord) { [weak self] in
+            print("[DEBUG] HotkeyManager: onKeyDown callback triggered for holdToRecord!")
             AppLogger.app.debug("HotkeyManager: onKeyDown callback triggered")
             Task { @MainActor in
                 await self?.handleKeyDown()

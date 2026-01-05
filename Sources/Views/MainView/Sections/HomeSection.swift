@@ -38,9 +38,8 @@ struct HomeSection: View {
     @State private var isPulsing: Bool = false
     @State private var microphoneGranted: Bool = false
     @State private var accessibilityGranted: Bool = false
-    @State private var currentPhraseIndex: Int = 0
-    @State private var displayedText: String = ""
-    @State private var typingTask: Task<Void, Never>?
+    @State private var lastTranscription: String = ""
+    @State private var hasTestedSuccessfully: Bool = false
     @State private var settings: UserSettings
 
     // MARK: - Initialization
@@ -60,15 +59,6 @@ struct HomeSection: View {
     // Task references for cancellation
     @State private var microphonePermissionTask: Task<Void, Never>?
     @State private var accessibilityPermissionTask: Task<Void, Never>?
-
-    // MARK: - Constants
-
-    private let samplePhrases: [String] = [
-        "Hello, this is a test...",
-        "Meeting notes from today...",
-        "Reminder: call the team...",
-        "Quick note to self..."
-    ]
 
     // MARK: - Body
 
@@ -95,15 +85,20 @@ struct HomeSection: View {
         .task {
             await refreshPermissions()
             startPulseAnimation()
-            startTypingAnimation()
         }
         .onDisappear {
-            typingTask?.cancel()
-            typingTask = nil
             microphonePermissionTask?.cancel()
             microphonePermissionTask = nil
             accessibilityPermissionTask?.cancel()
             accessibilityPermissionTask = nil
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .transcriptionDidComplete)) { notification in
+            if let text = notification.userInfo?["text"] as? String, !text.isEmpty {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                    lastTranscription = text
+                    hasTestedSuccessfully = true
+                }
+            }
         }
         .focusScope(homeFocusScope)
         .onKeyPress(.tab) {
@@ -389,50 +384,91 @@ struct HomeSection: View {
         microphoneGranted && accessibilityGranted
     }
 
-    // MARK: - Typing Preview
+    // MARK: - Test Section
 
     private var typingPreview: some View {
         VStack(spacing: 12) {
+            // Section label with status
             HStack {
-                Text("PREVIEW")
+                Text("TRY IT NOW")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.textTertiaryAdaptive)
                     .tracking(1.5)
+
                 Spacer()
+
+                if hasTestedSuccessfully {
+                    Label("Working!", systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.successGreen)
+                }
             }
             .padding(.horizontal, 4)
 
-            // Glass typing preview container
-            HStack(spacing: 0) {
-                Text(displayedText)
-                    .font(.system(size: 15, weight: .regular, design: .default))
-                    .foregroundStyle(.primary)
+            // Test prompt or result
+            VStack(alignment: .leading, spacing: 12) {
+                if lastTranscription.isEmpty {
+                    // Prompt to test
+                    HStack(spacing: 12) {
+                        Image(systemName: "mic.badge.plus")
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.amberPrimary)
 
-                // Animated cursor
-                Rectangle()
-                    .fill(Color.iconPrimaryAdaptive)
-                    .frame(width: 2, height: 20)
-                    .opacity(isPulsing ? 1.0 : 0.3)
-                    .animation(
-                        .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
-                        value: isPulsing
-                    )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Test your setup")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+
+                            Text("Press your hotkey and say something to verify everything is working")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                } else {
+                    // Show transcription result
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "text.quote")
+                                .font(.system(size: 14))
+                                .foregroundStyle(Color.successGreen)
+
+                            Text("Last transcription")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Text(lastTranscription)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        // Try again prompt
+                        HStack {
+                            Spacer()
+                            Text("Press your hotkey to try again")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
             }
-            .frame(minHeight: 28)
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.cardBackgroundAdaptive)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(hasTestedSuccessfully ? Color.successGreen.opacity(0.05) : Color.cardBackgroundAdaptive)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(
+                                hasTestedSuccessfully ? Color.successGreen.opacity(0.3) : Color.cardBorderAdaptive,
+                                lineWidth: 1
+                            )
                     )
             )
             .shadow(color: Color.cardShadowAdaptive, radius: 10, x: 0, y: 3)
         }
-        .accessibilityIdentifier("typingPreview")
+        .accessibilityIdentifier("testSection")
     }
 
     // MARK: - Private Methods
@@ -448,26 +484,6 @@ struct HomeSection: View {
             .repeatForever(autoreverses: true)
         ) {
             isPulsing = true
-        }
-    }
-
-    private func startTypingAnimation() {
-        typingTask?.cancel()
-        displayedText = ""
-        let phrase = samplePhrases[currentPhraseIndex]
-
-        typingTask = Task { @MainActor in
-            for char in phrase {
-                guard !Task.isCancelled else { return }
-                displayedText.append(char)
-                try? await Task.sleep(nanoseconds: 80_000_000)
-            }
-
-            guard !Task.isCancelled else { return }
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            guard !Task.isCancelled else { return }
-            currentPhraseIndex = (currentPhraseIndex + 1) % samplePhrases.count
-            startTypingAnimation()
         }
     }
 
