@@ -159,6 +159,32 @@ class TextInsertionService {
         fflush(stdout)
     }
 
+    /// Simulate pressing Enter key
+    private func simulateEnter() async throws {
+        print("[DEBUG-PASTE] Simulating Enter key press")
+        fflush(stdout)
+
+        guard let source = CGEventSource(stateID: .hidSystemState) else {
+            throw TextInsertionError.eventSourceCreationFailed
+        }
+
+        // Press Return (keycode 0x24 = 36)
+        guard let returnDown = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: true) else {
+            throw TextInsertionError.keyEventCreationFailed("Return key down")
+        }
+
+        guard let returnUp = CGEvent(keyboardEventSource: source, virtualKey: 0x24, keyDown: false) else {
+            throw TextInsertionError.keyEventCreationFailed("Return key up")
+        }
+
+        returnDown.post(tap: .cghidEventTap)
+        try await Task.sleep(nanoseconds: 10_000_000) // 10ms delay
+        returnUp.post(tap: .cghidEventTap)
+
+        print("[DEBUG-PASTE] Enter key posted successfully")
+        fflush(stdout)
+    }
+
     // MARK: - Fallback-Aware Insertion
 
     /// Insert text with fallback to clipboard if accessibility is not available
@@ -222,6 +248,15 @@ class TextInsertionService {
             try await insertText(text)
             print("[DEBUG-INSERT] Cmd+V paste insertion SUCCEEDED!")
             fflush(stdout)
+
+            // Press Enter after paste if configured
+            if settings.general.pasteBehavior == .pasteAndEnter {
+                print("[DEBUG-INSERT] PasteBehavior is pasteAndEnter, pressing Enter...")
+                fflush(stdout)
+                try await Task.sleep(nanoseconds: 50_000_000) // 50ms delay before Enter
+                try await simulateEnter()
+            }
+
             return .insertedViaAccessibility
         } catch {
             print("[DEBUG-INSERT] Accessibility insertion FAILED: \(error)")

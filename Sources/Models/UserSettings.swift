@@ -73,12 +73,55 @@ struct UserSettings: Codable, Sendable {
     )
 }
 
+/// Controls what happens after text is pasted
+enum PasteBehavior: String, Codable, Sendable, CaseIterable {
+    /// Just paste the text
+    case pasteOnly = "paste"
+    /// Paste the text and press Enter
+    case pasteAndEnter = "pasteAndEnter"
+
+    var displayName: String {
+        switch self {
+        case .pasteOnly: return "Paste only"
+        case .pasteAndEnter: return "Paste and Enter"
+        }
+    }
+}
+
 struct GeneralConfiguration: Codable, Sendable {
     var launchAtLogin: Bool
     var autoInsertText: Bool
     var copyToClipboard: Bool
     var accessibilityPromptDismissed: Bool
     var clipboardOnlyMode: Bool
+    var pasteBehavior: PasteBehavior
+
+    // Custom decoder to handle missing pasteBehavior in existing settings
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        launchAtLogin = try container.decode(Bool.self, forKey: .launchAtLogin)
+        autoInsertText = try container.decode(Bool.self, forKey: .autoInsertText)
+        copyToClipboard = try container.decode(Bool.self, forKey: .copyToClipboard)
+        accessibilityPromptDismissed = try container.decode(Bool.self, forKey: .accessibilityPromptDismissed)
+        clipboardOnlyMode = try container.decode(Bool.self, forKey: .clipboardOnlyMode)
+        pasteBehavior = try container.decodeIfPresent(PasteBehavior.self, forKey: .pasteBehavior) ?? .pasteOnly
+    }
+
+    init(
+        launchAtLogin: Bool = false,
+        autoInsertText: Bool = true,
+        copyToClipboard: Bool = true,
+        accessibilityPromptDismissed: Bool = false,
+        clipboardOnlyMode: Bool = false,
+        pasteBehavior: PasteBehavior = .pasteOnly
+    ) {
+        self.launchAtLogin = launchAtLogin
+        self.autoInsertText = autoInsertText
+        self.copyToClipboard = copyToClipboard
+        self.accessibilityPromptDismissed = accessibilityPromptDismissed
+        self.clipboardOnlyMode = clipboardOnlyMode
+        self.pasteBehavior = pasteBehavior
+    }
 }
 
 struct HotkeyConfiguration: Codable, Sendable {
