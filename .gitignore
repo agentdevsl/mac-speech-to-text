@@ -81,3 +81,9 @@ Resources/Models/
 
 # Temporary download directory
 .tmp-model-download/
+
+# Vendor directory (sherpa-onnx source/build)
+Vendor/
+
+# Frameworks (built xcframeworks - too large for git)
+Frameworks/
