@@ -22,8 +22,8 @@ struct VoiceTriggerSection: View {
     @State private var settings: UserSettings
     @State private var isSaving: Bool = false
     @State private var saveError: String?
-    @State private var showAddKeyword: Bool = false
-    @State private var newKeywordPhrase: String = ""
+    @State private var showKeywordEditor: Bool = false
+    @State private var editingKeyword: TriggerKeyword?
 
     // MARK: - Initialization
 
@@ -97,8 +97,10 @@ struct VoiceTriggerSection: View {
             )
             settings = loadedSettings
         }
-        .sheet(isPresented: $showAddKeyword) {
-            addKeywordSheet
+        .sheet(isPresented: $showKeywordEditor) {
+            KeywordEditorSheet(keyword: $editingKeyword) { savedKeyword in
+                saveKeyword(savedKeyword)
+            }
         }
     }
 
@@ -235,7 +237,8 @@ struct VoiceTriggerSection: View {
                 Spacer()
 
                 Button {
-                    showAddKeyword = true
+                    editingKeyword = nil  // nil = new keyword
+                    showKeywordEditor = true
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus.circle.fill")
@@ -414,39 +417,6 @@ struct VoiceTriggerSection: View {
         .accessibilityIdentifier("feedbackSection")
     }
 
-    // MARK: - Add Keyword Sheet
-
-    private var addKeywordSheet: some View {
-        VStack(spacing: 20) {
-            Text("Add Trigger Keyword")
-                .font(.headline)
-                .foregroundStyle(.primary)
-
-            TextField("Enter keyword phrase", text: $newKeywordPhrase)
-                .textFieldStyle(.roundedBorder)
-                .accessibilityIdentifier("newKeywordTextField")
-
-            HStack(spacing: 12) {
-                Button("Cancel") {
-                    newKeywordPhrase = ""
-                    showAddKeyword = false
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("cancelAddKeywordButton")
-
-                Button("Add") {
-                    addKeyword()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(Color.warmAmber)
-                .disabled(newKeywordPhrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityIdentifier("confirmAddKeywordButton")
-            }
-        }
-        .padding(24)
-        .frame(width: 300)
-    }
-
     // MARK: - Private Methods
 
     private func toggleKeyword(_ keyword: TriggerKeyword) {
@@ -465,42 +435,35 @@ struct VoiceTriggerSection: View {
         saveSettings()
     }
 
-    private func addKeyword() {
-        let trimmedPhrase = newKeywordPhrase.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedPhrase.isEmpty else { return }
-
-        // Check for duplicate phrase (case-insensitive)
-        let isDuplicate = settings.voiceTrigger.keywords.contains {
-            $0.phrase.lowercased() == trimmedPhrase.lowercased()
-        }
-        guard !isDuplicate else {
-            saveError = "A keyword with this phrase already exists."
-            newKeywordPhrase = ""
-            showAddKeyword = false
-            // Clear error after 3 seconds
-            Task { @MainActor in
-                try? await Task.sleep(for: .seconds(3))
-                if saveError == "A keyword with this phrase already exists." {
-                    saveError = nil
-                }
+    private func saveKeyword(_ keyword: TriggerKeyword) {
+        // Check if we're editing an existing keyword or adding a new one
+        if let index = settings.voiceTrigger.keywords.firstIndex(where: { $0.id == keyword.id }) {
+            // Update existing keyword
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                settings.voiceTrigger.keywords[index] = keyword
             }
-            return
-        }
+        } else {
+            // Check for duplicate phrase (case-insensitive) for new keywords
+            let isDuplicate = settings.voiceTrigger.keywords.contains {
+                $0.phrase.lowercased() == keyword.phrase.lowercased()
+            }
+            if isDuplicate {
+                saveError = "A keyword with this phrase already exists."
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(3))
+                    if saveError == "A keyword with this phrase already exists." {
+                        saveError = nil
+                    }
+                }
+                return
+            }
 
-        let newKeyword = TriggerKeyword(
-            phrase: trimmedPhrase,
-            boostingScore: 1.5,
-            triggerThreshold: 0.35,
-            isEnabled: true
-        )
-
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            settings.voiceTrigger.keywords.append(newKeyword)
+            // Add new keyword
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                settings.voiceTrigger.keywords.append(keyword)
+            }
         }
         saveSettings()
-
-        newKeywordPhrase = ""
-        showAddKeyword = false
     }
 
     private func saveSettings() {

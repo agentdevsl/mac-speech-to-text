@@ -55,8 +55,10 @@ final class MainWindow: NSObject, NSWindowDelegate {
     func show() {
         guard window == nil else {
             // Window already exists, just bring to front
-            window?.makeKeyAndOrderFront(nil)
+            // Activate app first, then make window key (important for menu bar apps)
             NSApp.activate(ignoringOtherApps: true)
+            window?.deminiaturize(nil)  // Un-minimize if minimized
+            window?.makeKeyAndOrderFront(nil)
             return
         }
 
@@ -86,10 +88,10 @@ final class MainWindow: NSObject, NSWindowDelegate {
         // Set content view
         newWindow.contentView = NSHostingView(rootView: mainView)
 
-        // Center and show window
+        // Center and show window (activate app first for menu bar apps)
         newWindow.center()
-        newWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        newWindow.makeKeyAndOrderFront(nil)
 
         window = newWindow
     }

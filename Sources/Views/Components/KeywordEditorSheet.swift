@@ -137,15 +137,8 @@ struct KeywordEditorSheet: View {
                 .foregroundStyle(.primary)
 
             TextField("Enter trigger phrase...", text: $phrase)
-                .textFieldStyle(.plain)
+                .textFieldStyle(.roundedBorder)
                 .font(.system(size: 15))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(textFieldBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(textFieldBorder, lineWidth: 1)
-                )
                 .accessibilityIdentifier("keywordPhraseTextField")
 
             Text("Any words or phrase (e.g., \"Hey Claude\", \"Computer\", \"Start Recording\")")
