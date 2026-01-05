@@ -438,10 +438,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        if isVoiceMonitoringActive {
-            await stopVoiceMonitoring()
-        } else {
+        let newState = !isVoiceMonitoringActive
+
+        if newState {
             await startVoiceMonitoring()
+        } else {
+            await stopVoiceMonitoring()
+        }
+
+        // Update settings to match the new state (keeps UI toggle in sync)
+        var settings = settingsService.load()
+        settings.voiceTrigger.enabled = newState
+        do {
+            try settingsService.save(settings)
+            // Post notification for UI to refresh (distinct from .voiceTriggerEnabledDidChange
+            // which would cause recursive start/stop)
+            NotificationCenter.default.post(
+                name: .voiceTriggerSettingsDidRefresh,
+                object: nil
+            )
+        } catch {
+            AppLogger.app.error("Failed to save voice trigger state: \(error.localizedDescription)")
         }
     }
 

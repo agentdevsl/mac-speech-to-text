@@ -74,11 +74,6 @@ struct GeneralSection: View {
                 // Startup and behavior toggles
                 behaviorSection
 
-                Divider()
-                    .padding(.vertical, 4)
-
-                // Hotkey display
-                hotkeySection
             }
             .padding(24)
             .animation(.easeInOut(duration: 0.3), value: saveError)
@@ -218,110 +213,6 @@ struct GeneralSection: View {
             }
         }
         .accessibilityIdentifier("behaviorSection")
-    }
-
-    // MARK: - Hotkey Section
-
-    private var hotkeySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Hotkey")
-                .font(.headline)
-                .foregroundStyle(.primary)
-
-            // Shortcut display row
-            HStack {
-                HStack(spacing: 12) {
-                    Image(systemName: "keyboard")
-                        .font(.system(size: 16))
-                        .foregroundStyle(Color.iconPrimaryAdaptive)
-                        .frame(width: 24)
-
-                    Text("Hold-to-Record")
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                }
-
-                Spacer()
-
-                // Shortcut recorder (custom to avoid Bundle.module crash)
-                VStack(spacing: 6) {
-                    ShortcutRecorderView(for: .holdToRecord)
-                        .accessibilityIdentifier("hotkeyRecorder")
-
-                    Text("Click to change")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(
-                        colorScheme == .dark
-                            ? Color.white.opacity(0.1)
-                            : Color.black.opacity(0.08),
-                        lineWidth: 1
-                    )
-            )
-
-            // Toggle recording shortcut (only shown in toggle mode)
-            if settings.ui.recordingMode == .toggle {
-                toggleRecordingShortcutRow
-            }
-
-            // Hotkey hint
-            Text("Use a unique key combination to avoid conflicts with other apps.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .accessibilityIdentifier("hotkeySection")
-    }
-
-    // MARK: - Toggle Recording Shortcut Row
-
-    @ViewBuilder
-    private var toggleRecordingShortcutRow: some View {
-        HStack {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.iconPrimaryAdaptive)
-                    .frame(width: 24)
-
-                Text("Toggle Recording")
-                    .font(.body)
-                    .foregroundStyle(.primary)
-            }
-
-            Spacer()
-
-            VStack(spacing: 6) {
-                ShortcutRecorderView(for: .toggleRecording, placeholder: "Set Toggle Key")
-                    .accessibilityIdentifier("toggleRecordingRecorder")
-
-                Text("Click to change")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(colorScheme == .dark ? Color(white: 0.15) : Color.white)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
-                    colorScheme == .dark
-                        ? Color.white.opacity(0.1)
-                        : Color.black.opacity(0.08),
-                    lineWidth: 1
-                )
-        )
     }
 
     // MARK: - Private Methods

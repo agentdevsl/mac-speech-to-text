@@ -54,14 +54,9 @@ struct VoiceTriggerSection: View {
                 // Section header
                 sectionHeader
 
-                // Main enable toggle
+                // Main enable toggle and shortcut (unified section)
                 mainToggleSection
-
-                Divider()
-                    .padding(.vertical, 4)
-
-                // Monitoring shortcut
-                monitoringShortcutSection
+                voiceTriggerShortcutSection
 
                 Divider()
                     .padding(.vertical, 4)
@@ -96,6 +91,10 @@ struct VoiceTriggerSection: View {
                 """
             )
             settings = loadedSettings
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .voiceTriggerSettingsDidRefresh)) { _ in
+            // Refresh settings when toggled via shortcut
+            settings = settingsService.load()
         }
         .sheet(isPresented: $showKeywordEditor) {
             KeywordEditorSheet(keyword: $editingKeyword) { savedKeyword in
@@ -172,11 +171,11 @@ struct VoiceTriggerSection: View {
         .accessibilityIdentifier("mainToggleSection")
     }
 
-    // MARK: - Monitoring Shortcut Section
+    // MARK: - Voice Trigger Shortcut Section
 
-    private var monitoringShortcutSection: some View {
+    private var voiceTriggerShortcutSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Monitoring Shortcut")
+            Text("Voice Trigger Shortcut")
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -187,7 +186,7 @@ struct VoiceTriggerSection: View {
                         .foregroundStyle(Color.warmAmber)
                         .frame(width: 24)
 
-                    Text("Toggle Monitoring")
+                    Text("Toggle Voice Triggers")
                         .font(.body)
                         .foregroundStyle(.primary)
                 }
@@ -218,11 +217,11 @@ struct VoiceTriggerSection: View {
                     )
             )
 
-            Text("Use this shortcut to quickly toggle voice monitoring on or off.")
+            Text("Use this shortcut to quickly toggle voice triggers on or off.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
-        .accessibilityIdentifier("monitoringShortcutSection")
+        .accessibilityIdentifier("voiceTriggerShortcutSection")
     }
 
     // MARK: - Keywords Section
@@ -257,6 +256,10 @@ struct VoiceTriggerSection: View {
                     KeywordRow(
                         keyword: keyword,
                         onToggle: { toggleKeyword(keyword) },
+                        onEdit: {
+                            editingKeyword = keyword
+                            showKeywordEditor = true
+                        },
                         onDelete: { deleteKeyword(keyword) }
                     )
                     .accessibilityIdentifier("keywordRow_\(keyword.id)")
@@ -495,12 +498,13 @@ struct VoiceTriggerSection: View {
 
 // MARK: - Keyword Row
 
-/// Row displaying a single trigger keyword with toggle and delete controls
+/// Row displaying a single trigger keyword with toggle, edit, and delete controls
 private struct KeywordRow: View {
     @Environment(\.colorScheme) private var colorScheme
 
     let keyword: TriggerKeyword
     let onToggle: () -> Void
+    let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -512,12 +516,32 @@ private struct KeywordRow: View {
                     .fontWeight(.medium)
                     .foregroundStyle(keyword.isEnabled ? .primary : .secondary)
 
-                Text(keyword.isEnabled ? "Enabled" : "Disabled")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                HStack(spacing: 8) {
+                    Text(keyword.isEnabled ? "Enabled" : "Disabled")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+
+                    Text("•")
+                        .font(.caption)
+                        .foregroundStyle(.quaternary)
+
+                    Text("Boost: \(String(format: "%.1f", keyword.boostingScore))")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
 
             Spacer()
+
+            // Edit button
+            Button(action: onEdit) {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.warmAmber)
+            }
+            .buttonStyle(.plain)
+            .help("Edit keyword settings")
+            .accessibilityLabel("Edit \(keyword.displayName)")
 
             // Enable/disable toggle
             Toggle("", isOn: Binding(

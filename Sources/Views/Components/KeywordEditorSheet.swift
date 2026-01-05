@@ -9,6 +9,26 @@ import SwiftUI
 /// A sheet for creating or editing a voice trigger keyword.
 /// Pass `nil` for `keyword` to create a new keyword, or an existing keyword to edit it.
 struct KeywordEditorSheet: View {
+    // MARK: - Supported Keywords
+
+    /// Keywords that have BPE token mappings and will work with wake word detection
+    /// To add more, the WakeWordService.bpeTokenMappings dictionary must also be updated
+    static let supportedKeywords: Set<String> = [
+        // Assistant-style
+        "hey siri", "hi google", "ok google", "alexa",
+        "hey claude", "claude", "jarvis", "hey jarvis",
+        "computer", "hey computer",
+        // Action-style
+        "start listening", "stop listening", "take note", "take notes",
+        "start recording", "stop recording", "go home", "play music",
+        "open mail", "open browser", "open calendar", "open settings",
+        "open notes", "search", "send message", "new email", "call",
+        "remind me", "set timer", "what time",
+        // Short triggers
+        "hey", "hello", "hello world", "okay", "listen", "record",
+        "start", "stop", "opus", "sonnet", "transcribe"
+    ]
+
     // MARK: - Properties
 
     /// Binding to the keyword being edited. Nil means creating a new keyword.
@@ -38,9 +58,19 @@ struct KeywordEditorSheet: View {
         isEditing ? "Edit Keyword" : "New Keyword"
     }
 
+    /// Normalized phrase for validation
+    private var normalizedPhrase: String {
+        phrase.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Whether the entered phrase is a supported keyword
+    private var isPhraseSupported: Bool {
+        Self.supportedKeywords.contains(normalizedPhrase)
+    }
+
     /// Whether the current input is valid for saving
     private var canSave: Bool {
-        !phrase.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !normalizedPhrase.isEmpty && isPhraseSupported
     }
 
     /// Description for boosting score
@@ -141,9 +171,96 @@ struct KeywordEditorSheet: View {
                 .font(.system(size: 15))
                 .accessibilityIdentifier("keywordPhraseTextField")
 
-            Text("Any words or phrase (e.g., \"Hey Claude\", \"Computer\", \"Start Recording\")")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Validation feedback
+            if !normalizedPhrase.isEmpty {
+                if isPhraseSupported {
+                    Label("Supported keyword", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                } else {
+                    Label("Unsupported - choose from the list below", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            // Supported keywords list
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Supported keywords:")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                FlowLayout(spacing: 6) {
+                    ForEach(Self.supportedKeywords.sorted(), id: \.self) { keyword in
+                        Button {
+                            phrase = keyword
+                        } label: {
+                            Text(keyword)
+                                .font(.caption)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(
+                                    normalizedPhrase == keyword
+                                        ? Color.warmAmber
+                                        : Color.warmGray.opacity(0.5)
+                                )
+                                .foregroundStyle(
+                                    normalizedPhrase == keyword ? .white : .primary
+                                )
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(.top, 4)
+        }
+    }
+
+    /// Flow layout for keyword chips
+    private struct FlowLayout: Layout {
+        var spacing: CGFloat = 8
+
+        func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+            let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+            return result.size
+        }
+
+        func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+            let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+            for (index, subview) in subviews.enumerated() {
+                subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
+                                          y: bounds.minY + result.positions[index].y),
+                              proposal: .unspecified)
+            }
+        }
+
+        struct FlowResult {
+            var size: CGSize = .zero
+            var positions: [CGPoint] = []
+
+            init(in maxWidth: CGFloat, subviews: Subviews, spacing: CGFloat) {
+                var currentX: CGFloat = 0
+                var currentY: CGFloat = 0
+                var lineHeight: CGFloat = 0
+
+                for subview in subviews {
+                    let size = subview.sizeThatFits(.unspecified)
+
+                    if currentX + size.width > maxWidth && currentX > 0 {
+                        currentX = 0
+                        currentY += lineHeight + spacing
+                        lineHeight = 0
+                    }
+
+                    positions.append(CGPoint(x: currentX, y: currentY))
+                    lineHeight = max(lineHeight, size.height)
+                    currentX += size.width + spacing
+                    self.size.width = max(self.size.width, currentX)
+                }
+
+                self.size.height = currentY + lineHeight
+            }
         }
     }
 

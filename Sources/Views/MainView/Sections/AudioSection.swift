@@ -653,13 +653,14 @@ private struct AudioDeviceErrorBanner: View {
 /// Visual indicator showing current sensitivity level
 private struct SensitivityIndicator: View {
     let level: Double
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background track
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.warmGray)
+                    .fill(trackColor)
 
                 // Filled portion
                 RoundedRectangle(cornerRadius: 4)
@@ -674,6 +675,11 @@ private struct SensitivityIndicator: View {
             }
         }
         .frame(height: 8)
+        .animation(.easeInOut(duration: 0.15), value: level)
+    }
+
+    private var trackColor: Color {
+        colorScheme == .dark ? Color.warmGray : Color.warmGray.opacity(0.4)
     }
 
     private var gradientColors: [Color] {
@@ -692,33 +698,63 @@ private struct SensitivityIndicator: View {
 /// Visual timeline showing silence threshold
 private struct SilenceTimelineIndicator: View {
     let threshold: TimeInterval
+    @Environment(\.colorScheme) private var colorScheme
+
+    // Slider range constants
+    private let minThreshold: CGFloat = 0.5
+    private let maxThreshold: CGFloat = 3.0
+    private let speakingRatio: CGFloat = 0.25  // Speaking segment takes 25% of bar
+
+    /// Normalized threshold value (0.0 to 1.0)
+    private var normalizedThreshold: CGFloat {
+        (threshold - minThreshold) / (maxThreshold - minThreshold)
+    }
+
+    /// Width ratio for the silence segment
+    private var silenceWidthRatio: CGFloat {
+        normalizedThreshold * (1.0 - speakingRatio)
+    }
+
+    /// Offset ratio for the threshold marker
+    private var markerOffsetRatio: CGFloat {
+        speakingRatio + silenceWidthRatio
+    }
+
+    private var trackColor: Color {
+        colorScheme == .dark ? Color.warmGray : Color.warmGray.opacity(0.4)
+    }
+
+    private var silenceColor: Color {
+        colorScheme == .dark ? Color.warmGrayMedium : Color.warmGrayMedium.opacity(0.6)
+    }
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 // Background track
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.warmGray)
+                    .fill(trackColor)
 
                 // Speaking segment (always at start)
                 RoundedRectangle(cornerRadius: 4)
                     .fill(Color.warmAmber)
-                    .frame(width: geometry.size.width * 0.3)
+                    .frame(width: geometry.size.width * speakingRatio)
 
-                // Silence segment
+                // Silence segment (gray area between speaking and marker)
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.warmGrayMedium)
-                    .frame(width: geometry.size.width * (threshold / 3.0) * 0.7)
-                    .offset(x: geometry.size.width * 0.3)
+                    .fill(silenceColor)
+                    .frame(width: geometry.size.width * silenceWidthRatio)
+                    .offset(x: geometry.size.width * speakingRatio)
 
-                // Threshold marker
-                Rectangle()
+                // Threshold marker (red line where recording stops)
+                RoundedRectangle(cornerRadius: 1)
                     .fill(Color.errorRed)
-                    .frame(width: 2)
-                    .offset(x: geometry.size.width * (0.3 + (threshold / 3.0) * 0.7))
+                    .frame(width: 3)
+                    .offset(x: geometry.size.width * markerOffsetRatio - 1.5)
             }
         }
         .frame(height: 8)
+        .animation(.easeInOut(duration: 0.15), value: threshold)
     }
 }
 
@@ -793,7 +829,7 @@ private struct MicrophoneDeviceRow: View {
         } else if isSelected {
             return Color.warmAmber
         } else {
-            return Color.warmGrayDark
+            return Color.iconSecondaryAdaptive
         }
     }
 
@@ -808,13 +844,13 @@ private struct MicrophoneDeviceRow: View {
         } else if isSelected {
             return Color.warmAmber.opacity(0.1)
         } else {
-            return Color.warmGray.opacity(0.3)
+            return Color.cardBackgroundAdaptive
         }
     }
 
     private var borderOverlay: some View {
         RoundedRectangle(cornerRadius: 8)
-            .stroke(borderColor, lineWidth: 1)
+            .stroke(borderColor, lineWidth: isSelected ? 1.5 : 1)
     }
 
     private var borderColor: Color {
@@ -823,7 +859,7 @@ private struct MicrophoneDeviceRow: View {
         } else if isSelected {
             return Color.warmAmber
         } else {
-            return Color.clear
+            return Color.cardBorderAdaptive
         }
     }
 
@@ -852,27 +888,36 @@ private struct AudioToggleRow: View {
     @Binding var isOn: Bool
 
     var body: some View {
-        Toggle(isOn: $isOn) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.warmAmber)
-                    .frame(width: 24)
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundStyle(Color.warmAmber)
+                .frame(width: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.body)
-                        .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(.primary)
 
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer()
+
+            Toggle("", isOn: $isOn)
+                .toggleStyle(.switch)
+                .tint(Color.warmAmber)
+                .labelsHidden()
         }
-        .toggleStyle(.switch)
-        .tint(Color.warmAmber)
-        .padding(.vertical, 4)
+        .padding(12)
+        .background(Color.cardBackgroundAdaptive)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+        )
     }
 }
 

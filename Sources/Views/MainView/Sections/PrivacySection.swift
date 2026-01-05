@@ -204,8 +204,12 @@ struct PrivacySection: View {
                 }
             }
             .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor))
+            .background(Color.cardBackgroundAdaptive)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+            )
         }
         .transition(.opacity.combined(with: .move(edge: .top)))
         .accessibilityIdentifier("privacySection.dataRetention")
@@ -275,14 +279,14 @@ private struct StoragePolicyRow: View {
             .background(
                 isSelected
                     ? Color.warmAmber.opacity(0.1)
-                    : Color(nsColor: .controlBackgroundColor)
+                    : Color.cardBackgroundAdaptive
             )
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(
-                        isSelected ? Color.warmAmber : Color.clear,
-                        lineWidth: 1.5
+                        isSelected ? Color.warmAmber : Color.cardBorderAdaptive,
+                        lineWidth: isSelected ? 1.5 : 1
                     )
             )
             .contentShape(Rectangle())

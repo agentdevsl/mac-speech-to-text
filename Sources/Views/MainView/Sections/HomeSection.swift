@@ -5,6 +5,7 @@
 // Displays recording status, permission cards, and typing animation demo
 // Glassmorphism design with frosted glass effects
 
+import KeyboardShortcuts
 import SwiftUI
 
 // MARK: - Permission Card Focus
@@ -221,49 +222,105 @@ struct HomeSection: View {
         .accessibilityIdentifier("heroSection")
     }
 
-    // MARK: - Hotkey Hint
+    // MARK: - Hotkey Section
 
     private var hotkeyHint: some View {
-        VStack(spacing: 10) {
-            Text("Press")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.textSecondaryAdaptive)
-
-            HStack(spacing: 6) {
-                ForEach(settings.hotkey.modifiers, id: \.self) { modifier in
-                    GlassKeyboardKey(symbol: modifier.displayName)
-                }
-                GlassKeyboardKey(symbol: hotkeyKeyName)
+        VStack(alignment: .leading, spacing: 16) {
+            // Section label
+            HStack {
+                Text("RECORDING SHORTCUT")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color.textTertiaryAdaptive)
+                    .tracking(1.5)
+                Spacer()
             }
-            .accessibilityIdentifier("hotkeyDisplay")
+            .padding(.horizontal, 4)
 
-            Text("anywhere to record")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.textSecondaryAdaptive)
-        }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 24)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.cardBackgroundAdaptive)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16)
-                        .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+            // Hold-to-Record shortcut
+            HStack {
+                HStack(spacing: 12) {
+                    Image(systemName: "keyboard")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Color.amberPrimary)
+                        .frame(width: 28)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Hold to Record")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(.primary)
+
+                        Text("Hold the key to record, release to transcribe")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                VStack(spacing: 4) {
+                    ShortcutRecorderView(for: .holdToRecord)
+                        .accessibilityIdentifier("hotkeyRecorder")
+
+                    Text("Click to change")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color.cardBackgroundAdaptive)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+                    )
+            )
+            .shadow(color: Color.cardShadowAdaptive, radius: 10, x: 0, y: 3)
+
+            // Toggle Recording shortcut (only shown in toggle mode)
+            if settings.ui.recordingMode == .toggle {
+                HStack {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 18))
+                            .foregroundStyle(Color.amberPrimary)
+                            .frame(width: 28)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Toggle Recording")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(.primary)
+
+                            Text("Press to start, press again to stop")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
+                    Spacer()
+
+                    VStack(spacing: 4) {
+                        ShortcutRecorderView(for: .toggleRecording, placeholder: "Set Toggle Key")
+                            .accessibilityIdentifier("toggleRecordingRecorder")
+
+                        Text("Click to change")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(16)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.cardBackgroundAdaptive)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(Color.cardBorderAdaptive, lineWidth: 1)
+                        )
                 )
-                .shadow(color: Color.cardShadowAdaptive, radius: 12, x: 0, y: 4)
-        )
-        .accessibilityIdentifier("hotkeyHint")
-    }
-
-    /// Display name for the configured hotkey
-    private var hotkeyKeyName: String {
-        switch settings.hotkey.keyCode {
-        case 49: return "Space"
-        case 36: return "Return"
-        case 53: return "Escape"
-        case 51: return "Delete"
-        default: return "Key \(settings.hotkey.keyCode)"
+                .shadow(color: Color.cardShadowAdaptive, radius: 10, x: 0, y: 3)
+            }
         }
+        .accessibilityIdentifier("hotkeySection")
     }
 
     // MARK: - Permission Cards
@@ -303,6 +360,7 @@ struct HomeSection: View {
             )
             .focusable()
             .focused($focusedCard, equals: .microphone)
+            .focusEffectDisabled()  // Disable default blue focus ring
             .accessibilityIdentifier("microphonePermissionCard")
 
             // Accessibility permission card
@@ -321,6 +379,7 @@ struct HomeSection: View {
             )
             .focusable()
             .focused($focusedCard, equals: .accessibility)
+            .focusEffectDisabled()  // Disable default blue focus ring
             .accessibilityIdentifier("accessibilityPermissionCard")
         }
         .accessibilityIdentifier("permissionCards")
@@ -601,12 +660,13 @@ private struct GlassPermissionCard: View {
 
     private var cardBorder: some View {
         RoundedRectangle(cornerRadius: 14)
-            .stroke(borderColor, lineWidth: isFocused ? 2 : 1)
+            .stroke(borderColor, lineWidth: isFocused ? 2.5 : 1)
     }
 
     private var borderColor: Color {
         if isFocused {
-            return Color.selectionBorderAdaptive
+            // Use warm amber for focus instead of system blue
+            return Color.amberPrimary
         } else if errorMessage != nil {
             return Color.errorRed.opacity(0.4)
         } else if isGranted {
@@ -617,7 +677,10 @@ private struct GlassPermissionCard: View {
     }
 
     private var shadowColor: Color {
-        if isGranted {
+        if isFocused {
+            // Amber glow when focused
+            return Color.amberPrimary.opacity(0.25)
+        } else if isGranted {
             return Color.successGreen.opacity(0.1)
         } else if errorMessage != nil {
             return Color.errorRed.opacity(0.1)

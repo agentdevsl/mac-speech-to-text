@@ -6,6 +6,8 @@ extension Notification.Name {
     static let settingsDidReset = Notification.Name("com.speechtotext.settingsDidReset")
     static let themeDidChange = Notification.Name("com.speechtotext.themeDidChange")
     static let voiceTriggerEnabledDidChange = Notification.Name("com.speechtotext.voiceTriggerEnabledDidChange")
+    /// Posted when voice trigger settings should be refreshed in UI (e.g., toggled via shortcut)
+    static let voiceTriggerSettingsDidRefresh = Notification.Name("com.speechtotext.voiceTriggerSettingsDidRefresh")
 }
 
 /// Protocol for settings service (enables testing with mocks)

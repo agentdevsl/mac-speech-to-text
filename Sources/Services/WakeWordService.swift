@@ -387,19 +387,52 @@ actor WakeWordService: WakeWordServiceProtocol {
     /// To add new keywords, use `sherpa-onnx-cli text2token` to convert text to BPE tokens.
     // swiftlint:disable:next line_length
     private static let bpeTokenMappings: [String: String] = [
+        // Assistant-style wake words
         "hey siri": "▁HE Y ▁S I RI",
-        "hello world": "▁HE LL O ▁WORLD",
         "hi google": "▁HI ▁GO O G LE",
+        "ok google": "▁O K ▁GO O G LE",
         "alexa": "▁A LE X A",
+        "hey claude": "▁HE Y ▁C LA U DE",
+        "claude": "▁C LA U DE",
+        "jarvis": "▁JAR V I S",
+        "hey jarvis": "▁HE Y ▁JAR V I S",
+        "computer": "▁COMP U T ER",
+        "hey computer": "▁HE Y ▁COMP U T ER",
+
+        // Action-style wake words
+        "start listening": "▁START ▁LIS T EN ING",
+        "stop listening": "▁STOP ▁LIS T EN ING",
+        "take note": "▁TAKE ▁NOTE",
+        "take notes": "▁TAKE ▁NOTE S",
+        "start recording": "▁START ▁REC OR D ING",
+        "stop recording": "▁STOP ▁REC OR D ING",
         "go home": "▁GO ▁HOME",
         "play music": "▁PLAY ▁MU S IC",
-        "hey claude": "▁HE Y ▁C LA U DE",  // Approximation - Claude broken into subwords
-        "claude": "▁C LA U DE",  // Approximation
-        "opus": "▁O P U S",  // Approximation
-        "sonnet": "▁S O N N E T",  // Approximation
-        "okay": "▁OKAY",
+        "open mail": "▁O PEN ▁MA IL",
+        "open browser": "▁O PEN ▁BRO W S ER",
+        "open calendar": "▁O PEN ▁CA LEN DAR",
+        "open settings": "▁O PEN ▁SET T ING S",
+        "open notes": "▁O PEN ▁NOTE S",
+        "search": "▁SEARCH",
+        "send message": "▁SEND ▁MES S AGE",
+        "new email": "▁NEW ▁E MA IL",
+        "call": "▁CALL",
+        "remind me": "▁RE MIND ▁ME",
+        "set timer": "▁SET ▁TIM ER",
+        "what time": "▁WHAT ▁TIME",
+
+        // Short triggers
         "hey": "▁HE Y",
-        "hello": "▁HE LL O"
+        "hello": "▁HE LL O",
+        "hello world": "▁HE LL O ▁WORLD",
+        "okay": "▁OKAY",
+        "listen": "▁LIS T EN",
+        "record": "▁REC ORD",
+        "start": "▁START",
+        "stop": "▁STOP",
+        "opus": "▁O P U S",
+        "sonnet": "▁S O N N E T",
+        "transcribe": "▁TRANS CRI BE"
     ]
 
     /// Generate keywords.txt content from TriggerKeyword array
