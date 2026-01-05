@@ -104,6 +104,16 @@ enum VoiceTriggerState: Sendable, Equatable {
         return false
     }
 
+    /// Whether the voice trigger is capturing audio (triggered or capturing state)
+    var isCapturing: Bool {
+        switch self {
+        case .triggered, .capturing:
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Whether the voice trigger is currently monitoring for wake words
     var isMonitoring: Bool {
         if case .monitoring = self {

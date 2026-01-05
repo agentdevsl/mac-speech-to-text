@@ -126,6 +126,8 @@ final class VoiceTriggerMonitoringService {
     ///
     /// - Throws: VoiceTriggerError if already monitoring or setup fails
     func startMonitoring() async throws {
+        print("[DEBUG] VoiceTriggerMonitoringService.startMonitoring() called")
+        fflush(stdout)
         AppLogger.info(AppLogger.service, "[\(serviceId)] startMonitoring() called, state=\(state.description)")
 
         guard !isTransitioning else {
@@ -163,9 +165,13 @@ final class VoiceTriggerMonitoringService {
 
             // Get wake word model path from bundle
             guard let modelPath = Constants.VoiceTrigger.modelPath else {
+                print("[DEBUG] Wake word model NOT found in bundle!")
+                fflush(stdout)
                 AppLogger.error(AppLogger.service, "[\(serviceId)] Wake word model not found in bundle")
                 throw VoiceTriggerError.wakeWordInitFailed("Wake word model not found in bundle")
             }
+            print("[DEBUG] Wake word model found at: \(modelPath)")
+            fflush(stdout)
             wakeWordModelPath = modelPath
 
             // Initialize wake word service with model and keywords
@@ -243,7 +249,13 @@ final class VoiceTriggerMonitoringService {
     /// We only use Task for the async wake word processing, not for the outer dispatch.
     ///
     /// - Parameter buffer: Audio buffer from capture service
+    private var audioBufferCount = 0
     func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
+        audioBufferCount += 1
+        if audioBufferCount % 100 == 1 {
+            print("[DEBUG] handleAudioBuffer called \(audioBufferCount) times, state=\(state.description)")
+            fflush(stdout)
+        }
         // Already on MainActor via caller's Task dispatch - no need for another Task wrapper
         switch self.state {
         case .monitoring:
@@ -251,10 +263,17 @@ final class VoiceTriggerMonitoringService {
             let floatSamples = self.convertBufferToFloatSamples(buffer)
             guard !floatSamples.isEmpty else { return }
 
+            if audioBufferCount % 100 == 1 {
+                print("[DEBUG] Sending \(floatSamples.count) samples to wake word service")
+                fflush(stdout)
+            }
+
             // Route to wake word detection (async operation requires Task)
             Task { [weak self] in
                 guard let self else { return }
                 if let result = await self.wakeWordService.processFrame(floatSamples) {
+                    print("[DEBUG] Wake word DETECTED: \(result.detectedKeyword)")
+                    fflush(stdout)
                     self.handleWakeWordDetected(keyword: result.detectedKeyword)
                 }
             }

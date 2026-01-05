@@ -302,9 +302,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            print("[DEBUG] voiceTriggerEnabledDidChange notification received")
+            fflush(stdout)
             Task { @MainActor in
                 guard let self else { return }
                 let enabled = notification.userInfo?["enabled"] as? Bool ?? false
+                print("[DEBUG] Voice trigger enabled = \(enabled)")
+                fflush(stdout)
 
                 if enabled {
                     AppLogger.app.info("Voice triggers enabled via settings - starting monitoring")
@@ -443,6 +447,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Start voice trigger monitoring
     private func startVoiceMonitoring() async {
+        print("[DEBUG] startVoiceMonitoring called")
+        fflush(stdout)
         AppLogger.app.info("Starting voice trigger monitoring")
 
         // Ensure service is initialized
@@ -538,8 +544,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let currentState = service.state
         if currentState != lastObservedVoiceTriggerState {
+            let previousState = lastObservedVoiceTriggerState
             lastObservedVoiceTriggerState = currentState
             postVoiceTriggerStateChange(currentState)
+
+            // Show/hide glass overlay based on state transitions
+            handleVoiceTriggerStateUI(from: previousState, to: currentState)
+        }
+    }
+
+    /// Handle UI updates for voice trigger state changes
+    private func handleVoiceTriggerStateUI(from previousState: VoiceTriggerState, to currentState: VoiceTriggerState) {
+        switch currentState {
+        case .triggered, .capturing:
+            // Show recording overlay when wake word triggers capture
+            if !previousState.isCapturing {
+                print("[DEBUG] Showing glass overlay for voice trigger capture")
+                fflush(stdout)
+                glassOverlayController.showRecording()
+            }
+
+        case .transcribing:
+            // Show transcribing state
+            print("[DEBUG] Showing transcribing state")
+            fflush(stdout)
+            glassOverlayController.showTranscribing()
+
+        case .inserting:
+            // Keep transcribing visual during insertion
+            break
+
+        case .monitoring, .idle:
+            // Hide overlay when returning to monitoring or idle
+            if previousState.isCapturing || previousState == .transcribing || previousState == .inserting {
+                print("[DEBUG] Hiding glass overlay")
+                fflush(stdout)
+                glassOverlayController.hideOverlay()
+            }
+
+        case .error:
+            // Hide overlay on error
+            glassOverlayController.hideOverlay()
         }
     }
 

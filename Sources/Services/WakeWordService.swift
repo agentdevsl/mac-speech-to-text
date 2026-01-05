@@ -255,9 +255,15 @@ actor WakeWordService: WakeWordServiceProtocol {
         )
     }
 
+    private var processFrameLogCount = 0
     func processFrame(_ samples: [Float]) -> WakeWordResult? {
+        processFrameLogCount += 1
+
         guard _isInitialized else {
-            // Silently return nil if not initialized (common case during startup)
+            if processFrameLogCount % 500 == 1 {
+                print("[DEBUG] WakeWordService not initialized!")
+                fflush(stdout)
+            }
             return nil
         }
 
@@ -266,6 +272,10 @@ actor WakeWordService: WakeWordServiceProtocol {
         }
 
         guard let spotter = keywordSpotter else {
+            if processFrameLogCount % 500 == 1 {
+                print("[DEBUG] WakeWordService spotter is nil!")
+                fflush(stdout)
+            }
             return nil
         }
 
@@ -275,8 +285,15 @@ actor WakeWordService: WakeWordServiceProtocol {
         spotter.acceptWaveform(samples: samples, sampleRate: 16000)
 
         // Decode while there are enough frames
+        var decodeCount = 0
         while spotter.isReady() {
             spotter.decode()
+            decodeCount += 1
+        }
+
+        if processFrameLogCount % 500 == 1 {
+            print("[DEBUG] WakeWordService: processed \(samples.count) samples, decoded \(decodeCount) times")
+            fflush(stdout)
         }
 
         // Check for keyword detection
