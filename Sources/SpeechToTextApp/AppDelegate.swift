@@ -292,7 +292,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             await self?.stopHoldToRecordSession(holdDuration: duration)
         }
 
+        hotkeyManager?.onRecordingCancel = { [weak self] in
+            await self?.cancelHoldToRecordSession()
+        }
+
         AppLogger.app.info("Global hotkey initialized via KeyboardShortcuts")
+    }
+
+    /// Cancel hold-to-record session (e.g., when hold duration is too short)
+    private func cancelHoldToRecordSession() async {
+        guard isHoldToRecordSessionActive else { return }
+
+        AppLogger.app.debug("Cancelling hold-to-record session (duration too short)")
+
+        // Stop audio level updates
+        stopRealAudioLevelUpdates()
+
+        // Cancel the recording
+        await holdToRecordViewModel.cancelRecording()
+
+        // Hide overlay and end session
+        glassOverlayController.hideOverlay()
+        isHoldToRecordSessionActive = false
     }
 
     // MARK: - Hold-to-Record Session Management
