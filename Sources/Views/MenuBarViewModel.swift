@@ -78,4 +78,6 @@ extension Notification.Name {
     static let showSettings = Notification.Name("showSettings")
     static let showMainView = Notification.Name("showMainView")
     static let switchLanguage = Notification.Name("switchLanguage")
+    /// Posted when voice trigger monitoring state changes (userInfo contains "state": VoiceTriggerState)
+    static let voiceTriggerStateChanged = Notification.Name("voiceTriggerStateChanged")
 }
