@@ -74,32 +74,50 @@ class HotkeyManager {
         // Register handlers for the hold-to-record shortcut.
         // The default shortcut (Ctrl+Shift+Space) is defined in ShortcutNames.swift.
         // KeyboardShortcuts library handles storage and default fallback automatically.
+        //
+        // NOTE: Do NOT call KeyboardShortcuts.getShortcut() here - it crashes due to
+        // Bundle.module not being available in executable targets.
+
+        print("[HOTKEY] setupHotkey() called")
+        fflush(stdout)
+
+        // First, explicitly enable the shortcut to ensure Carbon hotkey is registered
+        KeyboardShortcuts.enable(.holdToRecord)
+        print("[HOTKEY] Enabled .holdToRecord shortcut")
+        fflush(stdout)
 
         KeyboardShortcuts.onKeyDown(for: .holdToRecord) { [weak self] in
+            print("[HOTKEY] onKeyDown callback triggered!")
+            fflush(stdout)
             Task { @MainActor in
                 await self?.handleKeyDown()
             }
         }
 
         KeyboardShortcuts.onKeyUp(for: .holdToRecord) { [weak self] in
+            print("[HOTKEY] onKeyUp callback triggered!")
+            fflush(stdout)
             Task { @MainActor in
                 await self?.handleKeyUp()
             }
         }
 
-        if let shortcut = KeyboardShortcuts.getShortcut(for: .holdToRecord) {
-            AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord (\(shortcut))")
-        } else {
-            AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord (using default)")
-        }
+        print("[HOTKEY] Registered handlers for .holdToRecord (Ctrl+Shift+Space)")
+        fflush(stdout)
+        AppLogger.app.debug("HotkeyManager: Registered handlers for .holdToRecord")
     }
 
     // MARK: - Key Event Handlers (internal for testability)
 
     /// Handle key down event - starts recording if not already processing and not in cooldown
     func handleKeyDown() async {
+        print("[HOTKEY] handleKeyDown() - isProcessing=\(isProcessing)")
+        fflush(stdout)
+
         // Guard: already processing
         guard !isProcessing else {
+            print("[HOTKEY] handleKeyDown: IGNORED - already processing")
+            fflush(stdout)
             AppLogger.app.debug("HotkeyManager: Ignoring keyDown - already processing")
             return
         }
@@ -107,6 +125,8 @@ class HotkeyManager {
         // Guard: in cooldown period
         let now = currentTimeProvider()
         guard now.timeIntervalSince(lastActionTime) > cooldownInterval else {
+            print("[HOTKEY] handleKeyDown: IGNORED - in cooldown")
+            fflush(stdout)
             AppLogger.app.debug("HotkeyManager: Ignoring keyDown - in cooldown")
             return
         }
@@ -114,11 +134,15 @@ class HotkeyManager {
         // Start recording
         isProcessing = true
         keyPressStartTime = now
+        print("[HOTKEY] handleKeyDown: Starting recording, isProcessing=true")
+        fflush(stdout)
         AppLogger.app.debug("HotkeyManager: keyDown - starting recording")
 
         if let callback = onRecordingStart {
             await callback()
         } else {
+            print("[HOTKEY] handleKeyDown: WARNING - no callback!")
+            fflush(stdout)
             AppLogger.app.warning("HotkeyManager: onRecordingStart callback not set - recording may not start properly")
         }
     }

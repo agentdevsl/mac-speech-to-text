@@ -73,7 +73,7 @@ final class FluidAudioServiceTests: XCTestCase {
 
         // When/Then
         do {
-            _ = try await service.transcribe(samples: samples)
+            _ = try await service.transcribe(samples: samples, sampleRate: 16000.0)
             XCTFail("Should throw notInitialized error")
         } catch let error as FluidAudioError {
             XCTAssertEqual(error, .notInitialized)
@@ -91,7 +91,7 @@ final class FluidAudioServiceTests: XCTestCase {
         // Note: notInitialized error takes precedence over invalidAudioFormat
         // when service is not initialized
         do {
-            _ = try await service.transcribe(samples: samples)
+            _ = try await service.transcribe(samples: samples, sampleRate: 16000.0)
             XCTFail("Should throw error")
         } catch let error as FluidAudioError {
             // Either notInitialized (if checked first) or invalidAudioFormat is acceptable

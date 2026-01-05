@@ -4,7 +4,6 @@
 // Main View - General Settings Section
 // Recording mode, startup, text insertion, and hotkey configuration
 
-import KeyboardShortcuts
 import ServiceManagement
 import SwiftUI
 
@@ -216,7 +215,7 @@ struct GeneralSection: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
-            // Shortcut recorder row
+            // Shortcut display row
             HStack {
                 HStack(spacing: 12) {
                     Image(systemName: "keyboard")
@@ -229,7 +228,7 @@ struct GeneralSection: View {
                             .font(.body)
                             .foregroundStyle(.primary)
 
-                        Text("Click to record a new shortcut")
+                        Text("Default: ⌃⇧Space")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -237,9 +236,9 @@ struct GeneralSection: View {
 
                 Spacer()
 
-                // KeyboardShortcuts recorder - styled to match app aesthetic
-                KeyboardShortcuts.Recorder(for: .holdToRecord)
-                    .accessibilityIdentifier("hotkeyRecorder")
+                // Display current shortcut
+                ShortcutDisplayView()
+                    .accessibilityIdentifier("hotkeyDisplay")
             }
             .padding(16)
             .background(
@@ -257,7 +256,7 @@ struct GeneralSection: View {
             )
 
             // Hotkey hint
-            Text("Use a unique key combination to avoid conflicts with other apps. Default: Control + Shift + Space")
+            Text("Use a unique key combination to avoid conflicts with other apps.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
         }
@@ -444,6 +443,36 @@ private struct BlueToggleStyle: ToggleStyle {
                     }
                 }
         }
+    }
+}
+
+// MARK: - Shortcut Display View
+
+/// Displays the keyboard shortcut as a static value
+/// NOTE: We cannot call ANY KeyboardShortcuts methods that might access Bundle.module
+/// as it crashes in executable targets (SPM resource bundle issue)
+private struct ShortcutDisplayView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        // Display the default shortcut - we can't read the actual value safely
+        // The shortcut is hardcoded as Ctrl+Shift+Space in ShortcutNames.swift
+        Text("⌃⇧Space")
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color(white: 0.95))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        colorScheme == .dark ? Color.white.opacity(0.2) : Color.black.opacity(0.1),
+                        lineWidth: 1
+                    )
+            )
     }
 }
 

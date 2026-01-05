@@ -84,28 +84,10 @@ class TextInsertionService {
         print("[DEBUG-INSERT] Got focused element, attempting insertion of \(text.count) chars")
         fflush(stdout)
 
-        // Try to insert text at cursor using kAXSelectedTextAttribute
-        // This inserts at cursor position or replaces current selection (NOT the entire field)
-        let insertionResult = AXUIElementSetAttributeValue(
-            axElement,
-            kAXSelectedTextAttribute as CFString,
-            text as CFTypeRef
-        )
-
-        print("[DEBUG-INSERT] kAXSelectedTextAttribute result: \(insertionResult.rawValue)")
+        // Use Cmd+V paste - more reliable across all applications including Electron apps (VSCode, Slack, etc.)
+        // kAXSelectedTextAttribute often reports success but doesn't actually insert in these apps
+        print("[DEBUG-INSERT] Using Cmd+V paste for reliable insertion")
         fflush(stdout)
-
-        if insertionResult == .success {
-            print("[DEBUG-INSERT] Insertion via kAXSelectedTextAttribute succeeded!")
-            fflush(stdout)
-            return
-        }
-
-        // Log why direct insertion failed before falling back
-        AppLogger.service.warning("Direct insertion failed with error: \(String(describing: insertionResult), privacy: .public). Falling back to paste.")
-        print("[DEBUG-INSERT] kAXSelectedTextAttribute failed (\(insertionResult.rawValue)), trying paste fallback")
-
-        // Try alternative: simulate paste
         try await simulatePaste(text)
     }
 
@@ -233,12 +215,12 @@ class TextInsertionService {
             }
         }
 
-        // Try to insert via accessibility
-        print("[DEBUG-INSERT] Attempting accessibility insertion...")
+        // Try to insert via Cmd+V paste (more reliable than kAXSelectedTextAttribute)
+        print("[DEBUG-INSERT] Attempting Cmd+V paste insertion...")
         fflush(stdout)
         do {
             try await insertText(text)
-            print("[DEBUG-INSERT] Accessibility insertion SUCCEEDED!")
+            print("[DEBUG-INSERT] Cmd+V paste insertion SUCCEEDED!")
             fflush(stdout)
             return .insertedViaAccessibility
         } catch {

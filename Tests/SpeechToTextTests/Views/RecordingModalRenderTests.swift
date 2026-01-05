@@ -171,7 +171,7 @@ actor MockFluidAudioServiceForRenderTest: FluidAudioServiceProtocol {
         initialized = true
     }
 
-    func transcribe(samples: [Int16]) async throws -> TranscriptionResult {
+    func transcribe(samples: [Int16], sampleRate: Double) async throws -> TranscriptionResult {
         return TranscriptionResult(text: "Mock", confidence: 0.9, durationMs: 100)
     }
 
