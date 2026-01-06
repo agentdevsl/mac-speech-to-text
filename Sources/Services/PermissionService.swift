@@ -164,8 +164,12 @@ class PermissionService: PermissionChecker {
     }
 
     deinit {
-        // Note: Cannot call stopPolling() from deinit as it's isolated to MainActor
-        // The observer cleanup is handled when stopPolling() is explicitly called
+        // Clean up NotificationCenter observer to prevent memory leak
+        // Note: NotificationCenter.removeObserver is thread-safe, so we can call it from deinit
+        // even though the class is @MainActor isolated
+        if let observer = activationObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - Polling Control

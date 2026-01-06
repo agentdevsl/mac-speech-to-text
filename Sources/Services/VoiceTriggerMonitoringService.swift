@@ -92,6 +92,10 @@ final class VoiceTriggerMonitoringService {
     @ObservationIgnored private nonisolated(unsafe) var deinitSilenceTimer: Timer?
     @ObservationIgnored private nonisolated(unsafe) var deinitMaxDurationTimer: Timer?
 
+    /// Recovery task that transitions from error state back to monitoring
+    /// Stored so it can be cancelled during stopMonitoring()
+    @ObservationIgnored private var recoveryTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     init(
@@ -126,8 +130,6 @@ final class VoiceTriggerMonitoringService {
     ///
     /// - Throws: VoiceTriggerError if already monitoring or setup fails
     func startMonitoring() async throws {
-        print("[DEBUG] VoiceTriggerMonitoringService.startMonitoring() called")
-        fflush(stdout)
         AppLogger.info(AppLogger.service, "[\(serviceId)] startMonitoring() called, state=\(state.description)")
 
         guard !isTransitioning else {
@@ -165,13 +167,10 @@ final class VoiceTriggerMonitoringService {
 
             // Get wake word model path from bundle
             guard let modelPath = Constants.VoiceTrigger.modelPath else {
-                print("[DEBUG] Wake word model NOT found in bundle!")
-                fflush(stdout)
                 AppLogger.error(AppLogger.service, "[\(serviceId)] Wake word model not found in bundle")
                 throw VoiceTriggerError.wakeWordInitFailed("Wake word model not found in bundle")
             }
-            print("[DEBUG] Wake word model found at: \(modelPath)")
-            fflush(stdout)
+            AppLogger.debug(AppLogger.service, "[\(serviceId)] Wake word model found at: \(modelPath)")
             wakeWordModelPath = modelPath
 
             // Initialize wake word service with model and keywords
@@ -222,6 +221,10 @@ final class VoiceTriggerMonitoringService {
         maxDurationTimer = nil
         deinitMaxDurationTimer = nil
 
+        // Cancel any pending recovery task to prevent state changes after stop
+        recoveryTask?.cancel()
+        recoveryTask = nil
+
         // Stop services - await to prevent race conditions on restart
         await wakeWordService.shutdown()
         _ = try? await audioService.stopCapture()
@@ -253,8 +256,7 @@ final class VoiceTriggerMonitoringService {
     func handleAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         audioBufferCount += 1
         if audioBufferCount % 100 == 1 {
-            print("[DEBUG] handleAudioBuffer called \(audioBufferCount) times, state=\(state.description)")
-            fflush(stdout)
+            AppLogger.trace(AppLogger.service, "[\(serviceId)] handleAudioBuffer called \(audioBufferCount) times, state=\(state.description)")
         }
         // Already on MainActor via caller's Task dispatch - no need for another Task wrapper
         switch self.state {
@@ -264,16 +266,14 @@ final class VoiceTriggerMonitoringService {
             guard !floatSamples.isEmpty else { return }
 
             if audioBufferCount % 100 == 1 {
-                print("[DEBUG] Sending \(floatSamples.count) samples to wake word service")
-                fflush(stdout)
+                AppLogger.trace(AppLogger.service, "[\(serviceId)] Sending \(floatSamples.count) samples to wake word service")
             }
 
             // Route to wake word detection (async operation requires Task)
             Task { [weak self] in
                 guard let self else { return }
                 if let result = await self.wakeWordService.processFrame(floatSamples) {
-                    print("[DEBUG] Wake word DETECTED: \(result.detectedKeyword)")
-                    fflush(stdout)
+                    AppLogger.info(AppLogger.service, "[\(self.serviceId)] Wake word DETECTED: \(result.detectedKeyword)")
                     self.handleWakeWordDetected(keyword: result.detectedKeyword)
                 }
             }
@@ -448,6 +448,8 @@ final class VoiceTriggerMonitoringService {
                 self?.checkSilence()
             }
         }
+        // Explicitly add to main run loop to ensure timer fires correctly
+        RunLoop.main.add(timer, forMode: .common)
         silenceTimer = timer
         deinitSilenceTimer = timer
 
@@ -472,14 +474,11 @@ final class VoiceTriggerMonitoringService {
         // Log every second to show silence countdown
         silenceLogCounter += 1
         if silenceLogCounter % 10 == 0 {
-            print("[DEBUG] Silence check: \(String(format: "%.1f", silenceDuration))s / \(String(format: "%.0f", threshold))s threshold")
-            fflush(stdout)
+            AppLogger.debug(AppLogger.service, "[\(serviceId)] Silence check: \(String(format: "%.1f", silenceDuration))s / \(String(format: "%.0f", threshold))s threshold")
         }
 
         if silenceDuration >= threshold {
             silenceLogCounter = 0
-            print("[DEBUG] Silence threshold reached - starting transcription!")
-            fflush(stdout)
             AppLogger.info(
                 AppLogger.service,
                 "[\(serviceId)] Silence threshold reached (\(String(format: "%.1f", silenceDuration))s) - transcribing"
@@ -530,6 +529,8 @@ final class VoiceTriggerMonitoringService {
                 await self.handleSilenceTimeout() // Reuse same flow
             }
         }
+        // Explicitly add to main run loop to ensure timer fires correctly
+        RunLoop.main.add(timer, forMode: .common)
         maxDurationTimer = timer
         deinitMaxDurationTimer = timer
 
@@ -608,12 +609,21 @@ final class VoiceTriggerMonitoringService {
             state = .error(.transcriptionFailed(error.localizedDescription))
 
             // Attempt recovery to monitoring state after brief delay
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+            // Cancel any existing recovery task before creating new one to prevent race conditions
+            recoveryTask?.cancel()
+            // Store task reference so it can be cancelled in stopMonitoring()
+            recoveryTask = Task { @MainActor [weak self] in
+                do {
+                    try await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                } catch {
+                    // Task was cancelled
+                    return
+                }
                 guard let self, case .error = self.state else { return }
                 AppLogger.debug(AppLogger.service, "[\(self.serviceId)] Recovering from error to monitoring state")
                 self.state = .monitoring
                 self.errorMessage = nil
+                self.recoveryTask = nil
             }
         }
     }

@@ -95,7 +95,9 @@ final class RecordingViewModel {
     // The isBeingDeallocated flag prevents notification handlers from running during deallocation.
     @ObservationIgnored private nonisolated(unsafe) var deinitLanguageSwitchObserver: NSObjectProtocol?
     @ObservationIgnored private nonisolated(unsafe) var deinitInactivityTimer: Timer?
-    @ObservationIgnored private nonisolated(unsafe) var isBeingDeallocated: Bool = false
+    /// Thread-safe flag to prevent notification handlers from executing during deallocation.
+    /// Uses OSAllocatedUnfairLock to prevent data race between deinit and notification handlers.
+    @ObservationIgnored private let isBeingDeallocatedLock = OSAllocatedUnfairLock(initialState: false)
 
     /// Shared permission service instance (avoids state fragmentation from multiple instances)
     @ObservationIgnored private let permissionService: PermissionService
@@ -130,7 +132,8 @@ final class RecordingViewModel {
 
     deinit {
         // Set deallocation flag FIRST to prevent notification handlers from executing
-        isBeingDeallocated = true
+        // Using atomic lock to prevent data race with notification handlers
+        isBeingDeallocatedLock.withLock { $0 = true }
         AppLogger.trace(AppLogger.viewModel, "RecordingViewModel[\(viewModelId)] deallocating")
         if let observer = deinitLanguageSwitchObserver { NotificationCenter.default.removeObserver(observer) }
         deinitInactivityTimer?.invalidate()
@@ -157,7 +160,7 @@ final class RecordingViewModel {
             queue: .main  // Use main queue for synchronous deinit removal
         ) { [weak self] notification in
             guard let self,
-                  !self.isBeingDeallocated,
+                  !self.isBeingDeallocatedLock.withLock({ $0 }),
                   let languageCode = notification.userInfo?["languageCode"] as? String else {
                 return
             }
@@ -165,7 +168,7 @@ final class RecordingViewModel {
             // Use Task to defer to next run loop iteration, avoiding @Observable re-entrancy
             // during SwiftUI view body evaluation
             Task { @MainActor [weak self] in
-                guard let self, !self.isBeingDeallocated else { return }
+                guard let self, !self.isBeingDeallocatedLock.withLock({ $0 }) else { return }
                 await self.handleLanguageSwitch(to: languageCode)
             }
         }
@@ -427,9 +430,7 @@ final class RecordingViewModel {
             }
 
             // Transcribe audio
-            print("[DEBUG] onHotkeyReleased: Starting transcription with \(samples.count) samples at \(Int(sampleRate))Hz...")
-            fflush(stdout)
-            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription...")
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Starting transcription with \(samples.count) samples at \(Int(sampleRate))Hz...")
             try await transcribeWithFallback(samples: samples, sampleRate: sampleRate)
 
         } catch {
@@ -581,12 +582,8 @@ final class RecordingViewModel {
             }
 
             // Transcribe (samples are at native rate, FluidAudio will resample to 16kHz)
-            print("[DEBUG] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
-            fflush(stdout)
-            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
             let result = try await fluidAudioService.transcribe(samples: samples, sampleRate: sampleRate)
-            print("[DEBUG] FluidAudio result: text='\(result.text)', confidence=\(result.confidence), durationMs=\(result.durationMs)")
-            fflush(stdout)
             AppLogger.info(
                 AppLogger.viewModel,
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
@@ -625,6 +622,7 @@ final class RecordingViewModel {
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
+            isInserting = false  // Reset insertion flag in case error occurred during insertion phase
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             // Re-fetch session to avoid overwriting concurrent changes (bug fix)
             if var updatedSession = currentSession, currentSessionId == startSessionId {
@@ -729,12 +727,8 @@ final class RecordingViewModel {
             }
 
             // Transcribe (samples are at native rate, FluidAudio will resample to 16kHz)
-            print("[DEBUG] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
-            fflush(stdout)
-            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe...")
+            AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling FluidAudio transcribe with \(samples.count) samples at \(Int(sampleRate))Hz...")
             let result = try await fluidAudioService.transcribe(samples: samples, sampleRate: sampleRate)
-            print("[DEBUG] FluidAudio result: text='\(result.text)', confidence=\(result.confidence), durationMs=\(result.durationMs)")
-            fflush(stdout)
             AppLogger.info(
                 AppLogger.viewModel,
                 "[\(viewModelId)] Transcription complete: \(result.durationMs)ms, confidence=\(result.confidence)"
@@ -773,6 +767,7 @@ final class RecordingViewModel {
         } catch {
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Transcription failed: \(error.localizedDescription)")
             isTranscribing = false
+            isInserting = false  // Reset insertion flag in case error occurred during insertion phase
             errorMessage = "Transcription failed: \(error.localizedDescription)"
             // Re-fetch session to avoid overwriting concurrent changes (bug fix)
             if var updatedSession = currentSession, currentSessionId == startSessionId {
@@ -786,13 +781,9 @@ final class RecordingViewModel {
 
     /// Insert text with fallback to clipboard and show accessibility prompt if needed
     private func insertTextWithFallback(_ text: String) async throws {
-        print("[DEBUG] insertTextWithFallback() called with \(text.count) chars")
-        fflush(stdout)
         AppLogger.info(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback() called, textLength=\(text.count)")
 
         guard var session = currentSession else {
-            print("[DEBUG] insertTextWithFallback: no active session!")
-            fflush(stdout)
             AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] insertTextWithFallback: no active session")
             throw RecordingError.noActiveSession
         }
@@ -806,11 +797,9 @@ final class RecordingViewModel {
         currentSession = session
 
         // Use fallback-aware insertion
-        print("[DEBUG] Calling textInsertionService.insertTextWithFallback...")
-        fflush(stdout)
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] Calling textInsertionService.insertTextWithFallback...")
         let insertionResult = await textInsertionService.insertTextWithFallback(text)
-        print("[DEBUG] insertionResult: \(insertionResult)")
-        fflush(stdout)
+        AppLogger.debug(AppLogger.viewModel, "[\(viewModelId)] insertionResult: \(insertionResult)")
 
         // Check for session cancellation after await (bug fix: staleness detection)
         guard currentSessionId == startSessionId, var updatedSession = currentSession else {
@@ -838,6 +827,12 @@ final class RecordingViewModel {
             case .insertionFailed:
                 // Insertion failed but clipboard worked - no prompt needed
                 break
+            case .clipboardFailed(let errorMessage):
+                // Clipboard failed - log the error but don't prompt
+                // The text was NOT successfully saved anywhere
+                AppLogger.error(AppLogger.viewModel, "[\(viewModelId)] Clipboard failed: \(errorMessage)")
+                updatedSession.insertionSuccess = false
+                lastTranscriptionCopiedToClipboard = false
             }
 
         case .requiresAccessibilityPermission:
@@ -975,7 +970,7 @@ extension RecordingViewModel {
                 // Wait 1 second between polls
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
 
-                guard !Task.isCancelled, !self.isBeingDeallocated else { break }
+                guard !Task.isCancelled, !self.isBeingDeallocatedLock.withLock({ $0 }) else { break }
 
                 // Check if permission is now granted using shared service (bug fix)
                 if await self.permissionService.checkMicrophonePermission() {

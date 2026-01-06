@@ -21,6 +21,8 @@ enum ClipboardFallbackReason: Sendable, Equatable {
     case insertionFailed(String)
     /// User prefers clipboard-only mode
     case userPreference
+    /// Clipboard operation failed
+    case clipboardFailed(String)
 }
 
 /// Service for inserting text using Accessibility APIs
@@ -90,6 +92,9 @@ class TextInsertionService {
     /// This is the fallback method when Cmd+V doesn't work
     private func insertViaAccessibility(_ text: String) async throws {
         let systemWideElement = AXUIElementCreateSystemWide()
+        // Note: AXUIElementCreateSystemWide returns a +1 retained object per Core Foundation
+        // "Create Rule". However, Swift automatically manages CFTypeRef bridged types,
+        // so explicit CFRelease is not needed when assigned to a Swift variable.
         var focusedElement: CFTypeRef?
 
         let result = AXUIElementCopyAttributeValue(
@@ -102,7 +107,16 @@ class TextInsertionService {
             throw TextInsertionError.noFocusedElement
         }
 
-        let axElement = unsafeBitCast(element, to: AXUIElement.self)
+        // Validate the returned element is actually an AXUIElement before casting
+        // This prevents potential issues if the accessibility API returns an unexpected type
+        guard CFGetTypeID(element) == AXUIElementGetTypeID() else {
+            AppLogger.service.error("Focused element is not an AXUIElement (typeID: \(CFGetTypeID(element)))")
+            throw TextInsertionError.noFocusedElement
+        }
+
+        // Safe cast after type validation - AXUIElement is a CFTypeRef typealias
+        // swiftlint:disable:next force_cast
+        let axElement = (element as! AXUIElement)
 
         // Try to set the value directly
         let setResult = AXUIElementSetAttributeValue(
@@ -249,8 +263,8 @@ class TextInsertionService {
                 return .copiedToClipboardOnly(reason: .userPreference)
             } catch {
                 AppLogger.service.error("Clipboard copy failed in clipboard-only mode: \(error.localizedDescription, privacy: .public)")
-                // Even if clipboard fails, return user preference reason since that was the intent
-                return .copiedToClipboardOnly(reason: .userPreference)
+                // Return clipboard failure reason so caller knows text was NOT copied
+                return .copiedToClipboardOnly(reason: .clipboardFailed(error.localizedDescription))
             }
         }
 
@@ -273,7 +287,8 @@ class TextInsertionService {
                 }
             } catch {
                 AppLogger.service.error("Clipboard copy failed: \(error.localizedDescription, privacy: .public)")
-                return .requiresAccessibilityPermission
+                // Return clipboard failure reason so caller knows text was NOT copied
+                return .copiedToClipboardOnly(reason: .clipboardFailed(error.localizedDescription))
             }
         }
 
@@ -294,18 +309,20 @@ class TextInsertionService {
             }
 
             return .insertedViaAccessibility
-        } catch {
-            print("[DEBUG-INSERT] Accessibility insertion FAILED: \(error)")
+        } catch let insertionError {
+            print("[DEBUG-INSERT] Accessibility insertion FAILED: \(insertionError)")
             fflush(stdout)
-            AppLogger.service.warning("Accessibility insertion failed, falling back to clipboard: \(error.localizedDescription, privacy: .public)")
+            AppLogger.service.warning("Accessibility insertion failed, falling back to clipboard: \(insertionError.localizedDescription, privacy: .public)")
             // Already copied to clipboard as part of simulatePaste fallback in insertText
             // But if that also failed, try explicit clipboard copy
             do {
                 try await copyToClipboardPublic(text)
-            } catch {
-                AppLogger.service.error("Final clipboard fallback failed: \(error.localizedDescription, privacy: .public)")
+                return .copiedToClipboardOnly(reason: .insertionFailed(insertionError.localizedDescription))
+            } catch let clipboardError {
+                AppLogger.service.error("Final clipboard fallback failed: \(clipboardError.localizedDescription, privacy: .public)")
+                // Return clipboard failure so caller knows text was NOT saved anywhere
+                return .copiedToClipboardOnly(reason: .clipboardFailed(clipboardError.localizedDescription))
             }
-            return .copiedToClipboardOnly(reason: .insertionFailed(error.localizedDescription))
         }
     }
 

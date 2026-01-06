@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a single speech-to-text capture event from start to completion
-struct RecordingSession: Identifiable, Sendable {
+struct RecordingSession: Identifiable, Sendable, Codable {
     let id: UUID
     let startTime: Date
     var endTime: Date?
@@ -66,7 +66,7 @@ struct RecordingSession: Identifiable, Sendable {
 }
 
 /// Represents word-level timestamps in transcription
-struct TranscriptionSegment: Identifiable, Sendable {
+struct TranscriptionSegment: Identifiable, Sendable, Codable {
     let id: UUID
     let text: String
     let startTime: TimeInterval

@@ -16,10 +16,13 @@ class AppState {
     var voiceTriggerState: VoiceTriggerState = .idle
 
     // Services
-    let fluidAudioService: FluidAudioService
-    let permissionService: PermissionService
-    let settingsService: SettingsService
-    let statisticsService: StatisticsService
+    // CRITICAL: Actor types in @Observable must be @ObservationIgnored to prevent EXC_BAD_ACCESS
+    // crashes due to the observation macro scanning properties and triggering executor checks.
+    // See docs/CONCURRENCY_PATTERNS.md for details.
+    @ObservationIgnored let fluidAudioService: FluidAudioService
+    @ObservationIgnored let permissionService: PermissionService
+    @ObservationIgnored let settingsService: SettingsService
+    @ObservationIgnored let statisticsService: StatisticsService
 
     /// Task for loading statistics - tracked for proper lifecycle management
     @ObservationIgnored private var loadingTask: Task<Void, Never>?
@@ -45,6 +48,8 @@ class AppState {
         self.statistics = .empty
         let task = Task { [weak self] in
             guard let self else { return }
+            // Check for cancellation before doing work (e.g., if AppState was deallocated quickly)
+            guard !Task.isCancelled else { return }
             self.statistics = await statisticsService.getAggregatedStats()
         }
         loadingTask = task
@@ -124,8 +129,10 @@ class AppState {
 
     /// Cancel current session
     func cancelSession() {
-        guard var session = currentSession else { return }
-        session.state = .cancelled
+        // Guard: only cancel if there's an active session
+        guard currentSession != nil else { return }
+        // Note: We don't need to set session.state = .cancelled since we're immediately clearing it
+        // and not recording the cancelled session in statistics
         currentSession = nil
         isRecording = false
     }

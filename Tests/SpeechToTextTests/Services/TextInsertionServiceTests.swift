@@ -440,6 +440,36 @@ final class TextInsertionServiceTests: XCTestCase {
         XCTAssertEqual(reason1, reason2)
     }
 
+    func test_clipboardFallbackReason_clipboardFailed_preservesMessage() {
+        // Given
+        let reason = ClipboardFallbackReason.clipboardFailed("Clipboard unavailable")
+
+        // Then
+        if case .clipboardFailed(let message) = reason {
+            XCTAssertEqual(message, "Clipboard unavailable")
+        } else {
+            XCTFail("Expected clipboardFailed reason")
+        }
+    }
+
+    func test_clipboardFallbackReason_clipboardFailed_isEquatable() {
+        // Given
+        let reason1 = ClipboardFallbackReason.clipboardFailed("error")
+        let reason2 = ClipboardFallbackReason.clipboardFailed("error")
+
+        // Then
+        XCTAssertEqual(reason1, reason2)
+    }
+
+    func test_clipboardFallbackReason_clipboardFailed_differentMessagesNotEqual() {
+        // Given
+        let reason1 = ClipboardFallbackReason.clipboardFailed("error1")
+        let reason2 = ClipboardFallbackReason.clipboardFailed("error2")
+
+        // Then
+        XCTAssertNotEqual(reason1, reason2)
+    }
+
     // MARK: - copyToClipboardPublic Tests
 
     func test_copyToClipboardPublic_copiesToClipboard() async throws {
@@ -519,5 +549,141 @@ final class TextInsertionServiceTests: XCTestCase {
 
         // Then
         XCTAssertEqual(description, "Failed to create keyboard event for V key down")
+    }
+
+    func test_textInsertionError_keyEventCreationFailed_variousKeys() {
+        // Given - test all possible key event failure messages
+        let keys = ["Command key down", "V key up", "Command key up", "Return key down", "Return key up"]
+
+        // Then
+        for key in keys {
+            let error = TextInsertionError.keyEventCreationFailed(key)
+            XCTAssertTrue(error.errorDescription?.contains(key) ?? false,
+                "Error description should contain '\(key)'")
+        }
+    }
+
+    // MARK: - TextInsertionError Equatable Tests
+
+    func test_textInsertionError_noFocusedElement_isEquatable() {
+        // Given
+        let error1 = TextInsertionError.noFocusedElement
+        let error2 = TextInsertionError.noFocusedElement
+
+        // Then
+        XCTAssertEqual(error1, error2)
+    }
+
+    func test_textInsertionError_insertionFailed_isEquatable() {
+        // Given
+        let error1 = TextInsertionError.insertionFailed
+        let error2 = TextInsertionError.insertionFailed
+
+        // Then
+        XCTAssertEqual(error1, error2)
+    }
+
+    func test_textInsertionError_clipboardFailed_isEquatable() {
+        // Given
+        let error1 = TextInsertionError.clipboardFailed
+        let error2 = TextInsertionError.clipboardFailed
+
+        // Then
+        XCTAssertEqual(error1, error2)
+    }
+
+    func test_textInsertionError_eventSourceCreationFailed_isEquatable() {
+        // Given
+        let error1 = TextInsertionError.eventSourceCreationFailed
+        let error2 = TextInsertionError.eventSourceCreationFailed
+
+        // Then
+        XCTAssertEqual(error1, error2)
+    }
+
+    func test_textInsertionError_keyEventCreationFailed_sameKey_isEquatable() {
+        // Given
+        let error1 = TextInsertionError.keyEventCreationFailed("V key down")
+        let error2 = TextInsertionError.keyEventCreationFailed("V key down")
+
+        // Then
+        XCTAssertEqual(error1, error2)
+    }
+
+    func test_textInsertionError_keyEventCreationFailed_differentKeys_notEqual() {
+        // Given
+        let error1 = TextInsertionError.keyEventCreationFailed("V key down")
+        let error2 = TextInsertionError.keyEventCreationFailed("Command key down")
+
+        // Then
+        XCTAssertNotEqual(error1, error2)
+    }
+
+    func test_textInsertionError_differentTypes_notEqual() {
+        // Given
+        let errors: [TextInsertionError] = [
+            .noFocusedElement,
+            .insertionFailed,
+            .clipboardFailed,
+            .eventSourceCreationFailed,
+            .keyEventCreationFailed("test")
+        ]
+
+        // Then - each error type should not equal any other type
+        for i in 0..<errors.count {
+            for j in 0..<errors.count where i != j {
+                XCTAssertNotEqual(errors[i], errors[j],
+                    "\(errors[i]) should not equal \(errors[j])")
+            }
+        }
+    }
+
+    // MARK: - TextInsertionResult with ClipboardFailed Tests
+
+    func test_textInsertionResult_copiedToClipboardOnly_clipboardFailed_preservesReason() {
+        // Given
+        let result = TextInsertionResult.copiedToClipboardOnly(reason: .clipboardFailed("test error"))
+
+        // Then
+        if case .copiedToClipboardOnly(let reason) = result {
+            if case .clipboardFailed(let message) = reason {
+                XCTAssertEqual(message, "test error")
+            } else {
+                XCTFail("Expected clipboardFailed reason")
+            }
+        } else {
+            XCTFail("Expected copiedToClipboardOnly result")
+        }
+    }
+
+    // MARK: - insertTextWithFallback Result Inspection Tests
+
+    func test_insertTextWithFallback_resultIsNotNil() async {
+        // Given
+        let text = "Test"
+
+        // When
+        let result = await service.insertTextWithFallback(text)
+
+        // Then
+        // The result should always be one of the valid enum cases
+        switch result {
+        case .insertedViaAccessibility:
+            // Success via accessibility - valid
+            break
+        case .copiedToClipboardOnly(let reason):
+            // Verify reason is valid
+            switch reason {
+            case .accessibilityNotGranted, .userPreference:
+                break
+            case .insertionFailed(let message):
+                XCTAssertFalse(message.isEmpty, "Error message should not be empty")
+            case .clipboardFailed(let message):
+                XCTAssertFalse(message.isEmpty, "Error message should not be empty")
+            }
+        case .requiresAccessibilityPermission:
+            // Need permission - valid
+            break
+        }
     }
 }

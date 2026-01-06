@@ -319,3 +319,143 @@ final class AudioCaptureServiceTests: XCTestCase {
         XCTAssertNotNil(service)
     }
 }
+
+// MARK: - PendingWritesCounter Tests
+
+final class PendingWritesCounterTests: XCTestCase {
+
+    func test_initialState_isEmpty() {
+        // Given
+        let counter = PendingWritesCounter()
+
+        // When/Then
+        XCTAssertTrue(counter.isEmpty)
+        XCTAssertEqual(counter.currentCount, 0)
+    }
+
+    func test_increment_increasesCount() {
+        // Given
+        let counter = PendingWritesCounter()
+
+        // When
+        counter.increment()
+
+        // Then
+        XCTAssertFalse(counter.isEmpty)
+        XCTAssertEqual(counter.currentCount, 1)
+    }
+
+    func test_decrement_decreasesCount() {
+        // Given
+        let counter = PendingWritesCounter()
+        counter.increment()
+        counter.increment()
+
+        // When
+        counter.decrement()
+
+        // Then
+        XCTAssertFalse(counter.isEmpty)
+        XCTAssertEqual(counter.currentCount, 1)
+    }
+
+    func test_incrementAndDecrement_balancedReturnsToEmpty() {
+        // Given
+        let counter = PendingWritesCounter()
+
+        // When
+        counter.increment()
+        counter.increment()
+        counter.increment()
+        counter.decrement()
+        counter.decrement()
+        counter.decrement()
+
+        // Then
+        XCTAssertTrue(counter.isEmpty)
+        XCTAssertEqual(counter.currentCount, 0)
+    }
+
+    func test_waitForCompletion_immediatelyReturnsWhenEmpty() async {
+        // Given
+        let counter = PendingWritesCounter()
+
+        // When
+        let startTime = CFAbsoluteTimeGetCurrent()
+        await counter.waitForCompletion()
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+
+        // Then
+        // Should return immediately (< 10ms)
+        XCTAssertLessThan(elapsed, 0.01)
+    }
+
+    func test_waitForCompletion_waitsForPendingWrites() async {
+        // Given
+        let counter = PendingWritesCounter()
+        counter.increment()
+
+        // When - decrement in background after short delay
+        Task {
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            counter.decrement()
+        }
+
+        let startTime = CFAbsoluteTimeGetCurrent()
+        await counter.waitForCompletion()
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+
+        // Then
+        // Should wait at least 50ms but less than 200ms
+        XCTAssertGreaterThan(elapsed, 0.04)
+        XCTAssertLessThan(elapsed, 0.2)
+        XCTAssertTrue(counter.isEmpty)
+    }
+
+    func test_concurrentAccess_isThreadSafe() async {
+        // Given
+        let counter = PendingWritesCounter()
+        let iterations = 1000
+
+        // When - concurrent increments followed by concurrent decrements
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<iterations {
+                group.addTask {
+                    counter.increment()
+                }
+            }
+        }
+
+        XCTAssertEqual(counter.currentCount, iterations)
+
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<iterations {
+                group.addTask {
+                    counter.decrement()
+                }
+            }
+        }
+
+        // Then
+        XCTAssertTrue(counter.isEmpty)
+        XCTAssertEqual(counter.currentCount, 0)
+    }
+
+    func test_multipleWaiters_areNotSupported() async {
+        // Given - PendingWritesCounter only supports one waiter at a time
+        // This test documents the behavior rather than testing a feature
+        let counter = PendingWritesCounter()
+        counter.increment()
+
+        // When - first waiter will be notified when decrement happens
+        Task {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+            counter.decrement()
+        }
+
+        await counter.waitForCompletion()
+
+        // Then - counter should be empty
+        XCTAssertTrue(counter.isEmpty)
+    }
+}

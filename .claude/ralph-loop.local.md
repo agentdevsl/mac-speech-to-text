@@ -3,7 +3,7 @@ active: true
 iteration: 1
 max_iterations: 30
 completion_promise: "minimal"
-started_at: "2026-01-05T12:05:31Z"
+started_at: "2026-01-06T09:10:44Z"
 ---
 
-use 6 concurrent opus agents to complete code review for bugs and test coverage, fix all issues, increase test coverage test locally using macdev ssh then rerun complete code review with 6 opus agents bugs found
+find bugs /Users/simon.lynch/git/mac-speech-to-text/Sources/Services/TextInsertionService.swift use 4 concurrent opus agents to complete code review for bugs and test coverage, fix all issues, increase test coverage test locally using macdev ssh then rerun complete code review with 4 opus agents bugs found

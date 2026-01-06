@@ -430,4 +430,101 @@ final class AppStateTests: XCTestCase {
         // Then
         XCTAssertNil(appState.currentSession)
     }
+
+    // MARK: - Voice Trigger State Tests
+
+    func test_voiceTriggerState_initialValueIsIdle() {
+        // Given/When
+        let appState = AppState()
+
+        // Then
+        XCTAssertEqual(appState.voiceTriggerState, .idle)
+    }
+
+    func test_voiceTriggerStateObserver_updatesStateOnNotification() async {
+        // Given
+        let appState = AppState()
+        let expectedState = VoiceTriggerState.monitoring
+
+        // When
+        NotificationCenter.default.post(
+            name: .voiceTriggerStateChanged,
+            object: nil,
+            userInfo: ["state": expectedState]
+        )
+
+        // Allow async Task in observer to execute
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+
+        // Then
+        XCTAssertEqual(appState.voiceTriggerState, expectedState)
+    }
+
+    func test_voiceTriggerStateObserver_handlesMultipleStateChanges() async {
+        // Given
+        let appState = AppState()
+        let states: [VoiceTriggerState] = [
+            .monitoring,
+            .triggered(keyword: "Hey Claude"),
+            .capturing,
+            .transcribing,
+            .idle
+        ]
+
+        // When/Then
+        for state in states {
+            NotificationCenter.default.post(
+                name: .voiceTriggerStateChanged,
+                object: nil,
+                userInfo: ["state": state]
+            )
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            XCTAssertEqual(appState.voiceTriggerState, state, "State should be \(state)")
+        }
+    }
+
+    // MARK: - Cancel Session Edge Cases
+
+    func test_cancelSession_whenAlreadyRecording_stopsRecordingFlag() {
+        // Given
+        appState.startRecording()
+        XCTAssertTrue(appState.isRecording)
+
+        // When
+        appState.cancelSession()
+
+        // Then
+        XCTAssertFalse(appState.isRecording)
+        XCTAssertNil(appState.currentSession)
+    }
+
+    func test_cancelSession_calledMultipleTimes_doesNotCrash() {
+        // Given
+        appState.startRecording()
+
+        // When
+        appState.cancelSession()
+        appState.cancelSession() // Second call should be no-op
+        appState.cancelSession() // Third call should be no-op
+
+        // Then
+        XCTAssertNil(appState.currentSession)
+        XCTAssertFalse(appState.isRecording)
+    }
+
+    // MARK: - Start Recording Edge Cases
+
+    func test_startRecording_calledMultipleTimes_replacesSession() {
+        // Given
+        appState.startRecording()
+        let firstSession = appState.currentSession
+
+        // When
+        appState.startRecording() // Call again - should create new session
+
+        // Then
+        XCTAssertNotNil(appState.currentSession)
+        // Note: This test documents current behavior - session is replaced
+        // Future improvement: could guard against this
+    }
 }

@@ -74,7 +74,7 @@ struct ErrorStats: Codable, Identifiable, Sendable {
 }
 
 /// Aggregated statistics across different time periods
-struct AggregatedStats: Sendable {
+struct AggregatedStats: Sendable, Codable {
     let today: UsageStatistics
     let thisWeek: UsageStatistics
     let thisMonth: UsageStatistics

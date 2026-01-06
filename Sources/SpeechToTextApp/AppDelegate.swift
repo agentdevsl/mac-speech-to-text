@@ -178,7 +178,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         audioLevelTimer?.invalidate()
         audioLevelTimer = nil
 
-        // 2. Release hotkey manager to prevent new recording triggers
+        // 2. Shutdown and release hotkey manager to prevent new recording triggers
+        // Call shutdown() explicitly before releasing to properly disable Carbon hotkeys
+        hotkeyManager?.shutdown()
         hotkeyManager = nil
 
         // 3. Remove notification observers to prevent menu-triggered operations
@@ -211,32 +213,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         voiceTriggerStateTimer?.invalidate()
         voiceTriggerStateTimer = nil
 
-        // Stop voice monitoring with async cleanup using semaphore
-        let voiceCleanupSemaphore = DispatchSemaphore(value: 0)
+        // 6. Stop voice monitoring service synchronously
+        // Note: We avoid DispatchSemaphore.wait() on MainActor as it can cause deadlock
+        // Instead, we rely on the service's synchronous cleanup where possible
+        // and accept that async cleanup may not complete before termination
         let voiceService = voiceTriggerMonitoringService
         voiceTriggerMonitoringService = nil
+        // Fire-and-forget cleanup - termination proceeds regardless
         Task.detached {
             await voiceService?.stopMonitoring()
-            voiceCleanupSemaphore.signal()
         }
-        // Wait up to 300ms for voice monitoring cleanup
-        _ = voiceCleanupSemaphore.wait(timeout: .now() + 0.3)
 
-        // 6. Close and cleanup windows
+        // 7. Close and cleanup windows
         recordingWindow?.close()
         recordingWindow = nil
         GlassOverlayWindowController.shared.hideOverlay()
         MainWindowController.shared.closeWindow()
 
-        // 7. Cancel active recording session (best-effort async cleanup)
-        // Use semaphore with timeout to give async cleanup a chance to complete
-        let cleanupSemaphore = DispatchSemaphore(value: 0)
+        // 8. Cancel active recording session (fire-and-forget async cleanup)
+        // Note: We don't use semaphore to avoid MainActor deadlock
+        // The system will force-terminate after a short grace period anyway
         Task.detached { [holdToRecordViewModel] in
             await holdToRecordViewModel.cancelRecording()
-            cleanupSemaphore.signal()
         }
-        // Wait up to 500ms for cleanup, then proceed with termination
-        _ = cleanupSemaphore.wait(timeout: .now() + 0.5)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -545,6 +544,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var voiceTriggerStateTimer: Timer?
     /// Last observed voice trigger state (to detect changes)
     private var lastObservedVoiceTriggerState: VoiceTriggerState = .idle
+    /// Guard to prevent concurrent checkVoiceTriggerStateChange() execution
+    private var isCheckingVoiceTriggerState: Bool = false
 
     /// Start observing voice trigger state changes
     private func startObservingVoiceTriggerState() {
@@ -566,6 +567,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Check if voice trigger state has changed and notify if so
     private func checkVoiceTriggerStateChange() {
+        // Guard against concurrent execution (timer fires could overlap with slow operations)
+        guard !isCheckingVoiceTriggerState else { return }
+        isCheckingVoiceTriggerState = true
+        defer { isCheckingVoiceTriggerState = false }
+
         guard let service = voiceTriggerMonitoringService else { return }
 
         let currentState = service.state
@@ -641,10 +647,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isHoldToRecordSessionActive = false
 
         // Resume voice monitoring if we paused it
+        // IMPORTANT: Reset flag BEFORE await to prevent double-resume race condition
         if pausedVoiceMonitoringForManualRecording {
             print("[DEBUG] Resuming voice monitoring after cancelled recording...")
             fflush(stdout)
-            pausedVoiceMonitoringForManualRecording = false
+            pausedVoiceMonitoringForManualRecording = false  // Reset BEFORE await
             await startVoiceMonitoring()
         }
     }
@@ -656,25 +663,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Start a hold-to-record session
     private func startHoldToRecordSession() async {
-        // If voice monitoring is active, pause it temporarily for manual recording
-        if isVoiceMonitoringActive {
-            print("[DEBUG] Pausing voice monitoring for manual recording...")
-            fflush(stdout)
-            AppLogger.app.info("Pausing voice monitoring for manual hold-to-record")
-            await stopVoiceMonitoring()
-            pausedVoiceMonitoringForManualRecording = true
-        }
-
-        // Session guard: prevent concurrent session operations
+        // IMPORTANT: Session guard FIRST to prevent race conditions with rapid hotkey presses.
+        // If we pause voice monitoring before checking the guard, a second hotkey press could
+        // slip through while stopVoiceMonitoring() is awaited, causing state desync.
         guard !isHoldToRecordSessionActive else {
             print("[DEBUG] START IGNORED: session already active")
             fflush(stdout)
             AppLogger.app.warning("Hold-to-record session already active, ignoring start request")
             return
         }
+
+        // Mark session as active immediately to prevent concurrent starts
+        isHoldToRecordSessionActive = true
         print("[DEBUG] Starting new session...")
         fflush(stdout)
-        isHoldToRecordSessionActive = true
+
+        // If voice monitoring is active, pause it temporarily for manual recording
+        // IMPORTANT: Set flag BEFORE await to prevent race conditions where session
+        // completes before stopVoiceMonitoring() finishes
+        if isVoiceMonitoringActive {
+            print("[DEBUG] Pausing voice monitoring for manual recording...")
+            fflush(stdout)
+            AppLogger.app.info("Pausing voice monitoring for manual hold-to-record")
+            pausedVoiceMonitoringForManualRecording = true  // Set BEFORE await
+            await stopVoiceMonitoring()
+        }
         AppLogger.app.debug("Starting hold-to-record session")
 
         // Cancel any previous pending recording (handles stuck state)
@@ -697,6 +710,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppLogger.app.error("Failed to start hold-to-record: \(error.localizedDescription, privacy: .public)")
             glassOverlayController.hideOverlay()
             isHoldToRecordSessionActive = false
+
+            // Resume voice monitoring if we paused it (fix: was missing before)
+            if pausedVoiceMonitoringForManualRecording {
+                print("[DEBUG] Resuming voice monitoring after failed recording start...")
+                fflush(stdout)
+                pausedVoiceMonitoringForManualRecording = false  // Reset BEFORE await
+                await startVoiceMonitoring()
+            }
         }
     }
 
@@ -721,6 +742,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             AppLogger.app.warning("Stop requested but recording not active - cancelling session")
             glassOverlayController.hideOverlay()
             isHoldToRecordSessionActive = false
+
+            // Resume voice monitoring if we paused it (fix: was missing before)
+            if pausedVoiceMonitoringForManualRecording {
+                print("[DEBUG] Resuming voice monitoring after session with inactive recording...")
+                fflush(stdout)
+                pausedVoiceMonitoringForManualRecording = false  // Reset BEFORE await
+                await startVoiceMonitoring()
+            }
             return
         }
 
@@ -746,10 +775,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         isHoldToRecordSessionActive = false
 
         // Resume voice monitoring if we paused it
+        // IMPORTANT: Reset flag BEFORE await to prevent double-resume race condition
         if pausedVoiceMonitoringForManualRecording {
             print("[DEBUG] Resuming voice monitoring after manual recording...")
             fflush(stdout)
-            pausedVoiceMonitoringForManualRecording = false
+            pausedVoiceMonitoringForManualRecording = false  // Reset BEFORE await
             await startVoiceMonitoring()
         }
     }
@@ -761,13 +791,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Start updating overlay with real audio levels from RecordingViewModel
     private func startRealAudioLevelUpdates() {
         audioLevelTimer?.invalidate()
-        // Timer callback runs on main thread (RunLoop.main), and AppDelegate is @MainActor,
-        // so we can safely call MainActor-isolated methods directly without spawning a Task.
+        // Timer callback uses Task { @MainActor in } pattern for thread-safe access.
+        // This is safer than MainActor.assumeIsolated which can trap if called from wrong thread.
         audioLevelTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             guard let self else { return }
-            // Must dispatch to main actor since Timer closure is not actor-isolated
-            MainActor.assumeIsolated {
-                guard self.holdToRecordViewModel.isRecording else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.holdToRecordViewModel.isRecording else { return }
                 let level = Float(self.holdToRecordViewModel.audioLevel)
                 self.glassOverlayController.updateAudioLevel(level)
             }

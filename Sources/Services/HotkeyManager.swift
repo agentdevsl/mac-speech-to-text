@@ -64,16 +64,29 @@ class HotkeyManager {
         }
     }
 
+    /// Whether hotkeys have been disabled via shutdown()
+    private var hasShutdown: Bool = false
+
+    /// Explicitly shutdown the hotkey manager - MUST be called before releasing the instance
+    /// This should be called from applicationWillTerminate or when the manager is no longer needed
+    func shutdown() {
+        guard !hasShutdown else { return }
+        hasShutdown = true
+
+        AppLogger.app.debug("HotkeyManager: shutdown() - disabling hotkeys")
+        KeyboardShortcuts.disable(.holdToRecord)
+        KeyboardShortcuts.disable(.toggleRecording)
+        KeyboardShortcuts.disable(.toggleVoiceMonitoring)
+        AppLogger.app.debug("HotkeyManager: shutdown() - hotkeys disabled successfully")
+    }
+
     deinit {
-        // KeyboardShortcuts.disable must be called on main thread.
-        // deinit is nonisolated, so dispatch to main queue for cleanup.
-        // Using async to avoid blocking; cleanup is best-effort during deallocation.
-        DispatchQueue.main.async {
-            AppLogger.app.debug("HotkeyManager: deinit - disabling hotkeys")
-            KeyboardShortcuts.disable(.holdToRecord)
-            KeyboardShortcuts.disable(.toggleRecording)
-            KeyboardShortcuts.disable(.toggleVoiceMonitoring)
-            AppLogger.app.debug("HotkeyManager: deinit - hotkeys disabled successfully")
+        // Note: shutdown() should be called explicitly before deallocation
+        // We can't reliably disable hotkeys from deinit since it's nonisolated
+        // and KeyboardShortcuts.disable requires MainActor
+        if !hasShutdown {
+            // Log warning if shutdown wasn't called - indicates a bug in the caller
+            print("[WARNING] HotkeyManager deallocated without calling shutdown() - hotkeys may not be properly disabled")
         }
     }
 
