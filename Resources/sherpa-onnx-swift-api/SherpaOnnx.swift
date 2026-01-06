@@ -1235,17 +1235,20 @@ public class SherpaOnnxSpokenLanguageIdentificationWrapper {
 
 public class SherpaOnnxKeywordResultWrapper {
   /// A pointer to the underlying counterpart in C
-  public let result: UnsafePointer<SherpaOnnxKeywordResult>!
+  public let result: UnsafePointer<SherpaOnnxKeywordResult>?
 
   public var keyword: String {
+    guard let result = result else { return "" }
     return String(cString: result.pointee.keyword)
   }
 
   public var count: Int32 {
+    guard let result = result else { return 0 }
     return result.pointee.count
   }
 
   public var tokens: [String] {
+    guard let result = result else { return [] }
     if let tokensPointer = result.pointee.tokens_arr {
       var tokens: [String] = []
       for index in 0..<count {
@@ -1256,12 +1259,11 @@ public class SherpaOnnxKeywordResultWrapper {
       }
       return tokens
     } else {
-      let tokens: [String] = []
-      return tokens
+      return []
     }
   }
 
-  public init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
+  public init(result: UnsafePointer<SherpaOnnxKeywordResult>?) {
     self.result = result
   }
 
