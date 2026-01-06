@@ -9,7 +9,8 @@ set -e
 
 # Configuration
 SHERPA_VERSION="${SHERPA_VERSION:-v1.12.20}"
-SHERPA_RELEASE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION#v}-osx-universal2-static.tar.bz2"
+# Note: GitHub release file names include the 'v' prefix in the version
+SHERPA_RELEASE_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION}-osx-universal2-static.tar.bz2"
 
 # Paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,7 +36,7 @@ mkdir -p "${FRAMEWORKS_DIR}"
 mkdir -p "${TEMP_DIR}"
 
 # Download pre-built release
-ARCHIVE_NAME="sherpa-onnx-${SHERPA_VERSION#v}-osx-universal2-static.tar.bz2"
+ARCHIVE_NAME="sherpa-onnx-${SHERPA_VERSION}-osx-universal2-static.tar.bz2"
 ARCHIVE_PATH="${TEMP_DIR}/${ARCHIVE_NAME}"
 
 if [ ! -f "${ARCHIVE_PATH}" ]; then
@@ -50,7 +51,7 @@ fi
 echo "Extracting archive..."
 cd "${TEMP_DIR}"
 tar -xjf "${ARCHIVE_NAME}"
-EXTRACTED_DIR="${TEMP_DIR}/sherpa-onnx-${SHERPA_VERSION#v}-osx-universal2-static"
+EXTRACTED_DIR="${TEMP_DIR}/sherpa-onnx-${SHERPA_VERSION}-osx-universal2-static"
 echo "✓ Extracted to ${EXTRACTED_DIR}"
 
 # Create combined static library
