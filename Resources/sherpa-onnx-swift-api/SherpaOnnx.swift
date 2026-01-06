@@ -1194,17 +1194,17 @@ public class SherpaOnnxSpokenLanguageIdentificationWrapper {
 
 public class SherpaOnnxKeywordResultWrapper {
   /// A pointer to the underlying counterpart in C
-  let result: UnsafePointer<SherpaOnnxKeywordResult>!
+  public let result: UnsafePointer<SherpaOnnxKeywordResult>!
 
-  var keyword: String {
+  public var keyword: String {
     return String(cString: result.pointee.keyword)
   }
 
-  var count: Int32 {
+  public var count: Int32 {
     return result.pointee.count
   }
 
-  var tokens: [String] {
+  public var tokens: [String] {
     if let tokensPointer = result.pointee.tokens_arr {
       var tokens: [String] = []
       for index in 0..<count {
@@ -1220,7 +1220,7 @@ public class SherpaOnnxKeywordResultWrapper {
     }
   }
 
-  init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
+  public init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
     self.result = result
   }
 
@@ -1257,10 +1257,10 @@ public func sherpaOnnxKeywordSpotterConfig(
 
 public class SherpaOnnxKeywordSpotterWrapper {
   /// A pointer to the underlying counterpart in C
-  let spotter: OpaquePointer!
-  var stream: OpaquePointer!
+  public let spotter: OpaquePointer!
+  public var stream: OpaquePointer!
 
-  init(
+  public init(
     config: UnsafePointer<SherpaOnnxKeywordSpotterConfig>!
   ) {
     spotter = SherpaOnnxCreateKeywordSpotter(config)
@@ -1277,23 +1277,23 @@ public class SherpaOnnxKeywordSpotterWrapper {
     }
   }
 
-  func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
+  public func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
     SherpaOnnxOnlineStreamAcceptWaveform(stream, Int32(sampleRate), samples, Int32(samples.count))
   }
 
-  func isReady() -> Bool {
+  public func isReady() -> Bool {
     return SherpaOnnxIsKeywordStreamReady(spotter, stream) == 1 ? true : false
   }
 
-  func decode() {
+  public func decode() {
     SherpaOnnxDecodeKeywordStream(spotter, stream)
   }
 
-  func reset() {
+  public func reset() {
     SherpaOnnxResetKeywordStream(spotter, stream)
   }
 
-  func getResult() -> SherpaOnnxKeywordResultWrapper {
+  public func getResult() -> SherpaOnnxKeywordResultWrapper {
     let result: UnsafePointer<SherpaOnnxKeywordResult>? = SherpaOnnxGetKeywordResult(
       spotter, stream)
     return SherpaOnnxKeywordResultWrapper(result: result)
@@ -1301,7 +1301,7 @@ public class SherpaOnnxKeywordSpotterWrapper {
 
   /// Signal that no more audio samples would be available.
   /// After this call, you cannot call acceptWaveform() any more.
-  func inputFinished() {
+  public func inputFinished() {
     SherpaOnnxOnlineStreamInputFinished(stream)
   }
 }
