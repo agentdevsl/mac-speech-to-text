@@ -34,11 +34,12 @@ class TextInsertionService {
     }
 
     /// Insert text at the current cursor position
+    /// Prefers Cmd+V paste first, falls back to accessibility-based insertion if needed
     func insertText(_ text: String) async throws {
         print("[DEBUG-INSERT] insertText() called with \(text.count) chars: '\(text.prefix(50))...'")
         fflush(stdout)
 
-        // Check accessibility permission
+        // Check accessibility permission (required for both CGEvent posting and AXUIElement)
         guard permissionService.checkAccessibilityPermission() else {
             print("[DEBUG-INSERT] Accessibility permission DENIED")
             fflush(stdout)
@@ -48,13 +49,46 @@ class TextInsertionService {
 
         // Get the currently focused application
         guard NSWorkspace.shared.frontmostApplication != nil else {
-            // Fallback to clipboard if no focused app
             AppLogger.service.info("No frontmost application detected. Falling back to clipboard copy.")
             try await copyToClipboard(text)
             return
         }
 
-        // Get focused element via Accessibility APIs
+        // Strategy: Try Cmd+V paste first (most reliable for Electron apps like VSCode)
+        // Then fall back to accessibility-based insertion if Cmd+V fails
+        print("[DEBUG-INSERT] Attempting Cmd+V paste first (preferred method)")
+        fflush(stdout)
+
+        do {
+            try await simulatePaste(text)
+            print("[DEBUG-INSERT] Cmd+V paste succeeded")
+            fflush(stdout)
+            return
+        } catch {
+            print("[DEBUG-INSERT] Cmd+V paste failed: \(error), trying accessibility fallback")
+            fflush(stdout)
+        }
+
+        // Fallback: Try accessibility-based insertion via AXUIElement
+        print("[DEBUG-INSERT] Attempting accessibility-based insertion fallback")
+        fflush(stdout)
+
+        do {
+            try await insertViaAccessibility(text)
+            print("[DEBUG-INSERT] Accessibility insertion succeeded")
+            fflush(stdout)
+        } catch {
+            print("[DEBUG-INSERT] Accessibility insertion also failed: \(error)")
+            fflush(stdout)
+            // Text is already in clipboard from simulatePaste attempt
+            AppLogger.service.warning("Both insertion methods failed. Text is in clipboard.")
+            throw error
+        }
+    }
+
+    /// Insert text using accessibility APIs (AXUIElement)
+    /// This is the fallback method when Cmd+V doesn't work
+    private func insertViaAccessibility(_ text: String) async throws {
         let systemWideElement = AXUIElementCreateSystemWide()
         var focusedElement: CFTypeRef?
 
@@ -64,31 +98,33 @@ class TextInsertionService {
             &focusedElement
         )
 
-        if result != .success {
-            // Fallback to clipboard
-            AppLogger.service.info("Failed to get focused UI element (error: \(String(describing: result), privacy: .public)). Falling back to clipboard copy.")
-            try await copyToClipboard(text)
-            return
+        guard result == .success, let element = focusedElement else {
+            throw TextInsertionError.noFocusedElement
         }
 
-        guard let element = focusedElement else {
-            AppLogger.service.info("Focused element is nil after successful query. Falling back to clipboard copy.")
-            try await copyToClipboard(text)
-            return
-        }
-
-        // element is CFTypeRef from AXUIElementCopyAttributeValue - cast to AXUIElement
-        // Note: In Swift 6, CFTypeRef to AXUIElement cast always succeeds, so we use unsafeBitCast
         let axElement = unsafeBitCast(element, to: AXUIElement.self)
 
-        print("[DEBUG-INSERT] Got focused element, attempting insertion of \(text.count) chars")
-        fflush(stdout)
+        // Try to set the value directly
+        let setResult = AXUIElementSetAttributeValue(
+            axElement,
+            kAXValueAttribute as CFString,
+            text as CFTypeRef
+        )
 
-        // Use Cmd+V paste - more reliable across all applications including Electron apps (VSCode, Slack, etc.)
-        // kAXSelectedTextAttribute often reports success but doesn't actually insert in these apps
-        print("[DEBUG-INSERT] Using Cmd+V paste for reliable insertion")
-        fflush(stdout)
-        try await simulatePaste(text)
+        if setResult == .success {
+            return
+        }
+
+        // Try setting selected text attribute as alternative
+        let selectedTextResult = AXUIElementSetAttributeValue(
+            axElement,
+            kAXSelectedTextAttribute as CFString,
+            text as CFTypeRef
+        )
+
+        guard selectedTextResult == .success else {
+            throw TextInsertionError.insertionFailed
+        }
     }
 
     /// Copy text to clipboard (fallback method)
