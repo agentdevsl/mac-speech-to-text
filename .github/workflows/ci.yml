@@ -51,6 +51,15 @@ jobs:
           restore-keys: |
             spm-${{ runner.os }}-
 
+      - name: Cache sherpa-onnx xcframework
+        uses: actions/cache@v4
+        with:
+          path: Frameworks/sherpa-onnx.xcframework
+          key: sherpa-onnx-v1.12.20-${{ runner.os }}
+
+      - name: Setup sherpa-onnx xcframework
+        run: ./scripts/setup-sherpa-onnx.sh
+
       - name: Resolve dependencies
         run: swift package resolve
 
@@ -83,6 +92,15 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('**/Package.resolved') }}
           restore-keys: |
             spm-${{ runner.os }}-
+
+      - name: Cache sherpa-onnx xcframework
+        uses: actions/cache@v4
+        with:
+          path: Frameworks/sherpa-onnx.xcframework
+          key: sherpa-onnx-v1.12.20-${{ runner.os }}
+
+      - name: Setup sherpa-onnx xcframework
+        run: ./scripts/setup-sherpa-onnx.sh
 
       - name: Build release
         run: swift build -c release
