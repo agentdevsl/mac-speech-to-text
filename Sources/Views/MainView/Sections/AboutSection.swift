@@ -119,6 +119,14 @@ struct AboutSection: View {
                     .fontWeight(.medium)
                     .foregroundStyle(Color.warmAmber)
                     .padding(.top, 4)
+
+                // Description
+                Text("Transform your voice into text instantly with on-device AI. No internet required, no data leaves your Mac. Just press a hotkey or say a wake word and start speaking.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 8)
             }
         }
         .frame(maxWidth: .infinity)

@@ -18,54 +18,20 @@ struct SpeechToTextApp: App {
 
 // MARK: - Menu Bar Icon View
 
-/// Menu bar icon with visual indicator for voice trigger monitoring
+/// Menu bar icon with pulsing animation for voice trigger monitoring
 struct MenuBarIconView: View {
     let voiceTriggerState: VoiceTriggerState
 
-    /// Whether to show the monitoring indicator
+    @State private var isPulsing: Bool = false
+
+    /// Whether voice monitoring is active
     private var isMonitoringActive: Bool {
         voiceTriggerState.isActive
     }
 
-    /// Color for the monitoring indicator based on state
-    private var indicatorColor: Color {
-        switch voiceTriggerState {
-        case .monitoring:
-            return .amberPrimary
-        case .triggered, .capturing:
-            return .recordingActive
-        case .transcribing, .inserting:
-            return .info
-        default:
-            return .clear
-        }
-    }
-
-    var body: some View {
-        HStack(spacing: 2) {
-            Image(systemName: "mic.fill")
-                .symbolRenderingMode(.monochrome)
-
-            if isMonitoringActive {
-                VoiceMonitoringIndicator(
-                    state: voiceTriggerState,
-                    color: indicatorColor
-                )
-            }
-        }
-    }
-}
-
-/// Pulsing dot indicator for voice monitoring state
-struct VoiceMonitoringIndicator: View {
-    let state: VoiceTriggerState
-    let color: Color
-
-    @State private var isPulsing: Bool = false
-
     /// Whether to animate the pulse based on state
     private var shouldPulse: Bool {
-        switch state {
+        switch voiceTriggerState {
         case .monitoring, .capturing:
             return true
         default:
@@ -73,10 +39,20 @@ struct VoiceMonitoringIndicator: View {
         }
     }
 
+    /// Icon based on current state
+    private var iconName: String {
+        switch voiceTriggerState {
+        case .monitoring, .triggered, .capturing, .transcribing, .inserting:
+            return "waveform.badge.mic"
+        default:
+            return "waveform"
+        }
+    }
+
     var body: some View {
-        Circle()
-            .fill(color)
-            .frame(width: 6, height: 6)
+        Image(systemName: iconName)
+            .symbolRenderingMode(isMonitoringActive ? .palette : .monochrome)
+            .foregroundStyle(isMonitoringActive ? Color.orange : Color.primary)
             .opacity(isPulsing ? 0.5 : 1.0)
             .animation(
                 shouldPulse ?
@@ -89,8 +65,7 @@ struct VoiceMonitoringIndicator: View {
                     isPulsing = true
                 }
             }
-            .onChange(of: state) { _, newState in
-                // Update pulsing based on new state
+            .onChange(of: voiceTriggerState) { _, newState in
                 let newShouldPulse: Bool
                 switch newState {
                 case .monitoring, .capturing:

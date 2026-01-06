@@ -362,10 +362,13 @@ final class VoiceTriggerMonitoringService {
     private func handleAudioLevel(_ level: Double) {
         audioLevel = level
 
-        // Track audio activity for silence detection
+        // Track audio activity for silence detection (resets silence timer when talking)
         if level >= Constants.Audio.talkingThreshold {
             lastAudioTime = Date()
-            AppLogger.trace(AppLogger.service, "[\(serviceId)] Audio detected, level=\(String(format: "%.3f", level))")
+            // Log during capture to verify silence reset is working
+            if case .capturing = state {
+                AppLogger.debug(AppLogger.service, "[\(serviceId)] Voice detected during capture - silence timer reset, level=\(String(format: "%.3f", level))")
+            }
         }
     }
 
@@ -455,6 +458,7 @@ final class VoiceTriggerMonitoringService {
     }
 
     /// Check for silence timeout
+    private var silenceLogCounter = 0
     private func checkSilence() {
         guard case .capturing = state else { return }
         guard let lastAudio = lastAudioTime else { return }
@@ -465,10 +469,20 @@ final class VoiceTriggerMonitoringService {
         // Update remaining time for UI
         silenceTimeRemaining = max(0, threshold - silenceDuration)
 
+        // Log every second to show silence countdown
+        silenceLogCounter += 1
+        if silenceLogCounter % 10 == 0 {
+            print("[DEBUG] Silence check: \(String(format: "%.1f", silenceDuration))s / \(String(format: "%.0f", threshold))s threshold")
+            fflush(stdout)
+        }
+
         if silenceDuration >= threshold {
+            silenceLogCounter = 0
+            print("[DEBUG] Silence threshold reached - starting transcription!")
+            fflush(stdout)
             AppLogger.info(
                 AppLogger.service,
-                "[\(serviceId)] Silence threshold reached (\(String(format: "%.1f", silenceDuration))s)"
+                "[\(serviceId)] Silence threshold reached (\(String(format: "%.1f", silenceDuration))s) - transcribing"
             )
             Task { @MainActor [weak self] in
                 await self?.handleSilenceTimeout()
