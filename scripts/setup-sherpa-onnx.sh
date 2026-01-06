@@ -146,6 +146,10 @@ echo "✓ Created xcframework"
 # Move to project Frameworks directory
 mv "${TEMP_DIR}/sherpa-onnx.xcframework" "${FRAMEWORKS_DIR}/"
 
+# Note: The Swift API wrapper (Resources/sherpa-onnx-swift-api/SherpaOnnx.swift)
+# must be kept in sync with the SHERPA_VERSION used here.
+# It is committed to the repo for consistent local and CI builds.
+
 # Cleanup
 echo "Cleaning up..."
 rm -rf "${TEMP_DIR}"

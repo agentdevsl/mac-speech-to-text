@@ -1,5 +1,6 @@
 /// swift-api-examples/SherpaOnnx.swift
 /// Copyright (c)  2023  Xiaomi Corporation
+/// Synced with sherpa-onnx v1.12.20
 
 import Foundation  // For NSString
 import sherpa_onnx  // C API from xcframework
@@ -377,42 +378,6 @@ public func sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(
   )
 }
 
-public func sherpaOnnxOfflineMedAsrCtcModelConfig(
-  model: String = ""
-) -> SherpaOnnxOfflineMedAsrCtcModelConfig {
-  return SherpaOnnxOfflineMedAsrCtcModelConfig(
-    model: toCPointer(model)
-  )
-}
-
-public func sherpaOnnxOfflineFunASRNanoModelConfig(
-  encoderAdaptor: String = "",
-  llmPrefill: String = "",
-  llmDecode: String = "",
-  embedding: String = "",
-  tokenizer: String = "",
-  systemPrompt: String = "",
-  userPrompt: String = "",
-  maxNewTokens: Int = 200,
-  temperature: Float = 0.6,
-  topP: Float = 0.9,
-  seed: Int = 0
-) -> SherpaOnnxOfflineFunASRNanoModelConfig {
-  return SherpaOnnxOfflineFunASRNanoModelConfig(
-    encoder_adaptor: toCPointer(encoderAdaptor),
-    llm_prefill: toCPointer(llmPrefill),
-    llm_decode: toCPointer(llmDecode),
-    embedding: toCPointer(embedding),
-    tokenizer: toCPointer(tokenizer),
-    system_prompt: toCPointer(systemPrompt),
-    user_prompt: toCPointer(userPrompt),
-    max_new_tokens: Int32(maxNewTokens),
-    temperature: temperature,
-    top_p: topP,
-    seed: Int32(seed)
-  )
-}
-
 public func sherpaOnnxOfflineNemoEncDecCtcModelConfig(
   model: String = ""
 ) -> SherpaOnnxOfflineNemoEncDecCtcModelConfig {
@@ -539,11 +504,7 @@ public func sherpaOnnxOfflineModelConfig(
   wenetCtc: SherpaOnnxOfflineWenetCtcModelConfig =
     sherpaOnnxOfflineWenetCtcModelConfig(),
   omnilingual: SherpaOnnxOfflineOmnilingualAsrCtcModelConfig =
-    sherpaOnnxOfflineOmnilingualAsrCtcModelConfig(),
-  funasrNano: SherpaOnnxOfflineFunASRNanoModelConfig =
-    sherpaOnnxOfflineFunASRNanoModelConfig(),
-  medasr: SherpaOnnxOfflineMedAsrCtcModelConfig =
-    sherpaOnnxOfflineMedAsrCtcModelConfig()
+    sherpaOnnxOfflineOmnilingualAsrCtcModelConfig()
 ) -> SherpaOnnxOfflineModelConfig {
   return SherpaOnnxOfflineModelConfig(
     transducer: transducer,
@@ -566,9 +527,7 @@ public func sherpaOnnxOfflineModelConfig(
     zipformer_ctc: zipformerCtc,
     canary: canary,
     wenet_ctc: wenetCtc,
-    omnilingual: omnilingual,
-    funasr_nano: funasrNano,
-    medasr: medasr
+    omnilingual: omnilingual
   )
 }
 
@@ -1104,7 +1063,7 @@ public class SherpaOnnxGeneratedAudioWrapper {
   }
 }
 
-public typealias TtsCallbackWithArg = (
+typealias TtsCallbackWithArg = (
   @convention(c) (
     UnsafePointer<Float>?,  // const float* samples
     Int32,  // int32_t n
@@ -1235,20 +1194,17 @@ public class SherpaOnnxSpokenLanguageIdentificationWrapper {
 
 public class SherpaOnnxKeywordResultWrapper {
   /// A pointer to the underlying counterpart in C
-  public let result: UnsafePointer<SherpaOnnxKeywordResult>?
+  let result: UnsafePointer<SherpaOnnxKeywordResult>!
 
-  public var keyword: String {
-    guard let result = result else { return "" }
+  var keyword: String {
     return String(cString: result.pointee.keyword)
   }
 
-  public var count: Int32 {
-    guard let result = result else { return 0 }
+  var count: Int32 {
     return result.pointee.count
   }
 
-  public var tokens: [String] {
-    guard let result = result else { return [] }
+  var tokens: [String] {
     if let tokensPointer = result.pointee.tokens_arr {
       var tokens: [String] = []
       for index in 0..<count {
@@ -1259,11 +1215,12 @@ public class SherpaOnnxKeywordResultWrapper {
       }
       return tokens
     } else {
-      return []
+      let tokens: [String] = []
+      return tokens
     }
   }
 
-  public init(result: UnsafePointer<SherpaOnnxKeywordResult>?) {
+  init(result: UnsafePointer<SherpaOnnxKeywordResult>!) {
     self.result = result
   }
 
@@ -1300,10 +1257,10 @@ public func sherpaOnnxKeywordSpotterConfig(
 
 public class SherpaOnnxKeywordSpotterWrapper {
   /// A pointer to the underlying counterpart in C
-  public let spotter: OpaquePointer!
-  public var stream: OpaquePointer!
+  let spotter: OpaquePointer!
+  var stream: OpaquePointer!
 
-  public init(
+  init(
     config: UnsafePointer<SherpaOnnxKeywordSpotterConfig>!
   ) {
     spotter = SherpaOnnxCreateKeywordSpotter(config)
@@ -1320,23 +1277,23 @@ public class SherpaOnnxKeywordSpotterWrapper {
     }
   }
 
-  public func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
+  func acceptWaveform(samples: [Float], sampleRate: Int = 16000) {
     SherpaOnnxOnlineStreamAcceptWaveform(stream, Int32(sampleRate), samples, Int32(samples.count))
   }
 
-  public func isReady() -> Bool {
+  func isReady() -> Bool {
     return SherpaOnnxIsKeywordStreamReady(spotter, stream) == 1 ? true : false
   }
 
-  public func decode() {
+  func decode() {
     SherpaOnnxDecodeKeywordStream(spotter, stream)
   }
 
-  public func reset() {
+  func reset() {
     SherpaOnnxResetKeywordStream(spotter, stream)
   }
 
-  public func getResult() -> SherpaOnnxKeywordResultWrapper {
+  func getResult() -> SherpaOnnxKeywordResultWrapper {
     let result: UnsafePointer<SherpaOnnxKeywordResult>? = SherpaOnnxGetKeywordResult(
       spotter, stream)
     return SherpaOnnxKeywordResultWrapper(result: result)
@@ -1344,7 +1301,7 @@ public class SherpaOnnxKeywordSpotterWrapper {
 
   /// Signal that no more audio samples would be available.
   /// After this call, you cannot call acceptWaveform() any more.
-  public func inputFinished() {
+  func inputFinished() {
     SherpaOnnxOnlineStreamInputFinished(stream)
   }
 }
