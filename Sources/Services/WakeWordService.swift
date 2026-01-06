@@ -432,7 +432,21 @@ actor WakeWordService: WakeWordServiceProtocol {
         "stop": "▁STOP",
         "opus": "▁O P U S",
         "sonnet": "▁S O N N E T",
-        "transcribe": "▁TRANS CRI BE"
+        "transcribe": "▁TRANS CRI BE",
+
+        // Microsoft suite
+        "open word": "▁O PEN ▁WORD",
+        "open excel": "▁O PEN ▁EX C EL",
+        "open powerpoint": "▁O PEN ▁POW ER P OINT",
+        "open outlook": "▁O PEN ▁OUT LOOK",
+        "open teams": "▁O PEN ▁TEAM S",
+        "open onenote": "▁O PEN ▁ONE NOTE",
+        "open onedrive": "▁O PEN ▁ONE DRI VE",
+        "open sharepoint": "▁O PEN ▁SHA RE P OINT",
+        "new document": "▁NEW ▁DOC U MENT",
+        "save document": "▁SA VE ▁DOC U MENT",
+        "new spreadsheet": "▁NEW ▁SPREAD SHE ET",
+        "new presentation": "▁NEW ▁PRE S ENT A TION"
     ]
 
     /// Generate keywords.txt content from TriggerKeyword array

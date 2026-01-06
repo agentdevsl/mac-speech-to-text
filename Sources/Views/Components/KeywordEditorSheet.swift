@@ -26,7 +26,11 @@ struct KeywordEditorSheet: View {
         "remind me", "set timer", "what time",
         // Short triggers
         "hey", "hello", "hello world", "okay", "listen", "record",
-        "start", "stop", "opus", "sonnet", "transcribe"
+        "start", "stop", "opus", "sonnet", "transcribe",
+        // Microsoft suite
+        "open word", "open excel", "open powerpoint", "open outlook",
+        "open teams", "open onenote", "open onedrive", "open sharepoint",
+        "new document", "save document", "new spreadsheet", "new presentation"
     ]
 
     // MARK: - Properties
