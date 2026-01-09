@@ -42,7 +42,7 @@ jobs:
           swift --version
 
       - name: Cache Swift Package Manager dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .build
@@ -52,7 +52,7 @@ jobs:
             spm-${{ runner.os }}-
 
       - name: Cache sherpa-onnx xcframework
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Frameworks/sherpa-onnx.xcframework
           key: sherpa-onnx-v1.12.20-${{ runner.os }}
@@ -84,7 +84,7 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Cache Swift Package Manager dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             .build
@@ -94,7 +94,7 @@ jobs:
             spm-${{ runner.os }}-
 
       - name: Cache sherpa-onnx xcframework
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Frameworks/sherpa-onnx.xcframework
           key: sherpa-onnx-v1.12.20-${{ runner.os }}
